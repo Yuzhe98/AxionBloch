@@ -1,0 +1,39 @@
+# Ignore Python bytecode files
+*.pyc
+__pycache__/
+
+*.pyd
+*.so
+*.dll
+__pycache__/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Ignore virtual environment directories
+venv/
+.env/
+
+# Ignore IDE directories
+.vscode/
+.idea/
+
+# Ignore logs and data
+*.log
+*.out
+*.err
+*.npy
+*.npz
+*.pkl
+*.h5
+*.hdf5
+*.csv
+*.tsv
+*.png
+*.jpg
+
+# Ignore internal files
+_internal/

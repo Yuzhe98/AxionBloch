@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools", "wheel", "pybind11", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "Axion-Simulator"  # Replace with your project name
+version = "0.1.0"
+description = "Simulation tool for axion-induced nuclear magnetic resonance."
+authors = [
+    { name = "Yuzhe Zhang", email = "yuhzhang@uni-mainz.de" }
+]
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+dependencies = [
+    # see requirements.txt)
+]
+
+[tool.setuptools]
+zip-safe = false

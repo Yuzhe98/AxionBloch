@@ -1,0 +1,49 @@
+repos:
+  # -------------------------
+  # General Git hygiene hooks
+  # -------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        files: \.(py|txt|ipynb|c|cc|cpp|cxx|h|hpp)$
+      - id: end-of-file-fixer
+        files: \.(py|txt|ipynb|c|cc|cpp|cxx|h|hpp)$
+
+  # -------------------------
+  # Python formatting: Black
+  # -------------------------
+  - repo: https://github.com/psf/black
+    rev: 24.3.0
+    hooks:
+      - id: black
+        files: \.(py|ipynb)$
+
+  # -------------------------
+  # Python import sorting: isort
+  # -------------------------
+  - repo: https://github.com/pre-commit/mirrors-isort
+    rev: v5.12.0
+    hooks:
+      - id: isort
+        files: \.(py)$
+
+  # -------------------------
+  # Python linting: Ruff
+  # -------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: \.(py|ipynb)$
+
+  # -------------------------
+  # C / C++ formatting: clang-format
+  # -------------------------
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v18.1.8
+    hooks:
+      - id: clang-format
+        files: \.(c|cc|cpp|cxx|h|hpp)$
+        args: ["-i"]  # format files in-place
