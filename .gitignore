@@ -12,6 +12,7 @@ build/
 dist/
 *.egg-info/
 *.egg
+docs/_build/
 
 # Ignore virtual environment directories
 venv/
