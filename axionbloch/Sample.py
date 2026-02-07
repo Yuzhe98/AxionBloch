@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Optional
 
-from src.Envelope import (
+from axionbloch.Envelope import (
     PhysicalQuantity,
     _safe_convert,
     gamma_Xe129,
@@ -13,7 +13,7 @@ from src.Envelope import (
     mol_to_num,
 )
 
-from src.utils import PhysicalObject
+from axionbloch.utils import PhysicalObject
 
 
 class Sample(PhysicalObject):

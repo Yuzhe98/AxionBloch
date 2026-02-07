@@ -10,8 +10,8 @@ from typing import Optional
 
 from scipy.integrate import quad
 
-from src.Envelope import PhysicalQuantity
-from src.utils import PhysicalObject, Lorentzian
+from axionbloch.Envelope import PhysicalQuantity
+from axionbloch.utils import PhysicalObject, Lorentzian
 
 
 class Magnet(PhysicalObject):

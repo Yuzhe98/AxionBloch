@@ -23,7 +23,7 @@ from scipy.fft import ifft
 import pickle
 import h5py
 
-from src.utils import (
+from axionbloch.utils import (
     PhysicalObject,
     axion_lineshape,
     check,
@@ -31,13 +31,13 @@ from src.utils import (
     giveDateAndTime,
     sci_fmt,
 )
-from src.DataAnalysis import Signal
-from src.Sample import Sample
+from axionbloch.DataAnalysis import Signal
+from axionbloch.Sample import Sample
 
-from src.Apparatus import Magnet
-from src.Envelope import PhysicalQuantity
-from src.AxionWind import AxionWind, Station
-from src.SimuTypes import SimuParams, SimuEntry
+from axionbloch.Apparatus import Magnet
+from axionbloch.Envelope import PhysicalQuantity
+from axionbloch.AxionWind import AxionWind, Station
+from axionbloch.SimuTypes import SimuParams, SimuEntry
 
 import blochSimulation_c_ext.blochSimulation_c as bh
 

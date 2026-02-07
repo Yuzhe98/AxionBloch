@@ -7,9 +7,9 @@ from astropy.time import Time
 
 # import TASSLE.tassle.axion_wind as wind
 
-from src.Envelope import PhysicalQuantity, c
+from axionbloch.Envelope import PhysicalQuantity, c
 
-from src.utils import PhysicalObject
+from axionbloch.utils import PhysicalObject
 
 
 class Station:

@@ -14,7 +14,7 @@ from mpl_toolkits.mplot3d import proj3d
 
 from functools import partial
 
-from src.Envelope import PhysicalQuantity, _safe_convert
+from axionbloch.Envelope import PhysicalQuantity, _safe_convert
 from typing import Sequence
 
 import h5py

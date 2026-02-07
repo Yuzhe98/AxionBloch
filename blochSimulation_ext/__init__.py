@@ -1,7 +1,7 @@
-# __init__.py for blochSimulation_c package
+# __init__.py for blochSimulation package
 
 # Import the compiled pybind11 module
-from .blochSimulation_c import (
+from .blochsimulation import (
     add_3d_arrays_3loops,
     add_3d_arrays_parallel,
     add_3d_arrays_flattern_parallel,

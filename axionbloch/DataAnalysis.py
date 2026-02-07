@@ -5,7 +5,7 @@
 import os
 
 
-from src.utils import (
+from axionbloch.utils import (
     check,
     record_runtime_YorN,
     Lorentzian,

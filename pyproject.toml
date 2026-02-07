@@ -1,9 +1,13 @@
 [build-system]
-requires = ["setuptools", "wheel", "pybind11", "setuptools_scm"]
+requires = [
+    "setuptools>=61",
+    "wheel",
+    "pybind11>=2.10",
+]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "AxionBloch"
+name = "axionbloch"
 version = "0.1.0"
 description = "Simulation tool for axion-induced spin dynamics."
 authors = [

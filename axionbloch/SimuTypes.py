@@ -9,16 +9,16 @@ from dataclasses import dataclass
 
 # Only import these for type checking to avoid circular imports or runtime overhead
 if TYPE_CHECKING:
-    from src.SimuTools import (
+    from axionbloch.SimuTools import (
         Simulation,
         MagField,
     )  # Simulation engine and magnetic field type
 
 # Import physical quantities and modules used in simulation
-from src.Envelope import PhysicalQuantity  # physical quantity with units
-from src.AxionWind import AxionWind  # axion field information
-from src.Sample import Sample  # NMR sample
-from src.Apparatus import Magnet  # magnet
+from axionbloch.Envelope import PhysicalQuantity  # physical quantity with units
+from axionbloch.AxionWind import AxionWind  # axion field information
+from axionbloch.Sample import Sample  # NMR sample
+from axionbloch.Apparatus import Magnet  # magnet
 
 
 # -------------------------------------------------------------------

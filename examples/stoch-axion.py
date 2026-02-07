@@ -4,12 +4,12 @@ import os
 import numpy as np
 import time
 
-from src.AxionWind import AxionWind
-from src.SimuTools import MagField, Simulations
-from src.Sample import Sample
-from src.Apparatus import Magnet
-from src.Envelope import PhysicalQuantity, gamma_p, mu_p
-from src.SimuTypes import SimuParams
+from axionbloch.AxionWind import AxionWind
+from axionbloch.SimuTools import MagField, Simulations
+from axionbloch.Sample import Sample
+from axionbloch.Apparatus import Magnet
+from axionbloch.Envelope import PhysicalQuantity, gamma_p, mu_p
+from axionbloch.SimuTypes import SimuParams
 
 # set directory for saving data
 script_path = os.path.abspath(__file__)
