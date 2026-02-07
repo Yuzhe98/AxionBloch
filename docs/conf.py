@@ -12,6 +12,11 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.mathjax",
     "sphinx.ext.viewcode",
+    "myst_parser",
 ]
+
+source_suffix = {
+    ".md": "markdown",
+}
 
 html_theme = "sphinx_rtd_theme"
