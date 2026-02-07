@@ -3,7 +3,7 @@
 Bloch-equation-based simulations for axion-induced spin dynamics.
 
 ```{toctree}
-:maxdepth: 2
+:maxdepth: 16
 :caption: Contents
 
 installation
