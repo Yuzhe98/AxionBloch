@@ -8,7 +8,7 @@ from axionbloch.SimuTools import MagField, Simulation, gate
 from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet
 from axionbloch.utils import giveDateAndTime
-from axionbloch.Envelope import PhysicalQuantity, gamma_p, mu_p
+from axionbloch.enphylope import PhysicalQuantity, gamma_p, mu_p
 
 
 RCF_Freq_Hz = 1e6

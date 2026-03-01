@@ -1,122 +1,65 @@
-# src/AxionWind.py
+# src/AxionStream.py
 
 import numpy as np
 
-
-from astropy.time import Time
-
-# import TASSLE.tassle.axion_wind as wind
-
-from axionbloch.enphylope import PhysicalQuantity, c
-
+from axionbloch.enphylope import PhysicalQuantity
+from axionbloch.constants import c as c_SI
 from axionbloch.utils import PhysicalObject
 
 
-class Station:
+class AxionStream(PhysicalObject):
+    # Create the "axion stream" (axion field) object
+    # you can get properties of the axion field, computed based on the input information
     def __init__(
         self,
-        name="Station name",
-        NSsemisphere=None,  # 'N' or 'S'
-        EWsemisphere=None,  # 'E' or 'W'
-        unit="deg",
-        latitude_deg=None,  # in [deg]
-        longitude_deg=None,  # in [deg]
-        elevation=None,  # in [m]
-        verbose=False,
-    ):
-        """
-        initialize a station on Earth
-        """
-        if name is None:
-            raise ValueError("name is None")
-
-        self.name = name
-        self.NSsemisphere = NSsemisphere
-        self.EWsemisphere = EWsemisphere
-        # if latitude is None:
-        #     raise ValueError('latitude is None')
-        self.latitude_deg = latitude_deg
-        self.longitude_deg = longitude_deg
-        # if NSsemisphere == 'N':
-        #     self.theta = np.pi/2 - self.latitude
-        # elif NSsemisphere == 'S':
-        #     self.theta = np.pi/2 + self.latitude
-        # else:
-        #     raise ValueError('NSsemisphere != \'N\' nor \'S\'')
-
-        # if EWsemisphere == 'E':
-        #     self.phi = self.longitude
-        # elif EWsemisphere == 'W':
-        #     self.phi = (-1.)* self.longitude
-        # else:
-        #     raise ValueError('NSsemisphere != \'N\' nor \'S\'')
-
-        # self.nvec = np.array([np.sin(self.theta)*np.cos(self.phi), np.sin(self.theta)*np.sin(self.phi), np.cos(self.theta)])
-        self.elevation = elevation
-        self.R = self.elevation + 6356.7523e3  # radius
-        # self.rvec = self.R * self.nvec
-
-
-Mainz = Station(
-    name="Mainz",
-    NSsemisphere="N",  # 'N' or 'S'
-    EWsemisphere="E",  # 'E' or 'W'
-    unit="deg",
-    latitude_deg=49.9916,  # in [deg]
-    longitude_deg=(8.0 + 16.0 / 60.0 + 26.2056 / 3600),  # in [deg]
-    elevation=130.0,
-    verbose=False,
-)
-
-
-class AxionWind(PhysicalObject):
-    # Create the "axion wind" (axion field) object
-    # you can get propeties of the axion field, computed based on the input information
-    def __init__(
-        self,
-        name="axion",
+        name="axion stream",
         nu_a: PhysicalQuantity = None,  # compton frequency
         gaNN: PhysicalQuantity = None,  #
         Qa: PhysicalQuantity = None,
-        v_0: PhysicalQuantity = PhysicalQuantity(
-            220.0, "km/s"
-        ),  # Local (@ solar radius) galaxy circular rotation speed
+        # v_0: PhysicalQuantity = PhysicalQuantity(
+        #     220.0, "km/s"
+        # ),  # Local (@ solar radius) galaxy circular rotation speed
         v_lab: PhysicalQuantity = PhysicalQuantity(
             233.0, "km/s"
         ),  # Laboratory speed relative to the galactic rest frame
-        windAngle: PhysicalQuantity = None,
+        # windAngle: PhysicalQuantity = None,
         # dark matter axion density in [GeV/cm**3]
         # Standard halo model (SHM): 0.3
         # A commonly-used value: 0.4
         # Refined standard halo model (SHM++) / Particle Data Group 2024: 0.55
         rho_E_DM: PhysicalQuantity = PhysicalQuantity(0.3, "GeV/cm**3"),
+        numStreams: int = 1,
         verbose: bool = False,
     ):
         """
-        initialize NMR simulation
+        initialize axion stream object
+        Parameters
+        ----------  
+        nu_a: axion Compton frequency in Hz
+        gaNN: axion-nucleon coupling in 1/GeV
+        Qa: axion quality factor (dimensionless)
+        v_0: Local (@ solar radius) galaxy circular rotation speed in km/s
+        v_lab: Laboratory speed relative to the galactic rest frame in km/s
+        rho_E_DM: dark matter axion density in GeV/cm**3
+        numStreams: number of axion streams to simulate (default: 1)
+        verbose: whether to print the input parameters and calculated properties of the axion stream
         """
         super().__init__()
         self.name = name
-        self.v_0 = v_0
+        # self.v_0 = v_0
         self.v_lab = v_lab
 
         self.rho_E_DM = rho_E_DM
         self.nu_a = nu_a
         self.gaNN = gaNN
 
-        # self.year = year
-        # self.month = month
-        # self.day = day
-        # self.time_hms = time_hms
-        # self.timeastro = timeastro
-
         if Qa is None:
-            self.Qa = (c / self.v_lab) ** 2.0
+            self.Qa = (c_SI / self.v_lab) ** 2.0
 
         self.FWHM = 1.0 / self.Qa
 
         #
-        self.nu_a_eff = self.nu_a * (PhysicalQuantity(1, "") + self.v_lab**2 / c**2)
+        self.nu_a_eff = self.nu_a * (PhysicalQuantity(1, "") + self.v_lab**2 / c_SI**2)
         self.nu_a_eff = self.nu_a_eff.convert_to("Hz")
 
         # coherence time (estimated)

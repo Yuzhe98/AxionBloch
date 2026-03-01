@@ -10,7 +10,7 @@ from typing import Optional
 
 from scipy.integrate import quad
 
-from axionbloch.Envelope import PhysicalQuantity
+from axionbloch.enphylope import PhysicalQuantity
 from axionbloch.utils import PhysicalObject, Lorentzian
 
 

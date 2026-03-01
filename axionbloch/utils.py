@@ -14,7 +14,7 @@ from mpl_toolkits.mplot3d import proj3d
 
 from functools import partial
 
-from axionbloch.Envelope import PhysicalQuantity, _safe_convert
+from axionbloch.enphylope import PhysicalQuantity, _safe_convert
 from typing import Sequence
 
 import h5py
@@ -2555,7 +2555,6 @@ def exampleofprogress():
     sys.stdout.write("\n")  # Move to the next line after the progress bar is complete
 
 
-
 def getFWHM(x, y):
     """
     Calculate the Full Width at Half Maximum (FWHM) of a curve.
@@ -2907,3 +2906,55 @@ def check_norm(x: np.ndarray, y: np.ndarray):
         warnings.warn(
             f"Array is not normalized! Integral = {integral:.5f}", category=UserWarning
         )
+
+
+def coh_time_g1(x, dt):
+    """
+    x : complex-valued time series
+    dt: sampling interval
+    method: "1e" or "integral"
+    """
+    # TODO : check if the input x long enough (compared to the coherence time) for a reliable estimation of g1 and tau
+    duration = len(x) * dt
+    E = np.array(x)  # complex field
+    N = len(E)
+
+    tic = time.time()
+    corr = np.correlate(E, E.conj(), mode="full")
+    toc = time.time()
+    print(f"Time taken for correlation: {toc - tic:.3f} seconds")
+
+    corr = corr[N - 1 :]
+    check(corr.std())
+    check(corr[0])
+    check(corr[1])
+    check(corr[2])
+    check(np.sum(np.abs(x)**2))
+    g1 = corr / np.sum(np.abs(x) ** 2)  # positive delays only
+
+    fig = plt.figure(figsize=(6.0, 4.0), dpi=150)  # initialize a figure
+    gs = gridspec.GridSpec(nrows=1, ncols=1)  # create grid for multiple figures
+    ax00 = fig.add_subplot(gs[0, 0])
+    ax00.plot(g1.real, label="real part")
+    ax00.plot(g1.imag, label="imaginary part")
+    # ax00.set_xlabel("time (s)")
+    ax00.set_ylabel("g1 (arb. units)")
+    ax00.legend()
+    fig.suptitle("", wrap=True)
+    plt.tight_layout()
+    plt.show()
+
+    tau = 2 * np.sum(np.abs(g1) ** 2) * dt
+    if tau > duration:
+        warnings.warn(
+            f"Estimated coherence time tau = {tau:.3e} s is longer than the total duration of the time series ({duration:.3e} s). "
+            "The estimation may be unreliable. Consider using a longer time series.",
+            category=UserWarning,
+        )
+    if tau <= dt:
+        warnings.warn(
+            f"Estimated coherence time tau = {tau:.3e} s is not greater than the sampling interval dt = {dt:.3e} s. "
+            "The estimation may be unreliable. Consider using a shorter sampling interval.",
+            category=UserWarning,
+        )
+    return tau

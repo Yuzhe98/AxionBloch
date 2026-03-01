@@ -35,7 +35,7 @@ from axionbloch.DataAnalysis import Signal
 from axionbloch.Sample import Sample
 
 from axionbloch.Apparatus import Magnet
-from axionbloch.Envelope import PhysicalQuantity
+from axionbloch.enphylope import PhysicalQuantity
 from axionbloch.AxionWind import AxionWind, Station
 from axionbloch.SimuTypes import SimuParams, SimuEntry
 

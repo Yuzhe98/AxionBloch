@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     )  # Simulation engine and magnetic field type
 
 # Import physical quantities and modules used in simulation
-from axionbloch.Envelope import PhysicalQuantity  # physical quantity with units
+from axionbloch.enphylope import PhysicalQuantity  # physical quantity with units
 from axionbloch.AxionWind import AxionWind  # axion field information
 from axionbloch.Sample import Sample  # NMR sample
 from axionbloch.Apparatus import Magnet  # magnet

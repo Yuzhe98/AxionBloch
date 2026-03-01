@@ -1,6 +1,6 @@
-##########################################
+##############################################
 # for unit management and physical calculation
-##########################################
+##############################################
 
 from pint import UnitRegistry
 from typing import Optional
@@ -154,7 +154,7 @@ class PhysicalQuantity:
         elif isinstance(other, (int, float)):  #
             result = PhysicalQuantity(other * self.value, str(self.unit)).quantity
         else:
-            TypeError(f"Unsupported division with type {type(other)}")
+            TypeError(f"Unsupported multiplication with type {type(other)}")
         return PhysicalQuantity(result.magnitude, str(result.units))
 
     def __rmul__(self, other):
@@ -166,7 +166,7 @@ class PhysicalQuantity:
         elif isinstance(other, (int, float)):  #
             result = PhysicalQuantity(self.value * other, str(self.unit)).quantity
         else:
-            TypeError(f"Unsupported division with type {type(other)}")
+            TypeError(f"Unsupported multiplication with type {type(other)}")
         return PhysicalQuantity(result.magnitude, str(result.units))
 
     def __truediv__(self, other):
@@ -262,7 +262,7 @@ class PhysicalQuantity:
         # If not handled, let NumPy fall back
         return NotImplemented
 
-    def convert_to(self, unit: str)-> "PhysicalQuantity":
+    def convert_to(self, unit: str) -> "PhysicalQuantity":
         """
         Convert the quantity to a new unit.
         :param unit: The new unit as a string
@@ -281,115 +281,14 @@ class PhysicalQuantity:
         return converted_quantity.magnitude
 
 
-def _safe_convert(quantity: Optional[PhysicalQuantity], unit: str) -> Optional[PhysicalQuantity]:
+def _safe_convert(
+    quantity: Optional[PhysicalQuantity], unit: str
+) -> Optional[PhysicalQuantity]:
     """
     convert quantities to a new unit
     return None if the quantity is None
     """
     return quantity.convert_to(unit) if quantity is not None else None
-
-
-# Electron charge
-e = PhysicalQuantity(-1.602176634e-19, "coulomb")
-
-# mol to number by Avogadro's number
-mol_to_num = PhysicalQuantity(6e23, "mol**(-1)")
-
-# Constants
-
-# Light speed  speed_of_light
-# c = PhysicalQuantity(299792458, "m / s")
-c = PhysicalQuantity(1, "c")
-
-# Atomic mass unit
-u = PhysicalQuantity(931.49410242, "MeV / c**2")
-
-# Boltzmann constant in eV K^-1
-kB = PhysicalQuantity(8.617333262145e-5, "eV / kelvin")
-# Boltzmann constant in J K^-1
-# kB = PhysicalQuantity(1.380649e-23, "joule / kelvin")
-
-# Planck constant
-h_Planck = PhysicalQuantity(4.135667696e-15, "eV * s")
-
-# Reduced Planck constant
-hbar = PhysicalQuantity(1, "hbar")
-
-# Masses of electron, proton, and neutron
-me = PhysicalQuantity(0.51099895000, "MeV / c**2")
-mp = PhysicalQuantity(938.27208816, "MeV / c**2")
-mn = PhysicalQuantity(939.56542052, "MeV / c**2")
-
-# Bohr magneton
-mu_B = PhysicalQuantity(5.7883818012e-5, "eV / tesla")
-
-# Magnetic permeability of free space
-mu_0 = PhysicalQuantity(1.25663706212e-6, "henry / m")
-
-
-# Nuclear magneton
-def mu_N(m):
-    return (-1.0 * e * hbar) / (2 * m)  # * c **2
-
-
-# Magnetic dipole moment of proton
-gp = PhysicalQuantity(5.585694713, "")
-I_p = PhysicalQuantity(1 / 2, "") * hbar
-mu_p = gp * mu_N(mp) * I_p / hbar
-
-# Gyromagnetic ratio of proton
-gamma_p = PhysicalQuantity(2.6752218708e8, "hertz / tesla")
-
-# Magnetic dipole moment of Xe nucleus
-mu_Xe129 = PhysicalQuantity(-0.777969, "dimensionless") * mu_N(mp)
-
-# Gyromagnetic ratio of Xe129
-gamma_Xe129 = PhysicalQuantity(-7.441e7, "hertz / tesla")
-
-
-if __name__ == "__main__":
-    # solar_mass = PhysicalQuantity(1, 'solar_mass').convert_to('kg').value
-    # parsec = PhysicalQuantity(1, 'parsec').convert_to('m').value  # 30856775814913673 m
-    # # 30856775814913673
-    # # 30856775814671916.000000
-    # au = PhysicalQuantity(1, 'au').convert_to('m').value  # 149597870700
-    # parsecFromAU = au * 648000. / (np.pi)
-    # oneppm = PhysicalQuantity(1, 'ppm').convert_to('')
-    # a = 1 + oneppm
-    # # print(f'{parsec:22f}')
-    # # print(f'{parsecFromAU:22f}')
-    # print(f'{oneppm.value}')
-    # cfreq = PhysicalQuantity(1.348570, "MHz")
-    # print((cfreq / (gamma_p / (2 * pi))).convert_to("T"))
-    # print(PhysicalQuantity(1.0, "ppb").convert_to(""))
-
-    # Dimensionless examples
-    x = PhysicalQuantity(1.0, "cm**3 m**(-3)")
-    print("np.exp(x)   =", np.exp(x))
-    print("np.tanh(x)  =", np.tanh(x))
-    print("np.sin(x)   =", np.sin(x))
-    print("np.cos(x)   =", np.cos(x))
-    print("np.sinh(x)  =", np.sinh(x))
-    print("np.cosh(x)  =", np.cosh(x))
-
-    # Arithmetic examples with units
-    a = PhysicalQuantity(3.0, "m")
-    b = PhysicalQuantity(2.0, "m")
-    c = PhysicalQuantity(5.0, "s")
-
-    print("\nnp.add(a, b)      =", np.add(a, b))  # m
-    print("np.subtract(a, b) =", np.subtract(a, b))  # m
-    print("np.multiply(a, b) =", np.multiply(a, b))  # m*m
-    print("np.divide(a, c)   =", np.divide(a, c))  # m/s
-
-    print(mu_Xe129.convert_to("J/T").unit)
-    induc = PhysicalQuantity(100, "henry")
-    print(induc.convert_to("nanohenry"))
-    print(induc.convert_to("nH"))
-
-    res = PhysicalQuantity(100, "ohm")
-    print(res.convert_to("kiloohm"))
-    # print(induc.convert_to("nH"))
 
 
 """

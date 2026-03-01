@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Optional
 
-from axionbloch.Envelope import (
+from axionbloch.enphylope import (
     PhysicalQuantity,
     _safe_convert,
     gamma_Xe129,

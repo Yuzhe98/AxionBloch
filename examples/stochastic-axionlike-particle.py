@@ -8,7 +8,8 @@ from axionbloch.AxionWind import AxionWind
 from axionbloch.SimuTools import MagField, Simulations
 from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet
-from axionbloch.Envelope import PhysicalQuantity, gamma_p, mu_p
+from axionbloch.enphylope import PhysicalQuantity
+from axionbloch.constants import gamma_p, mu_p
 from axionbloch.SimuTypes import SimuParams
 
 # set directory for saving data
