@@ -220,7 +220,7 @@ py::tuple generateTrajectories(py::array_t<double> B_vec,
   return py::make_tuple(trjry, dMdt, McrossB, d2Mdt2);
 }
 
-PYBIND11_MODULE(blochSimulation_c, m) {
+PYBIND11_MODULE(blochsimulation, m) {
   m.doc() = "Native C++ for nuclear magnetic resonance simulation based on Bloch equations. ";
   m.def("add_3d_arrays_3loops", &add_3d_arrays_3loops, "Add two X×Y×Z arrays");
   m.def("add_3d_arrays_parallel", &add_3d_arrays_parallel, "Add two X×Y×Z arrays");

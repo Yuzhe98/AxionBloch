@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 # Import physical quantities and modules used in simulation
 from axionbloch.enphylope import PhysicalQuantity  # physical quantity with units
-from axionbloch.AxionWind import AxionWind  # axion field information
+from axionbloch.axionwind import AxionWind  # axion field information
 from axionbloch.Sample import Sample  # NMR sample
 from axionbloch.Apparatus import Magnet  # magnet
 

@@ -1,4 +1,4 @@
 try:
-    from ._bloch_ext import *
+    from .blochsimulation import *
 except ImportError:
     pass

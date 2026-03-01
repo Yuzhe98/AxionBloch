@@ -11,10 +11,10 @@ from matplotlib.ticker import ScalarFormatter, FuncFormatter
 # import matplotlib.ticker as mticker
 from mpl_toolkits.mplot3d import Axes3D  # for type hinting
 
-from tqdm import tqdm
+# from tqdm import tqdm
 
-import numba as nb
-from numba import njit
+# import numba as nb
+# from numba import njit
 
 from scipy.stats import uniform, expon
 from scipy.fft import ifft
@@ -31,15 +31,17 @@ from axionbloch.utils import (
     giveDateAndTime,
     sci_fmt,
 )
-from axionbloch.DataAnalysis import Signal
+# from axionbloch.DataAnalysis import Signal
 from axionbloch.Sample import Sample
 
 from axionbloch.Apparatus import Magnet
 from axionbloch.enphylope import PhysicalQuantity
-from axionbloch.AxionWind import AxionWind, Station
+from axionbloch.axionwind import AxionWind
+from axionbloch.axionstream import AxionStream
 from axionbloch.SimuTypes import SimuParams, SimuEntry
+from axionbloch.station import Station
 
-import blochSimulation_c_ext.blochSimulation_c as bh
+import axionbloch.blochsimulation as bh
 
 RECORD_RUNTIME = True
 
@@ -386,9 +388,9 @@ class MagField(PhysicalObject):
                 -0.5 / timeStep, 0.5 / timeStep, num=timeLen, endpoint=True
             )
             lineshape = axion_lineshape(
-                v_0=220e3,
-                v_lab=233e3,
-                nu_a=nu_a_rot_Hz + RCF_freq_Hz,
+                v_0_ms=220e3,
+                v_lab_ms=233e3,
+                nu_a_Hz=nu_a_rot_Hz + RCF_freq_Hz,
                 nu=frequencies + RCF_freq_Hz,
                 case="grad_perp",
                 alpha=0.0,
@@ -554,9 +556,9 @@ class MagField(PhysicalObject):
             if verbose:
                 tic = time.perf_counter()
             lineshape = axion_lineshape(
-                v_0=220e3,
-                v_lab=233e3,
-                nu_a=nu_a_rot_Hz + RCF_freq_Hz,
+                v_0_ms=220e3,
+                v_lab_ms=233e3,
+                nu_a_Hz=nu_a_rot_Hz + RCF_freq_Hz,
                 nu=frequencies + RCF_freq_Hz,
                 case="grad_perp",
                 alpha=0.0,
@@ -718,7 +720,7 @@ class MagField(PhysicalObject):
 
         # print(f"{self.setALP_Field.__name__}: setALP_Field")
 
-    def setALPfields(
+    def setByiFFT(
         self,
         method: str,  # 'inverse-FFT'
         # timeStamp_s: np.ndarray,
@@ -758,9 +760,9 @@ class MagField(PhysicalObject):
 
             tic = time.perf_counter()
             avg_lineshape = axion_lineshape(
-                v_0=220e3,
-                v_lab=233e3,
-                nu_a=nu_a_rot_Hz + RCF_freq_Hz,
+                v_0_ms=220e3,
+                v_lab_ms=233e3,
+                nu_a_Hz=nu_a_rot_Hz + RCF_freq_Hz,
                 nu=frequencies + RCF_freq_Hz,
                 case="grad_perp",
                 alpha=0.0,
@@ -919,6 +921,166 @@ class MagField(PhysicalObject):
         else:
             raise ValueError("method not found")
 
+    def setAxionFields(
+        self,
+        # method: str,  # 'inverse-FFT'
+        axion: AxionWind | AxionStream,
+        timeStep_s: float,
+        timeLen: int,
+        simuRate_Hz: float,
+        duration_s: float,
+        # nu_a_rot_Hz: float,  # axion effective frequency in RCF
+        use_stoch: bool,
+        RCF_freq_Hz: float,
+        numFields: int,
+        rand_seed: int = None,
+        B_a_rms_T: float = None,  # amplitude of the pseudo-magnetic field in (T)
+        makePlot: bool = False,
+        verbose: bool = False,
+    ):
+        """
+        generate a pseudo-magnetic field (ALP field gradient)
+        """
+        self.numFields = numFields
+        numSteps = timeLen - 1
+
+        def setALP_Field_invFFT():
+            """
+            generate Bx, By, dBxdt, dBydt
+            """
+            frequencies = np.linspace(
+                -0.5 / timeStep_s, 0.5 / timeStep_s, num=numSteps, endpoint=True
+            )
+
+            ampSpectra = axion.getAmpSpectra(
+                frequencies=frequencies + RCF_freq_Hz,
+                case="grad_perp",
+                numSpectra=numFields,
+                use_stoch=use_stoch,
+                rand_seed=rand_seed,
+                verbose=verbose,
+            )
+
+            # amplitue spectra of axion fieds
+            ax_AS: np.ndarray = (
+                B_a_rms_T * simuRate_Hz * np.sqrt(duration_s) * ampSpectra
+            )
+
+            freq = np.fft.fftfreq(numSteps, timeStep_s)  # shape = (numSteps)
+            
+            if makePlot:
+                fig = plt.figure(figsize=(6.0, 4.0), dpi=150)  # initialize a figure
+                gs = gridspec.GridSpec(
+                    nrows=1, ncols=1
+                )  # create grid for multiple figures
+                axPSD = fig.add_subplot(gs[0, 0])
+
+
+                axPSD.scatter(
+                    frequencies,
+                    np.abs(ampSpectra)**2,
+                    # label="Average ALP-field gradient PSD",
+                    # linestyle="--",zorder=3,
+                )
+                if use_stoch:
+                    rand_lineshapes = np.abs(ampSpectra) ** 2
+                    axPSD.errorbar(
+                        x=frequencies,
+                        y=rand_lineshapes.mean(axis=0),
+                        yerr=rand_lineshapes.std(axis=0),
+                        label="Stochastic ALP-field gradient PSD",
+                        linestyle="-",
+                    )
+                else:
+                    axPSD.plot(
+                        frequencies,
+                        np.abs(ampSpectra)**2,
+                        label="Average ALP-field gradient PSD",
+                        color="tab:orange",
+                        linestyle="--",
+                        zorder=3,
+                    )
+                axPSD.set_xlabel(f"Frequency - {RCF_freq_Hz:.0g} (Hz)")
+                axPSD.set_ylabel("")
+                axPSD.legend()
+                plt.tight_layout()
+                plt.show()
+
+            # ifft_runtimes = []
+            if verbose:
+                tic = time.perf_counter()
+
+            
+            # ttic = time.perf_counter()
+            ax_AS_pos_neg: np.ndarray = np.fft.fftshift(ax_AS, axes=1)
+            # ttoc = time.perf_counter()
+            # ifft_runtimes.append(ttoc - ttic)
+
+            # ttic = time.perf_counter()
+            # Ba_t = np.fft.ifft(ax_AS_pos_neg, axis=1)
+            B_t: np.ndarray = ifft(
+                ax_AS_pos_neg, axis=1
+            )  # batch IFFT along time axis
+            # ttoc = time.perf_counter()
+            # ifft_runtimes.append(ttoc - ttic)
+
+            # ttic = time.perf_counter()
+            dBdt_FFT: np.ndarray = 1j * 2 * np.pi * freq * ax_AS_pos_neg
+            # ttoc = time.perf_counter()
+            # ifft_runtimes.append(ttoc - ttic)
+
+            # ttic = time.perf_counter()
+            # dBadt = np.fft.ifft(dBadt_FFT, axis=1)
+            dBdt: np.ndarray = ifft(dBdt_FFT, axis=1)
+            # ttoc = time.perf_counter()
+            # ifft_runtimes.append(ttoc - ttic)
+
+            if verbose:
+                toc = time.perf_counter()
+                timeConsumption = toc - tic
+                print(f"ifft total time consumption = {timeConsumption:.3e} s")
+                # for i, runtime in enumerate(ifft_runtimes):
+                # print("individual runtimes =", ifft_runtimes)
+
+            if verbose:
+                tic = time.perf_counter()
+
+            self.B_vec = np.zeros((numFields, numSteps, 3))
+            self.dBdt_vec = np.zeros((numFields, numSteps, 3))
+
+            self.B_vec[:, :, 0] = B_t.real
+            self.B_vec[:, :, 1] = B_t.imag
+            self.dBdt_vec[:, :, 0] = dBdt.real
+            self.dBdt_vec[:, :, 1] = dBdt.imag
+
+            # # Stack real and imaginary parts along the last axis
+            # self.B_vec = np.stack((Ba_t.real, Ba_t.imag, np.zeros_like(Ba_t.real)), axis=2)
+            # self.dBdt_vec = np.stack((dBadt.real, dBadt.imag, np.zeros_like(dBadt.real)), axis=2)
+
+            if verbose:
+                toc = time.perf_counter()
+                timeConsumption = toc - tic
+                print(f"array-asignment time consumption = {timeConsumption:.3e} s")
+
+            # check(Bx_amp.shape)
+            # check(By_amp.shape)
+            # check(dBxdt_amp.shape)
+            # check(dBydt_amp.shape)
+
+            # check(Bx.shape)
+            # check(By.shape)
+            # check(dBxdt.shape)
+            # check(dBydt.shape)
+            # check(self.B_vec.shape)
+            # check(self.dBdt_vec.shape)
+
+        # if method == "inverse-FFT":
+        setALP_Field_invFFT()
+        # elif method == "time-interfer":
+        #     setALP_Field_timeIntf()
+        # else:
+        #     raise ValueError("method not found")
+
     def plotField(self, demodfreq, samprate, showplt_opt):
         specxaxis, spectrum, specxunit, specyunit = self.showTSandPSD(
             dataX=self.B_vec[:, 0],
@@ -935,38 +1097,11 @@ class Simulations:
     def __init__(
         self,
         name: str = "NMR simulationS",
-        # pool: Optional[list[Simulation]] = None,
-        # samples: Optional[list[Sample]] = None,  # class Sample
-        # axions: Optional[list[AxionWind]] = None,  # refer to class Station
-        # stations: [list[Station]] = None,  # refer to class Station
         all_params: list = None,
-        # init_M: Optional[PhysicalQuantity] = PhysicalQuantity(
-        #     1.0, ""
-        # ),  # initial magnetization vector amplitude
-        # init_M_theta: Optional[PhysicalQuantity] = PhysicalQuantity(0, "rad"),
-        # init_M_phi: Optional[PhysicalQuantity] = PhysicalQuantity(0, "rad"),
         verbose=True,
     ):
         """ """
-        # self.axions = axions
-        # self. =
-        # self.samples = samples
-        # self.magnets = magnets
-        # self.excFields = excFields
-        # self.init_M = init_M
-        # self.init_M_theta = init_M_theta
-        # self. =
-        # self. =
-        # self. =
-        # self. =
-        # self. =
-
-        # magnets: Optional[list[Magnet]] = None,
-        # excFields: Optional[list[MagField]] = None,  # class MagField
-
-        # RCF_freqs: Optional[list[PhysicalQuantity]] = None,
-        # rates: Optional[list[PhysicalQuantity]] = None,
-        # durations: Optional[list[PhysicalQuantity]] = None,
+        self.name = name
         self.pool: list[SimuEntry] = []
         self.all_params: list[SimuParams] = all_params
 
@@ -1012,7 +1147,7 @@ class Simulations:
             if verbose:
                 print("", flush=True)
                 for key, pq in params["key_info"].items():
-                    print(key, " =", pq, flush=True)
+                    print(key, "=", pq, flush=True)
                 # print("Axion Compton frequency =", axion.nu_a)
                 # print(
                 #     f"simulation duration = {duration.value_in('s'):e} (s).", flush=True
@@ -1030,7 +1165,7 @@ class Simulations:
             est_runtime += t_setFields_s + t_trjry_s
             if verbose:
                 # print(
-                #     "[setALPfields] time consumption estimated =",
+                #     "[simu.excField.setAxionFields.__name__] time consumption estimated =",
                 #     t_setFields_s / 60,
                 #     "min",
                 # )
@@ -1040,7 +1175,7 @@ class Simulations:
                 #     "min",
                 # )
                 print(
-                    "Estimated step runtime = "
+                    "Estimated step runtime ="
                     + f"{(t_setFields_s + t_trjry_s) / 60:.2g} min",
                     flush=True,
                 )
@@ -1056,75 +1191,6 @@ class Simulations:
         actu_trjry_s = 0.0
         # initialization
         est_runtime, est_setFields_s, est_trjry_s = self.setup(verbose=verbose)
-        # for params in self.all_params:
-        #     #
-        #     sample = params["sample"]  # set the sample
-        #     axion = params["axion"]
-        #     magnet = params["magnet"]
-        #     excField = params["excField"]  # initailize excitation field
-        #     numFields = params["numFields"]
-        #     init_M = params["init_M"]
-        #     init_M_theta = params["init_M_theta"]
-        #     init_M_phi = params["init_M_phi"]
-        #     rate= params["rate"]
-        #     duration= params["duration"]
-
-        #     RCF_freq: PhysicalQuantity = axion.nu_a_eff
-
-        #     use_stoch = True
-
-        #     # initialize simulation
-        #     simu = Simulation(
-        #         name="simulation",
-        #         axion=axion,
-        #         sample=sample,
-        #         magnet=magnet,
-        #         excField=excField,
-        #         init_M=init_M,
-        #         init_M_theta=init_M_theta,
-        #         init_M_phi=init_M_phi,
-        #         RCF_freq=RCF_freq,
-        #         rate=rate,
-        #         duration=duration,
-        #         verbose=verbose,
-        #     )
-        #     self.pool.append({"simu": simu, "params": params})
-
-        #     if verbose:
-        #         print("", flush=True)
-        #         for key, pq in params["key_info"].items():
-        #             print(key, " =", pq, flush=True)
-        #         # print("Axion Compton frequency =", axion.nu_a)
-        #         # print(
-        #         #     f"simulation duration = {duration.value_in('s'):e} (s).", flush=True
-        #         # )
-        #         print("simu.magnet.numPt =", simu.magnet.numPt, flush=True)
-        #         # print("simuRate =", simuRate, flush=True)
-        #         print(f"Number of fields = {numFields}", flush=True)
-
-        #     # estimate setting fields time
-        #     t_setFields_s = T_SETFIELD_S * numFields * (simu.numSteps + 1)
-        #     # estimate simulation time
-        #     t_trjry_s = T_SIMUSTEP_S * simu.numSteps * simu.magnet.numPt * numFields
-        #     est_setFields_s += t_setFields_s
-        #     est_trjry_s += t_trjry_s
-        #     est_runtime += t_setFields_s + t_trjry_s
-        #     if verbose:
-        #         # print(
-        #         #     "[setALPfields] time consumption estimated =",
-        #         #     t_setFields_s / 60,
-        #         #     "min",
-        #         # )
-        #         # print(
-        #         #     "[generateTrajectories] time consumption estimated =",
-        #         #     t_trjry_s / 60,
-        #         #     "min",
-        #         # )
-        #         print(
-        #             "Estimated step runtime = "
-        #             + f"{(t_setFields_s + t_trjry_s) / 60:.2g} min",
-        #             flush=True,
-        #         )
 
         if not autoStart:
             print(
@@ -1154,24 +1220,24 @@ class Simulations:
         # run simulations
         for i, params in enumerate(self.all_params):
             simu: Simulation = self.pool[i]["simu"]
+            
             # set fields
             tic = time.perf_counter()
-            simu.excField.setALPfields(
-                method="inverse-FFT",
-                # timeStamp_s=simu.timeStamp_s,
+            simu.excField.setAxionFields(
+                axion=params["axion"],
                 timeStep_s=simu.timeStep_s,
                 timeLen=simu.timeLen,
                 simuRate_Hz=simu.rate_Hz,
                 duration_s=simu.duration_s,
-                B_a_rms_T=params["B_a_rms"].value_in(
-                    "T"
-                ),  # rms amplitude of the pseudo-magnetic field in [T]
-                nu_a_rot_Hz=params["axion"].nu_a.value_in("Hz")
-                - simu.RCF_freq_Hz,  # frequency in the rotating frame
+                # nu_a_rot_Hz=params["axion"].nu_a.value_in("Hz")
+                # - simu.RCF_freq_Hz,  # frequency in the rotating frame
                 use_stoch=True,
                 RCF_freq_Hz=simu.RCF_freq_Hz,
                 numFields=params["numFields"],
                 rand_seed=params["rand_seed"],
+                B_a_rms_T=params["B_a_rms"].value_in(
+                    "T"
+                ),  # rms amplitude of the pseudo-magnetic field in [T]
                 makePlot=False,
                 verbose=False,
             )
@@ -1183,11 +1249,11 @@ class Simulations:
                 for key, pq in params["key_info"].items():
                     print(key, "=", pq, flush=True)
                 print(
-                    f"[setALPfields] time consumption = {timeConsumption:.6f} s = {timeConsumption/60:.1g} min",
+                    f"[{simu.excField.setAxionFields.__name__}] time consumption = {timeConsumption:.6f} s = {timeConsumption/60:.1g} min",
                     flush=True,
                 )
                 print(
-                    f"[setALPfields] individual step time consumption = {timeConsumption/(simu.numSteps+1)/simu.excField.numFields:.3e} s",
+                    f"[{simu.excField.setAxionFields.__name__}] individual step time consumption = {timeConsumption/(simu.numSteps+1)/simu.excField.numFields:.3e} s",
                     flush=True,
                 )
             # ------------------------------------
@@ -1204,15 +1270,15 @@ class Simulations:
             actu_trjry_s += timeConsumption
             if verbose:
                 print(
-                    f"[generateTrajectories] time consumption = {timeConsumption:.2g} s = {timeConsumption/60:.1g} min",
+                    f"[{simu.generateTrajectories.__name__}] time consumption = {timeConsumption:.2g} s = {timeConsumption/60:.1g} min",
                     flush=True,
                 )
                 print(
-                    f"[generateTrajectories] individual step time consumption = {timeConsumption/simu.numSteps/simu.magnet.numPt/simu.excField.numFields:.2e} s",
+                    f"[{simu.generateTrajectories.__name__}] individual step time consumption = {timeConsumption/simu.numSteps/simu.magnet.numPt/simu.excField.numFields:.2e} s",
                     flush=True,
                 )
             # ------------------------------------
-            simu.keepMeanStd()
+            # simu.keepMeanStd()
 
         if verbose:
             actu_runtime = actu_setFields_s + actu_trjry_s
@@ -1592,1236 +1658,12 @@ class Simulation(PhysicalObject):
         rate_Hz = np.amax([21 * nuL_Hz_abs_max, 10 * T2Rate, 10 * RBW])
         return PhysicalQuantity(rate_Hz, "Hz")
 
-    # def RandomJump(
-    #     self,
-    #     numofcohT=None,  # float. number of coherent period for simulation
-    #     verbose=False,
-    # ):
-    #     """
-    #     Generate simulation parameters by 'RandomJump' method.
-
-    #     Parameters
-    #     ----------
-    #     numofcohT : float
-
-    #     Number of coherent period for simulation. Can be integer or float values. Default in None.
-
-    #     verbose : bool
-
-    #     """
-    #     numofsampling = int(np.ceil(numofcohT))
-    #     check(numofsampling)
-    #     BALPamp_array = statRayleigh(
-    #         sigma=self.excField.BALP,
-    #         num=numofsampling,
-    #         showplt=verbose,
-    #         verbose=verbose,
-    #     )
-    #     theta_array = (
-    #         statUni2Pi(num=numofsampling, showplt=verbose, verbose=verbose) / 2.0
-    #     )
-    #     phi_array = statUni2Pi(num=numofsampling, showplt=verbose, verbose=verbose)
-    #     phase0_array = statUni2Pi(num=numofsampling, showplt=verbose, verbose=verbose)
-    #     BALP_list = []
-
-    #     BALPamp_array[0] = self.excField.BALP
-    #     check(BALPamp_array)
-    #     theta_array[0] = 90.0 * np.pi / 180.0
-    #     phi_array[0] = 0.0 * np.pi / 180.0
-    #     phase0_array[0] = 0
-
-    #     numofsimustep_perperiod = int(self.simuRate_Hz * self.excField.cohT)
-    #     timestamp = np.linspace(
-    #         start=0,
-    #         stop=numofsampling * self.excField.cohT,
-    #         num=int(np.ceil(self.simuRate_Hz * numofsampling * self.excField.cohT)),
-    #     )
-    #     for i in range(numofsampling - 1):
-    #         BALP = 0.5 * BALPamp_array[i]
-    #         theta = theta_array[i]
-    #         phi = phi_array[i]
-    #         Bx = BALP * np.sin(theta) * np.cos(phi)
-    #         By = BALP * np.sin(theta) * np.sin(phi)
-    #         Bz = BALP * np.cos(theta)
-    #         phase0 = phase0_array[i]
-    #         for j in range(numofsimustep_perperiod):
-    #             BALP_list.append([Bx, By, Bz, phase0].copy())  # room for modification?
-    #     for i in [-1]:
-    #         BALP = 0.5 * BALPamp_array[i]
-    #         theta = theta_array[i]
-    #         phi = phi_array[i]
-    #         Bx = (
-    #             BALP * np.sin(theta) * np.cos(phi) * np.cos(phi)
-    #         )  # *np.cos(2*np.pi*self.nu_rot*timestamp)
-    #         By = (
-    #             BALP * np.sin(theta) * np.sin(phi) * np.sin(phi)
-    #         )  # *np.sin(2*np.pi*self.nu_rot*timestamp)
-    #         Bz = BALP * np.cos(theta)
-    #         phase0 = phase0_array[i]
-    #         numofstep_lastperiod = int(
-    #             self.simuRate_Hz * self.excField.cohT * (numofcohT - numofsampling + 1)
-    #         )
-    #         check(numofstep_lastperiod)
-    #         for j in range(numofstep_lastperiod):
-    #             BALP_list.append(
-    #                 [Bx, By, Bz, phase0].copy()
-    #             )  # self.BALP_array [Bx, By, Bz, phase0]
-    #     del BALPamp_array, theta_array, phi_array, phase0_array
-    #     self.Bexc_t_vec = np.array(BALP_list)  # self.BALP_array [Bx, By, Bz, phase0]
-    #     self.dBexc_dt_vec = np.zeros(self.Bexc_t_vec.shape)
-    #     # check(self.BALP_array)
-    #     self.timeStamp = np.arange(len(self.Bexc_t_vec) + 1) * self.timeStep_s
-
-    # @nb.jit(
-    #     [
-    #         "int16(int64, int64, float64[:], \
-    #     float64, float64[:], float64[:], \
-    #     float64[:], float64[:,:], float64[:,:],     \
-    #     float64[:], float64, float64, \
-    #     float64, float64)"
-    #     ],
-    #     nopython=True,
-    # )
-    # def ThermalLightLoop(
-    #     numofsimustep,  # int
-    #     numofALPparticle,  # int
-    #     random_phase,  # float[:]
-    #     ALP_B,  # float
-    #     ALP_nu_rot,  # float[:]
-    #     ALP_phase,  # float[:]
-    #     ALP_vtova_arr,  # float[:]
-    #     BALP_arr,  # float[:,:]
-    #     dBALPdt_arr,  # float[:,:]
-    #     ALPwind_direction_earth,  # float[:]
-    #     init_time,  # float
-    #     simustep,  # float
-    #     station_theta,  # float
-    #     station_phi,  # float
-    # ):
-
-    #     # BALP_list = np.array([])
-    #     for i in range(numofsimustep):
-    #         # if verbose and i%10000 == 0:
-    #         #     check(i)
-    #         # decide BALP amplitude and phase0 from 2D random walk and decoherence due to 2 particle collision in each step
-    #         # update ALP particles' phase array
-    #         (
-    #             ALP_phase[(2 * i) % (2 * numofALPparticle)],
-    #             ALP_phase[(2 * i + 1) % (2 * numofALPparticle)],
-    #         ) = (random_phase[2 * i], random_phase[2 * i + 1])
-    #         # BALP = abs(rw)  # ALPwind_BALP *
-    #         # phase0 = np.angle(rw)
-    #         BALP = np.sum(
-    #             ALP_B
-    #             * ALP_vtova_arr
-    #             * np.sin(
-    #                 2 * np.pi * ALP_nu_rot * (init_time + i * simustep) + ALP_phase
-    #             )
-    #         ) / sqrt(2.0 * numofALPparticle)
-    #         dBALPdt = np.sum(
-    #             ALP_B
-    #             * ALP_vtova_arr
-    #             * 2
-    #             * np.pi
-    #             * ALP_nu_rot
-    #             * np.cos(
-    #                 2 * np.pi * ALP_nu_rot * (init_time + i * simustep) + ALP_phase
-    #             )
-    #         ) / sqrt(2.0 * numofALPparticle)
-    #         # decide the direciton of B_ALP from the experiment time and motion of celestial bodies
-    #         theta_e = ALPwind_direction_earth[1]  #
-    #         phi_e = ALPwind_direction_earth[2]  #
-    #         theta_s = station_theta  # theta_station
-    #         phi_s = (
-    #             init_time + i * simustep
-    #         ) * 2 * 3.141592 / 86164.0 + station_phi  # phi_station
-
-    #         x = sin(theta_e) * cos(theta_s) * cos(phi_e - phi_s) - cos(theta_e) * sin(
-    #             theta_s
-    #         )
-    #         y = sin(theta_e) * sin(phi_e - phi_s)
-    #         z = sin(theta_e) * sin(theta_s) * cos(phi_e - phi_s) + cos(theta_e) * cos(
-    #             theta_s
-    #         )
-    #         Bx, By, Bz = 0.5 * BALP * np.array([x, y, z])
-    #         dBxdt, dBydt, dBzdt = (
-    #             0.5 * dBALPdt * np.array([x, y, z])
-    #         )  # to be improved!!!!!!
-    #         BALP_arr[i] = [Bx, By, Bz]  # , phase0 to be improved?
-    #         dBALPdt_arr[i] = [dBxdt, dBydt, dBzdt]
-    #         # BALP_modu_list.append(direction_lab)
-    #     # BALP_array = np.array(BALP_list)
-    #     # return BALP_array
-    #     return 0
-
-    # def ThermalLight(
-    #     self,
-    #     numofcohT=None,  # float. number of coherent period for simulation
-    #     usenumba=True,
-    #     verbose=False,
-    # ):
-    #     """
-    #     Generate parameters by 'thermal light' method.
-
-    #     Parameters
-    #     ----------
-    #     numofcohT : float
-
-    #     Number of coherent period for simulation. Can be integer or float values. Default in None.
-
-    #     verbose : bool
-
-    #     """
-    #     numofsimustep = int(self.simuRate_Hz * self.excField.cohT * numofcohT)
-    #     # initialize an array of particles
-    #     # rw2D = []
-    #     # numofALPparticle = int(self.simurate*self.ALPwind.cohT)
-    #     self.numofALPparticle = int(self.simuRate_Hz * self.excField.cohT)
-    #     if self.numofALPparticle < 1000:
-    #         print("WARNING: self.numofALPparticle < 1000")
-    #     ALP_phase = statUni2Pi(
-    #         num=2 * self.numofALPparticle, showplt=False, verbose=False
-    #     )
-    #     sin_arr = np.sin(ALP_phase)
-    #     cos_arr = np.cos(ALP_phase)
-    #     random_phase = uniform.rvs(loc=0, scale=2 * np.pi, size=2 * numofsimustep)
-
-    #     self.ALP_B = (
-    #         self.excField.BALP
-    #     )  # why? * (1 + self.ALPwind.Gamma * np.random.standard_cauchy(size=2 * self.numofALPparticle))
-    #     ALP_nu = self.excField.nu * (1 + (self.ALP_B / self.excField.BALP * 1e-3) ** 2)
-    #     ALP_nu_rot = abs(ALP_nu) - abs(self.sample.gamma.value_in("Hz/T") * self.B0z_T / (2 * np.pi))
-    #     self.va = 220 * 1e3  # 220 km/s
-    #     self.speedtova = maxwell.rvs(size=2 * self.numofALPparticle)
-
-    #     plt.rc("font", size=16)
-    #     if verbose:
-    #         fig = plt.figure(figsize=(8 * 0.6, 6 * 0.6), dpi=150)  #
-    #         gs = gridspec.GridSpec(nrows=1, ncols=1)  #
-    #         # fig.subplots_adjust(left=left_spc, top=top_spc, right=right_spc,
-    #         #                     bottom=bottom_spc, wspace=xgrid_spc, hspace=ygrid_spc)
-    #         ax = fig.add_subplot(gs[0, 0])
-    #         ax.hist(self.speedtova, bins=100, density=True, color="tab:green")
-    #         ax.set_xlabel("$|v|/v_0$")
-    #         ax.set_ylabel("Probability density")
-    #         # plt.title('Speed distribution')
-    #         plt.tight_layout()
-    #         plt.show()
-    #         # check(np.amin(self.speedtova))
-
-    #     self.nu_a_arr = self.excField.nu * (1.0 + (self.speedtova * self.va / 3e8) ** 2)
-    #     # check(np.amin(self.nu_a_arr))
-    #     if verbose:
-    #         fig = plt.figure(figsize=(8 * 0.6, 6 * 0.6), dpi=150)  #
-    #         gs = gridspec.GridSpec(nrows=1, ncols=1)  #
-    #         # fig.subplots_adjust(left=left_spc, top=top_spc, right=right_spc,
-    #         #                     bottom=bottom_spc, wspace=xgrid_spc, hspace=ygrid_spc)
-    #         ax = fig.add_subplot(gs[0, 0])
-    #         ax.hist(
-    #             1e6 * (self.nu_a_arr / self.excField.nu - 1),
-    #             bins=100,
-    #             density=True,
-    #             color="tab:purple",
-    #         )
-    #         ax.set_xlabel("$(\\nu/\\nu_a-1) \\times 10^6$")
-
-    #         ax.set_ylabel("Probability density")
-    #         ax.set_xlim(-0.5, 10.5)  # [0, 1, 2, 3, 4, 5, 6, 7,8 , 9, 10]
-    #         ax.set_xticks([0, 2, 4, 6, 8, 10])  # [0, 1, 2, 3, 4, 5, 6, 7,8 , 9, 10]
-    #         # plt.title('Speed distribution')
-    #         plt.tight_layout()
-    #         plt.show()
-
-    #         # plt.hist(1e6 * (self.nu_a_arr/self.ALPwind.nu-1), bins=100, density=True)
-    #         # plt.xlabel('$(\\nu/\\nu_a-1) \\times 10^6$')
-    #         # plt.ylabel('Distribution density')
-    #         # plt.title('Frequency distribution')
-    #         # plt.show()
-
-    #     ALP_nu_rot_arr = self.nu_a_arr - abs(
-    #         self.sample.gamma.value_in("Hz/T") * self.B0z_T / (2 * np.pi)
-    #     )
-    #     # plt.hist(ALP_B/self.ALPwind.BALP, bins=1000)
-    #     # plt.show()
-
-    #     # for i in range(int(self.simurate*self.ALPwind.cohT)):
-    #     #     phase = uniform.rvs(loc=0, scale=2*np.pi,size=numofstep)
-    #     #     sin_arr = np.sin(phase)
-    #     #     cos_arr = np.cos(phase)
-    #     #     rw2D.append(np.sum(cos_arr) + 1j*np.sum(sin_arr))
-    #     # rw2D = self.ALPwind.BALP*np.array(rw2D, dtype=np.complex64)/np.sqrt(self.numofALPparticle/2.)
-    #     rw = (np.sum(cos_arr) + 1j * np.sum(sin_arr)) / np.sqrt(
-    #         self.numofALPparticle / 2.0
-    #     )
-
-    #     # check(numofsimustep)
-    #     self.Bexc_t_vec = np.zeros((numofsimustep, 3))
-    #     self.dBexc_dt_vec = np.zeros((numofsimustep, 3))
-    #     # loop
-    #     if usenumba:
-    #         # check(nb.typeof(numofsimustep))
-    #         # check(nb.typeof(self.numofALPparticle))
-    #         # check(nb.typeof(self.ALP_B))
-    #         # check(nb.typeof(ALP_phase))
-    #         # check(nb.typeof(rw))
-    #         # check(nb.typeof(self.BALP_array))
-    #         # check(nb.typeof(self.ALPwind.direction_earth))
-    #         # check(nb.typeof(self.ALPwind.BALP))
-    #         # check(nb.typeof(self.init_time))
-    #         # check(nb.typeof(self.simustep))
-    #         # check(nb.typeof(self.station.theta))
-    #         # check(nb.typeof(self.station.phi))
-    #         # check(nb.typeof(self.nu_rot))
-
-    #         # numofsimustep,  # int
-    #         # numofALPparticle,  # int
-    #         # random_phase,  # float[:]
-
-    #         # ALP_B,  # float
-    #         # ALP_nu_rot,  # float[:]
-    #         # ALP_phase,  # float[:]
-
-    #         # ALP_vtova_arr,  # float[:]
-    #         # BALP_arr,  # float[:,:]
-    #         # dBALPdt_arr,  # float[:,:]
-
-    #         # ALPwind_direction_earth,  # float[:]
-    #         # init_time,  # float
-    #         # simustep,  # float
-
-    #         # station_theta,  # float
-    #         # station_phi,  # float
-    #         Simulation.ThermalLightLoop(
-    #             numofsimustep=numofsimustep,  # int
-    #             numofALPparticle=self.numofALPparticle,  # int
-    #             random_phase=random_phase,  # float[:]
-    #             ALP_B=self.ALP_B,  # float
-    #             ALP_nu_rot=ALP_nu_rot_arr,  # float[:]
-    #             ALP_phase=ALP_phase,  # float[:]
-    #             ALP_vtova_arr=self.speedtova,  # float[:]
-    #             BALP_arr=self.Bexc_t_vec,  # float[:,:]
-    #             dBALPdt_arr=self.dBexc_dt_vec,  # float[:,:]
-    #             ALPwind_direction_earth=self.excField.direction_earth,  # float[:]
-    #             init_time=self.init_time,  # float
-    #             simustep=self.timeStep_s,  # float
-    #             station_theta=self.station.theta,  # float
-    #             station_phi=self.station.phi,  # float
-    #         )
-
-    #     else:
-    #         for i in range(numofsimustep):
-    #             # if verbose and i%10000 == 0:
-    #             #     check(i)
-    #             # decide BALP amplitude and phase0 from 2D random walk and decoherence due to 2 particle collision in each step
-    #             # tic = time.perf_counter()
-    #             phase_2i, phase_2ip1 = (
-    #                 ALP_phase[(2 * i) % (2 * self.numofALPparticle)],
-    #                 ALP_phase[(2 * i + 1) % (2 * self.numofALPparticle)],
-    #             )
-    #             rw -= (
-    #                 np.cos(phase_2i)
-    #                 + 1j * np.sin(phase_2i)
-    #                 + np.cos(phase_2ip1)
-    #                 + 1j * np.sin(phase_2ip1)
-    #             ) / np.sqrt(self.numofALPparticle / 2.0)
-
-    #             phase_2i_new, phase_2ip1_new = (
-    #                 random_phase[2 * i],
-    #                 random_phase[2 * i + 1],
-    #             )
-    #             rw += (
-    #                 np.cos(phase_2i_new)
-    #                 + 1j * np.sin(phase_2i_new)
-    #                 + np.cos(phase_2ip1_new)
-    #                 + 1j * np.sin(phase_2ip1_new)
-    #             ) / np.sqrt(2.0 * self.numofALPparticle)
-    #             (
-    #                 ALP_phase[(2 * i) % (2 * self.numofALPparticle)],
-    #                 ALP_phase[(2 * i + 1) % (2 * self.numofALPparticle)],
-    #             ) = (phase_2i_new, phase_2ip1_new)
-
-    #             BALP = self.excField.BALP * np.abs(rw)
-    #             phase0 = np.angle(rw)
-    #             # decide the direciton of B_ALP from the experiment time and motion of celestial bodies
-    #             # toc = time.perf_counter()
-    #             # newphase_generation += toc-tic
-    #             # tic = time.perf_counter()
-    #             direction_lab = Npole2station(
-    #                 theta_e=self.excField.direction_earth[1],  #
-    #                 phi_e=self.excField.direction_earth[2],  #
-    #                 theta_s=self.station.theta,  # theta_station
-    #                 phi_s=(self.init_time + i * self.timeStep_s) * 2 * np.pi / 86164.0
-    #                 + self.station.phi,  # phi_station
-    #                 verbose=False,
-    #             )
-    #             Bx, By, Bz = BALP * direction_lab
-    #             self.Bexc_t_vec[i] = [Bx, By, Bz, phase0]
-    #             # BALP_modu_list.append(direction_lab)
-    #             # toc = time.perf_counter()
-    #             # newBALP_generation += toc-tic
-    #     # looptime = newphase_generation + newBALP_generation
-    #     # if verbose:
-    #     #     check(newphase_generation/looptime)
-    #     self.timeStamp = np.arange(len(self.Bexc_t_vec)) * self.timeStep_s
-    #     check(self.excField.BALP * abs(self.sample.gamma.value_in("Hz/T")))
-    #     # check(self.BALP_array[:, 0])
-    #     self.BALPsq_arr = (
-    #         self.Bexc_t_vec[:, 0] ** 2
-    #         + self.Bexc_t_vec[:, 1] ** 2
-    #         + self.Bexc_t_vec[:, 2] ** 2
-    #     )
-    #     check(np.mean(np.sqrt(self.BALPsq_arr)) * abs(self.sample.gamma.value_in("Hz/T")))
-    #     check(np.sqrt(np.mean(self.BALPsq_arr)) * abs(self.sample.gamma.value_in("Hz/T")))
-    #     if verbose:
-    #         fig = plt.figure(figsize=(8 * 0.6, 6 * 0.6), dpi=150)  #
-    #         gs = gridspec.GridSpec(nrows=1, ncols=1)  #
-    #         # fig.subplots_adjust(left=left_spc, top=top_spc, right=right_spc,
-    #         #                     bottom=bottom_spc, wspace=xgrid_spc, hspace=ygrid_spc)
-    #         ax = fig.add_subplot(gs[0, 0])
-    #         ax.plot(
-    #             self.timeStamp,
-    #             2 * self.Bexc_t_vec[:, 0] / self.excField.BALP,
-    #             color="tab:brown",
-    #         )
-    #         ax.set_xlabel("time (s)")
-    #         ax.set_ylabel("$B_{a,t} / B_{a} $")
-    #         plt.tight_layout()
-    #         plt.show()
-    #     # plt.hist(np.sqrt(self.BALPsq_arr)/self.ALPwind.BALP, bins=30)
-    #     # plt.title('BALP_array/ALPwind.BALP')
-    #     # plt.show()
-    #     if verbose:
-    #         fig = plt.figure(figsize=(8 * 0.6, 6 * 0.6), dpi=150)  #
-    #         gs = gridspec.GridSpec(nrows=1, ncols=1)  #
-    #         # fig.subplots_adjust(left=left_spc, top=top_spc, right=right_spc,
-    #         #                     bottom=bottom_spc, wspace=xgrid_spc, hspace=ygrid_spc)
-    #         ax = fig.add_subplot(gs[0, 0])
-    #         ax.hist(
-    #             2 * np.sqrt(self.BALPsq_arr) / self.excField.BALP,
-    #             bins=50,
-    #             density=True,
-    #             color="blue",
-    #         )
-    #         ax.set_xticks([0, 1, 2, 3, 4])
-    #         ax.set_xlabel("$ |B_{a,t} / B_{a}| $")
-    #         ax.set_ylabel("Probability density")
-    #         plt.tight_layout()
-    #         plt.show()
-
-    # def InfCoherence(
-    #     self,
-    #     numofcohT=None,  # float. number of coherent period for simulation
-    #     verbose=False,
-    # ):
-    #     """
-    #     Generate parameters by 'thermal light' method.
-
-    #     Parameters
-    #     ----------
-    #     numofcohT : float
-
-    #     Number of coherent period for simulation. Can be integer or float values. Default in None.
-
-    #     verbose : bool
-
-    #     """
-    #     numofsimustep = int(self.simuRate_Hz * self.excField.cohT * numofcohT)
-    #     # initialize an array of particles
-    #     # rw2D = []
-    #     # numofALPparticle = int(self.simurate*self.ALPwind.cohT)
-    #     self.numofALPparticle = int(1234567)
-    #     ALP_phase = statUni2Pi(
-    #         num=2 * self.numofALPparticle, showplt=False, verbose=False
-    #     )
-    #     sin_arr = np.sin(ALP_phase)
-    #     cos_arr = np.cos(ALP_phase)
-    #     rw = (np.sum(cos_arr) + 1j * np.sum(sin_arr)) / np.sqrt(
-    #         self.numofALPparticle / 2.0
-    #     )
-    #     BALP = self.excField.BALP * np.abs(rw)
-    #     phase0 = np.angle(rw)
-    #     if verbose:
-    #         check(numofsimustep)
-    #     BALP_list = []
-    #     BALP_modu_list = []
-    #     # newphase_generation = 0
-    #     # newBALP_generation = 0
-    #     # loop
-    #     for i in range(numofsimustep):
-    #         # if verbose and i%10000 == 0:
-    #         #     check(i)
-    #         # decide the direciton of B_ALP from the experiment time and motion of celestial bodies
-    #         # toc = time.perf_counter()
-    #         # newphase_generation += toc-tic
-    #         # tic = time.perf_counter()
-    #         direction_lab = Npole2station(
-    #             theta_e=self.excField.direction_earth[1],  #
-    #             phi_e=self.excField.direction_earth[2],  #
-    #             theta_s=self.station.theta,  # theta_station
-    #             phi_s=(self.init_time + i * self.timeStep_s) * 2 * np.pi / 86164.0
-    #             + self.station.phi,  # phi_station
-    #             verbose=False,
-    #         )
-    #         Bx, By, Bz = BALP * direction_lab
-    #         BALP_list.append([Bx, By, Bz, phase0].copy())
-    #         BALP_modu_list.append(direction_lab)
-    #         # toc = time.perf_counter()
-    #         # newBALP_generation += toc-tic
-    #     # looptime = newphase_generation + newBALP_generation
-    #     # if verbose:
-    #     #     check(newphase_generation/looptime)
-    #     self.Bexc_t_vec = np.array(BALP_list)  # [Bx, By, Bz, phase0]
-    #     self.BALP_modu_array = np.array(BALP_modu_list) * self.excField.BALP
-    #     self.timeStamp = np.arange(len(self.Bexc_t_vec)) * self.timeStep_s
-
-    # def GenerateParam(
-    #     self,
-    #     numofcohT=None,  # float. number of coherent period for simulation
-    #     excType=None,  # 'inf coherence' 'ThermalLight'
-    #     showplt=False,  # whether to plot B_ALP
-    #     plotrate=None,
-    #     verbose=False,
-    # ):
-    #     """
-    #     Generate parameters for simulation.
-
-    #     Parameters
-    #     ----------
-    #     numofcohT : float
-
-    #     Number of coherent period for simulation. Can be integer or float values. Default in None.
-
-    #     excType : string
-
-    #     The type of excitation for generating simulation parameters.
-
-    #     'RandomJump' - The amplitude, phase, direction of B_1 field will jump to new random values.
-
-    #             The amplitude is sampled from Rayleigh distribution --> see utils.statRayleigh()
-
-    #             phase, direction (theta and phi in spherical coordinates) obey U[0, 2 pi), U[0, pi) and U[0, 2 pi).
-
-    #             theta->azimuthal angle, phi->polar angle.
-
-    #             refer to [1] -> 5. Sensitivity scaling with averaging time.
-
-    #     'thermal light' - Gradually change B_1 by the period of 1 coherent time.
-
-    #             The amplitude, phase, direction of B_1 field obey same distributions as in 'RandomJump' method.
-
-    #             However, there's no sudden jump. The decoherent progress happens gradually over time.
-
-    #             Refer to [2] and [3] for more details in this 'thermal light source' like ensemble.
-
-    #     verbose : bool
-
-    #     Reference
-    #     ---------
-    #     [1] Budker, D., Graham, P. W., Ledbetter, M., Rajendran, S. & Sushkov, A. O.
-    #         Proposal for a cosmic axion spin precession experiment (CASPEr). Phys. Rev.
-    #         X 4, 021030 (2014).
-
-    #     [2] Loudon, R. The Quantum Theory of Light 2nd edn (Oxford University Press, 1983).
-
-    #     [3] Dmitry Budker and Alexander O. Sushkov,  Physics on your feet: Berkeley graduate exam questions, DOI: 10.1080/00107514.2016.1156750
-
-    #     """
-    #     if self.excField.cohT is None:
-    #         raise ValueError("self.ALPwind.cohT is None")
-    #     if numofcohT is None:
-    #         raise TypeError("numofcohT is None")
-    #     # if numofcohT < 1:
-    #     #     raise ValueError('numofcohT < 1')
-    #     self.numofcohT = numofcohT * 1.0
-    #     self.method_dict = {
-    #         "RandomJump": Simulation.RandomJump,
-    #         "ThermalLight": Simulation.ThermalLight,
-    #         "InfCoherence": Simulation.InfCoherence,
-    #     }
-    #     if excType not in self.method_dict.keys():
-    #         raise KeyError("method not in self.method_dict.keys()")
-    #     else:
-    #         self.excType = excType
-
-    #     self.method_dict[excType](
-    #         self,
-    #         numofcohT=numofcohT,  # float. number of coherent period for simulation
-    #         verbose=verbose,
-    #     )
-    #     if showplt and excType == "InfCoherence":
-    #         if plotrate > self.simuRate_Hz:
-    #             print(
-    #                 "WARNING: plotrate > self.simurate. plotrate will be decreased to simurate"
-    #             )
-    #             plotrate = self.simuRate_Hz
-    #             plotintv = 1
-    #         else:
-    #             plotintv = int(1.0 * self.simuRate_Hz / plotrate)
-    #         # self.BALP_array = np.array(BALP_list)  # [Bx, By, Bz, phase0]
-    #         # self.timestamp = np.arange(len(self.BALP_array)+1)*self.simustep
-
-    #         fig = plt.figure(figsize=(4 * 1.0, 3 * 1.0), dpi=150)  #
-    #         gs = gridspec.GridSpec(nrows=1, ncols=1)  #
-    #         # fig.subplots_adjust( left=left_spc, top=top_spc, right=right_spc,bottom=bottom_spc,
-    #         # wspace=0.1, hspace=0.01)
-    #         # BALPamp_ax = fig.add_subplot(gs[0,0])
-    #         # BALPamp_ax.plot(self.timestamp[0:-1:plotintv], self.BALP_array[0:-1:plotintv, 3], label='$B_{ALP}$', color='tab:red', alpha=0.9)
-    #         # BALPamp_ax.legend(loc='upper right')
-    #         # BALPamp_ax.set_ylabel('ALP B field / T')
-    #         # BALPamp_ax.set_xlabel('time (s)')
-
-    #         BALPxyz_ax = fig.add_subplot(gs[0, 0])
-    #         BALPxyz_ax.plot(
-    #             self.timeStamp[0:-1:plotintv],
-    #             self.BALP_modu_array[0:-1:plotintv, 0],
-    #             label="ALP $B_{x}$",
-    #             color="tab:blue",
-    #             alpha=0.7,
-    #         )  # self.BALP_array[0:-1:plotintv, 0]
-    #         BALPxyz_ax.plot(
-    #             self.timeStamp[0:-1:plotintv],
-    #             self.BALP_modu_array[0:-1:plotintv, 1],
-    #             label="ALP $B_{y}$",
-    #             color="tab:orange",
-    #             alpha=0.7,
-    #         )
-    #         BALPxyz_ax.plot(
-    #             self.timeStamp[0:-1:plotintv],
-    #             self.BALP_modu_array[0:-1:plotintv, 2],
-    #             label="ALP $B_{z}$",
-    #             color="tab:green",
-    #             alpha=0.7,
-    #         )
-    #         BALPxyz_ax.set_ylabel("ALP B field / T")
-    #         BALPxyz_ax.set_xlabel("Time / hour")
-    #         BALPxyz_ax.legend(loc="upper right")
-    #         formatter = mticker.FuncFormatter(lambda y, _: f"{y/3600:.0f}")
-    #         BALPxyz_ax.xaxis.set_major_formatter(formatter)
-    #         plt.tight_layout()
-    #         plt.show()
-    #     elif showplt and excType != "InfCoherence":
-    #         if plotrate > self.simuRate_Hz:
-    #             print(
-    #                 "WARNING: plotrate > self.simurate. plotrate will be decreased to simurate"
-    #             )
-    #             plotrate = self.simuRate_Hz
-    #             plotintv = 1
-    #         else:
-    #             plotintv = int(1.0 * self.simuRate_Hz / plotrate)
-    #         # self.BALP_array = np.array(BALP_list)  # [Bx, By, Bz, phase0]
-    #         # self.timestamp = np.arange(len(self.BALP_array)+1)*self.simustep
-
-    #         fig = plt.figure(figsize=(7 * 1.0, 3 * 1.0), dpi=150)  #
-    #         gs = gridspec.GridSpec(nrows=1, ncols=2)  #
-    #         # fig.subplots_adjust( left=left_spc, top=top_spc, right=right_spc,bottom=bottom_spc,
-    #         # wspace=0.1, hspace=0.01)
-    #         # BALPamp_ax = fig.add_subplot(gs[0,0])
-    #         # BALPamp_ax.plot(self.timestamp[0:-1:plotintv], self.BALP_array[0:-1:plotintv, 3], label='$B_{ALP}$', color='tab:red', alpha=0.9)
-    #         # BALPamp_ax.legend(loc='upper right')
-    #         # BALPamp_ax.set_ylabel('ALP B field / T')
-    #         # BALPamp_ax.set_xlabel('time (s)')
-
-    #         BALPxyz_ax = fig.add_subplot(gs[0, 0])
-    #         BALPxyz_ax.plot(
-    #             self.timeStamp[0:-1:plotintv],
-    #             self.Bexc_t_vec[0:-1:plotintv, 0],
-    #             label="ALP $B_{x}$",
-    #             color="tab:blue",
-    #             alpha=0.7,
-    #         )  # self.BALP_array[0:-1:plotintv, 0]
-    #         BALPxyz_ax.plot(
-    #             self.timeStamp[0:-1:plotintv],
-    #             self.Bexc_t_vec[0:-1:plotintv, 1],
-    #             label="ALP $B_{y}$",
-    #             color="tab:orange",
-    #             alpha=0.7,
-    #         )
-    #         BALPxyz_ax.plot(
-    #             self.timeStamp[0:-1:plotintv],
-    #             self.Bexc_t_vec[0:-1:plotintv, 2],
-    #             label="ALP $B_{z}$",
-    #             color="tab:green",
-    #             alpha=0.7,
-    #         )
-    #         BALPxyz_ax.set_ylabel("ALP B field / T")
-    #         BALPxyz_ax.set_xlabel("Time / hour")
-    #         BALPxyz_ax.legend(loc="upper right")
-    #         formatter_s2h = mticker.FuncFormatter(lambda x, _: f"{x/3600:.1f}")
-    #         BALPxyz_ax.xaxis.set_major_formatter(formatter_s2h)
-
-    #         BALPphase0_ax = fig.add_subplot(gs[0, 1])
-    #         BALPphase0_ax.plot(
-    #             self.timeStamp[0:-1:plotintv],
-    #             self.Bexc_t_vec[0:-1:plotintv, 3],
-    #             label="ALP $\Phi_{0}$",
-    #             color="tab:cyan",
-    #             alpha=1.0,
-    #         )  # self.BALP_array[0:-1:plotintv, 0]
-    #         BALPphase0_ax.set_ylabel("Phase0/$\pi$ ")
-    #         BALPphase0_ax.set_xlabel("Time / hour")
-    #         BALPphase0_ax.xaxis.set_major_formatter(formatter_s2h)
-    #         # formatter_rad2pi = mticker.FuncFormatter(lambda y, _: f'{y/np.pi:.1f}')
-    #         # BALPphase0_ax.yaxis.set_major_formatter(formatter_rad2pi)
-    #         BALPphase0_ax.set_ylim(-1 * np.pi, 1 * np.pi)
-    #         BALPphase0_ax.set_yticks([-1 * np.pi, 0.0, 1 * np.pi])
-    #         BALPphase0_ax.set_yticklabels(["-$\pi$", "0", "$\pi$"])
-    #         plt.tight_layout()
-    #         plt.show()
-
-    # def generatePulseExcitation(
-    #     self,
-    #     pulseDur: float = 100e-6,
-    #     tipAngle: float = np.pi / 2,
-    #     direction: np.ndarray = np.array([1, 0, 0]),
-    #     nu_rot: float = None,
-    #     showplt: bool = False,  # whether to plot B_ALP
-    #     plotrate: float = None,
-    #     verbose: bool = False,
-    # ):
-    #     self.excType = "pulse"
-    #     B1 = 2 * tipAngle / (self.sample.gamma.value_in("Hz/T") * pulseDur)
-    #     duty_func = partial(gate, start=0, stop=pulseDur)
-    #     if nu_rot is None:
-    #         nu_rot = self.excField.nu - self.demodFreq_Hz
-    #     self.excField.setXYPulse(
-    #         timeStamp=self.timeStamp,
-    #         B1=B1,  # amplitude of the excitation pulse in (T)
-    #         nu_rot=nu_rot,  # Hz
-    #         init_phase=0,
-    #         direction=direction,
-    #         duty_func=duty_func,
-    #         verbose=False,
-    #     )
-
-    #     # check(duty_func(pulseDur / 2))
-
-    # @nb.jit
-    @nb.jit(
-        [
-            "void(float64[:,:], float64[:,:], \
-        float64, float64, float64, \
-            float64, float64, float64, float64, float64, float64, \
-        float64[:,:], float64[:,:], float64[:,:], float64[:,:])"
-        ],
-        nopython=True,
-    )
-    def generateTrajectory_1LoopByNb_loop(
-        B_t,
-        dBdt,  # \
-        Mx,
-        My,
-        Mz,  # \
-        gamma,
-        timeStep,
-        tsq_half,
-        M0eq,
-        T2,
-        T1,  #
-        trjry,
-        dMdt,
-        McrossB,
-        d2Mdt2,
-    ):
-        N = B_t.shape[0]
-
-        for i in range(N):
-            # for i, Bexc in enumerate(B_t):  # self.BALP_array [Bx, By, Bz, phase0]
-            # [Bx, By, Bz] = Bexc[
-            #     0:3
-            # ]  # *np.cos(2*np.pi * nu_rot * (i) * timestep + BALP[-1])
-            Bx = B_t[i, 0]
-            By = B_t[i, 1]
-            Bz = B_t[i, 2]
-            dBxdt = dBdt[i, 0]
-            dBydt = dBdt[i, 1]
-            dBzdt = dBdt[i, 2]
-
-            # --- First derivatives ---
-            # [dBxdt, dBydt, dBzdt] = dBdt[i][0:3]  #
-            dMxdt = gamma * (My * Bz - Mz * By) - Mx / T2
-            dMydt = gamma * (Mz * Bx - Mx * Bz) - My / T2
-            dMzdt = gamma * (Mx * By - My * Bx) - (Mz - M0eq) / T1
-
-            # --- Second derivatives ---
-            d2Mxdt2 = (
-                gamma * (dMydt * Bz + My * dBzdt - dMzdt * By - Mz * dBydt) - dMxdt / T2
-            )
-            d2Mydt2 = (
-                gamma * (dMzdt * Bx + Mz * dBxdt - dMxdt * Bz - Mx * dBzdt) - dMydt / T2
-            )
-            d2Mzdt2 = (
-                gamma * (dMxdt * By + Mx * dBydt - dMydt * Bx - My * dBxdt) - dMzdt / T1
-            )
-
-            # --- Integrate via truncated Taylor expansion ---
-            Mx += dMxdt * timeStep + d2Mxdt2 * tsq_half
-            My += dMydt * timeStep + d2Mydt2 * tsq_half
-            Mz += dMzdt * timeStep + d2Mzdt2 * tsq_half
-            # Mx1 = Mx + dMxdt * timeStep + d2Mxdt2 / 2.0 * timeStep**2
-            # My1 = My + dMydt * timeStep + d2Mydt2 / 2.0 * timeStep**2
-            # Mz1 = Mz + dMzdt * timeStep + d2Mzdt2 / 2.0 * timeStep**2
-
-            # record magnetization. only for recording. trjry does not involve in the kinetic simulation
-            trjry[i + 1, 0] += Mx
-            trjry[i + 1, 1] += My
-            trjry[i + 1, 2] += Mz
-
-            # ------ if we want to monitor the process ------
-            # dMdt[i, 0] = dMxdt
-            # dMdt[i, 1] = dMydt
-            # dMdt[i, 2] = dMzdt
-
-            # McrossB[i, 0] = My * Bz - Mz * By
-            # McrossB[i, 1] = Mz * Bx - Mx * Bz
-            # McrossB[i, 2] = Mx * By - My * Bx
-
-            # d2Mdt2[i, 0] = d2Mxdt2
-            # d2Mdt2[i, 1] = d2Mydt2
-            # d2Mdt2[i, 2] = d2Mzdt2
-            # ------ --------------------------------- ------
-
-            # [Mx, My, Mz] = [Mx1, My1, Mz1].copy()
-
-    def generateTrajectory_1LoopByNb(self, verbose: bool = False):
-        """
-        Generate trajectory of magnetization vector in Cartesian coordinate system
-        based on kinetic simulation for Bloch equations.
-        """
-        self.trjry = np.zeros((len(self.excField.B_vec) + 1, 3))
-        M = self.init_M_amp
-        theta = self.init_M_theta_rad
-        phi = self.init_M_phi_rad
-        [Mx0, My0, Mz0] = np.array(
-            [
-                M * np.sin(theta) * np.cos(phi),
-                M * np.sin(theta) * np.sin(phi),
-                M * np.cos(theta),
-            ]
-        )
-        M_init = np.array([Mx0, My0, Mz0])
-        # Magnetization at equilibrium
-        M0equ = 1.0
-        #
-        self.trjry[0] = M_init
-        tsq_half = 0.5 * self.timeStep_s**2
-        for i, B0_i in enumerate(self.magnet.B_vals_T):
-            ratio = self.magnet.ratios[i]
-
-            self.dMdt = np.zeros((len(self.excField.B_vec), 3))
-            self.McrossB = np.zeros((len(self.excField.B_vec), 3))
-            self.d2Mdt2 = np.zeros((len(self.excField.B_vec), 3))
-
-            B0z_rot_amp = B0_i - self.RCF_freq_Hz / (
-                self.sample.gamma.value_in("Hz/T") / (2 * np.pi)
-            )  # scalar
-            B0z_rot = B0z_rot_amp * np.ones(
-                len(self.excField.B_vec)
-            )  # B0z_rot.shape is (N)
-            B0_rot = np.outer(B0z_rot, np.array([0, 0, 1]))  # B0_rot.shape is (N, 3)
-
-            Simulation.generateTrajectory_1LoopByNb_loop(
-                B_t=self.excField.B_vec + B0_rot,
-                dBdt=self.excField.dBdt_vec,
-                Mx=ratio * Mx0,
-                My=ratio * My0,
-                Mz=ratio * Mz0,
-                gamma=self.sample.gamma.value_in("Hz/T"),
-                timeStep=self.timeStep_s,
-                tsq_half=tsq_half,
-                M0eq=ratio * M0equ,
-                T2=self.T2_s,
-                T1=self.T1_s,
-                trjry=self.trjry,
-                dMdt=self.dMdt,
-                McrossB=self.McrossB,
-                d2Mdt2=self.d2Mdt2,
-            )
-
-    @nb.jit(
-        [
-            "void("
-            "float64[:,:], float64[:,:], float64[:], float64[:], "
-            "float64, float64, float64, float64, float64, "
-            "float64, float64, float64, float64, float64,"
-            "float64[:,:])"
-        ],
-        nopython=True,
-    )
-    # @nb.njit
-    def generateTrajectory_2LoopsByNb_loop(
-        B_vec,
-        dBdt_vec,
-        B_vals_T,
-        ratios,
-        gamma,
-        timeStep,
-        tSqHalf,
-        T1,
-        T2,
-        RCF_Freq_Hz,
-        Mx0,
-        My0,
-        Mz0,
-        M0eqb,
-        trjry,
-    ):
-        N = B_vec.shape[0]
-        K = B_vals_T.shape[0]
-
-        # trjry = np.zeros((K, N+1, 3))
-
-        # trjry = np.zeros((N+1, 3))
-        trjry[0, 0] = Mx0
-        trjry[0, 1] = My0
-        trjry[0, 2] = Mz0
-
-        for k in range(K):  # OUTER LOOP (now compiled)
-            Mx = ratios[k] * Mx0
-            My = ratios[k] * My0
-            Mz = ratios[k] * Mz0
-
-            M0eqb_k = ratios[k] * M0eqb
-
-            B0z_rot_amp = B_vals_T[k] - RCF_Freq_Hz / (gamma / (2 * np.pi))
-
-            for i in range(N):  # INNER LOOP (compiled)
-                Bx = B_vec[i, 0]
-                By = B_vec[i, 1]
-                Bz = B_vec[i, 2] + B0z_rot_amp
-
-                dBxdt = dBdt_vec[i, 0]
-                dBydt = dBdt_vec[i, 1]
-                dBzdt = dBdt_vec[i, 2]
-
-                # derivatives
-                dMxdt = gamma * (My * Bz - Mz * By) - Mx / T2
-                dMydt = gamma * (Mz * Bx - Mx * Bz) - My / T2
-                dMzdt = gamma * (Mx * By - My * Bx) - (Mz - M0eqb_k) / T1
-
-                d2Mxdt2 = (
-                    gamma * (dMydt * Bz + My * dBzdt - dMzdt * By - Mz * dBydt)
-                    - dMxdt / T2
-                )
-                d2Mydt2 = (
-                    gamma * (dMzdt * Bx + Mz * dBxdt - dMxdt * Bz - Mx * dBzdt)
-                    - dMydt / T2
-                )
-                d2Mzdt2 = (
-                    gamma * (dMxdt * By + Mx * dBydt - dMydt * Bx - My * dBxdt)
-                    - dMzdt / T1
-                )
-
-                Mx += dMxdt * timeStep + tSqHalf * d2Mxdt2
-                My += dMydt * timeStep + tSqHalf * d2Mydt2
-                Mz += dMzdt * timeStep + tSqHalf * d2Mzdt2
-
-                # trjry[k, i+1, 0] = Mx
-                # trjry[k, i+1, 1] = My
-                # trjry[k, i+1, 2] = Mz
-                trjry[i + 1, 0] += Mx
-                trjry[i + 1, 1] += My
-                trjry[i + 1, 2] += Mz
-
-        # return trjry
-
-    def generateTrajectory_2LoopsByNb(self, verbose: bool = False):
-        """
-        Generate trajectory of magnetization vector in Cartesian coordinate system
-        based on kinetic simulation for Bloch equations.
-        """
-        self.trjry = np.zeros((len(self.excField.B_vec) + 1, 3))
-        self.dMdt = np.zeros((len(self.excField.B_vec), 3))
-        self.McrossB = np.zeros((len(self.excField.B_vec), 3))
-        self.d2Mdt2 = np.zeros((len(self.excField.B_vec), 3))
-
-        M = self.init_M_amp
-        theta = self.init_M_theta_rad
-        phi = self.init_M_phi_rad
-        [Mx0, My0, Mz0] = np.array(
-            [
-                M * np.sin(theta) * np.cos(phi),
-                M * np.sin(theta) * np.sin(phi),
-                M * np.cos(theta),
-            ]
-        )
-        M_init = np.array([Mx0, My0, Mz0])
-        # Magnetization at equilibrium
-        M0eqb = 1.0
-        #
-        # self.trjry[0] = M_init
-        tSqHalf = 0.5 * self.timeStep_s**2
-        Simulation.generateTrajectory_2LoopsByNb_loop(
-            B_vec=self.excField.B_vec,
-            dBdt_vec=self.excField.dBdt_vec,
-            B_vals_T=self.magnet.B_vals_T,
-            ratios=self.magnet.ratios,
-            gamma=self.sample.gamma.value_in("Hz/T"),
-            timeStep=self.timeStep_s,
-            tSqHalf=tSqHalf,
-            T2=self.T2_s,
-            T1=self.T1_s,
-            RCF_Freq_Hz=self.RCF_freq_Hz,
-            Mx0=Mx0,
-            My0=My0,
-            Mz0=Mz0,
-            M0eqb=M0eqb,
-            trjry=self.trjry,
-        )
-
-        # for i, B0_i in enumerate(self.magnet_det.B_vals_T):
-        #     ratio = self.magnet_det.ratios[i]
-
-        #     self.dMdt = np.zeros((len(self.excField.B_vec), 3))
-        #     self.McrossB = np.zeros((len(self.excField.B_vec), 3))
-        #     self.d2Mdt2 = np.zeros((len(self.excField.B_vec), 3))
-
-        #     B0z_rot_amp = B0_i - self.RCF_Freq_Hz / (
-        #         self.sample.gamma.value_in("Hz/T") / (2 * np.pi)
-        #     )  # scalar
-        #     B0z_rot = B0z_rot_amp * np.ones(
-        #         len(self.excField.B_vec)
-        #     )  # B0z_rot.shape is (N)
-        #     B0_rot = np.outer(B0z_rot, np.array([0, 0, 1]))  # B0_rot.shape is (N, 3)
-
-        #     Simulation.generateTrajectoryLoop_doubleLoop(
-        #         B_t=self.excField.B_vec + B0_rot,
-        #         dBdt=self.excField.dBdt_vec,
-        #         Mx=ratio * Mx,
-        #         My=ratio * My,
-        #         Mz=ratio * Mz,
-        #         gamma=self.sample.gamma.value_in("Hz/T"),
-        #         timeStep=self.timeStep_s,
-        #         tSqHalf=tSqHalf,
-        #         M0equ=ratio * M0equ,
-        #         T2=self.T2_s,
-        #         T1=self.T1_s,
-        #         trjry=self.trjry,
-        #         dMdt=self.dMdt,
-        #         McrossB=self.McrossB,
-        #         d2Mdt2=self.d2Mdt2,
-        #     )
-
-    def generateTrajectory_noNb(self, use_numba: bool = False, verbose: bool = False):
-        """
-        Generate trajectory of magnetization vector in Cartesian coordinate system
-        based on kinetic simulation for Bloch equations.
-        """
-        self.trjry = np.zeros((len(self.excField.B_vec) + 1, 3))
-        self.dMdt = np.zeros((len(self.excField.B_vec), 3))
-        self.McrossB = np.zeros((len(self.excField.B_vec), 3))
-        self.d2Mdt2 = np.zeros((len(self.excField.B_vec), 3))
-        M = self.init_M_amp
-        theta = self.init_M_theta_rad
-        phi = self.init_M_phi_rad
-        [Mx0, My0, Mz0] = np.array(
-            [
-                M * np.sin(theta) * np.cos(phi),
-                M * np.sin(theta) * np.sin(phi),
-                M * np.cos(theta),
-            ]
-        )
-        M_init = np.array([Mx0, My0, Mz0])
-        # vecM0 = np.array([Mx, My, Mz])
-        # Magnetization at equilibrium
-        M0equ = 1.0
-        #
-        self.trjry[0] = M_init
-        #
-        timeStep = self.timeStep_s
-        gamma = self.sample.gamma.value_in("Hz/T")
-        B0z_rot_amp = self.B0z_T - self.RCF_freq_Hz / (
-            self.sample.gamma.value_in("Hz/T") / (2 * np.pi)
-        )
-        B0z_rot = B0z_rot_amp * np.ones(len(self.excField.B_vec))
-        B0_rot = np.outer(B0z_rot, np.array([0, 0, 1]))
-
-        # does not support inhomogeneous bias field
-        for i, BALP in enumerate(self.excField.B_vec):
-            [Bx, By, Bz] = BALP[0:3] * np.cos(
-                2 * np.pi * self.nuL_Hz * (i) * timeStep + BALP[-1]
-            )
-            [dBxdt, dBydt, dBzdt] = (
-                (-1.0)
-                * BALP[0:3]
-                * 2
-                * np.pi
-                * self.nuL_Hz
-                * np.sin(2 * np.pi * self.nuL_Hz * (i) * timeStep + BALP[-1])
-            )
-            dMxdt = gamma * (My * Bz - Mz * By) - Mx / self.T2_s
-            dMydt = gamma * (Mz * Bx - Mx * Bz) - My / self.T2_s
-            dMzdt = gamma * (Mx * By - My * Bx) - (Mz - M0equ) / self.T1_s
-
-            d2Mxdt2 = (
-                gamma * (dMydt * Bz + My * dBzdt - dMzdt * By - Mz * dBydt)
-                - dMxdt / self.T2_s
-            )
-            d2Mydt2 = (
-                gamma * (dMzdt * Bx + Mz * dBxdt - dMxdt * Bz - Mx * dBzdt)
-                - dMydt / self.T2_s
-            )
-            d2Mzdt2 = (
-                gamma * (dMxdt * By + Mx * dBydt - dMydt * Bx - My * dBxdt)
-                - dMzdt / self.T1_s
-            )
-
-            Mx1 = Mx + dMxdt * timeStep + d2Mxdt2 / 2.0 * timeStep**2
-            My1 = My + dMydt * timeStep + d2Mydt2 / 2.0 * timeStep**2
-            Mz1 = Mz + dMzdt * timeStep + d2Mzdt2 / 2.0 * timeStep**2
-
-            self.trjry[i + 1] = [Mx1, My1, Mz1]
-            self.dMdt[i] = [dMxdt, dMydt, dMzdt]
-            self.McrossB[i] = [
-                My * Bz - Mz * By,
-                Mz * Bx - Mx * Bz,
-                Mx * By - My * Bx,
-            ]
-            self.d2Mdt2[i] = [d2Mxdt2, d2Mydt2, d2Mzdt2]
-            # [Mx0, My0, Mz0] = [Mx, My, Mz].copy()
-            [Mx, My, Mz] = [Mx1, My1, Mz1].copy()
-
-        if verbose:
-            check(self.trjry.shape)
-
-    @njit(
-        [
-            "void(float64[:,:], float64[:,:], float64[:], float64[:], "
-            "float64, float64, float64, float64, float64, "
-            "float64, float64, float64, float64, float64, "
-            "float64[:,:])"
-        ],
-        nopython=True,
-    )
-    def generateTrajectory_vectorized_loop(
-        B_vec,
-        dBdt_vec,
-        B_vals_T,
-        ratios,
-        gamma,
-        timeStep,
-        tSqHalf,
-        T1,
-        T2,
-        RCF_freq_Hz,
-        Mx0,
-        My0,
-        Mz0,
-        M0eqb,
-        trjry,
-    ):
-        # numFields = B_vec.shape[0]  # number of time steps
-        numTimeSteps = B_vec.shape[0]  # number of time steps
-        # K = B_vals_T.shape[0]  # number of ratios/B_vals
-
-        # Initialize magnetization for all spin packets
-        # M shape = (numPt)
-        Mx = ratios * Mx0
-        My = ratios * My0
-        Mz = ratios * Mz0
-        M0eqb_arr = ratios * M0eqb
-
-        # Precompute B0z_rot_amp for all K
-        B0z_rot_amp = B_vals_T - RCF_freq_Hz / (gamma / (2 * np.pi))
-
-        # Initialize trajectory array for accumulation
-        trjry[0, 0] = Mx0
-        trjry[0, 1] = My0
-        trjry[0, 2] = Mz0
-
-        # Loop over time steps
-        for i in range(numTimeSteps):
-            # Extract B and dBdt at this time step
-            Bx = B_vec[i, 0]
-            By = B_vec[i, 1]
-            Bz_raw = B_vec[i, 2]
-            dBxdt = dBdt_vec[i, 0]
-            dBydt = dBdt_vec[i, 1]
-            dBzdt = dBdt_vec[i, 2]
-
-            #
-            Bz = Bz_raw + B0z_rot_amp
-
-            # First derivatives (vectorized over K)
-            dMxdt = gamma * (My * Bz - Mz * By) - Mx / T2
-            dMydt = gamma * (Mz * Bx - Mx * Bz) - My / T2
-            dMzdt = gamma * (Mx * By - My * Bx) - (Mz - M0eqb_arr) / T1
-
-            # Second derivatives (vectorized over K)
-            d2Mxdt2 = (
-                gamma * (dMydt * Bz + My * dBzdt - dMzdt * By - Mz * dBydt) - dMxdt / T2
-            )
-            d2Mydt2 = (
-                gamma * (dMzdt * Bx + Mz * dBxdt - dMxdt * Bz - Mx * dBzdt) - dMydt / T2
-            )
-            d2Mzdt2 = (
-                gamma * (dMxdt * By + Mx * dBydt - dMydt * Bx - My * dBxdt) - dMzdt / T1
-            )
-
-            # Update M for all K
-            Mx += dMxdt * timeStep + tSqHalf * d2Mxdt2
-            My += dMydt * timeStep + tSqHalf * d2Mydt2
-            Mz += dMzdt * timeStep + tSqHalf * d2Mzdt2
-
-            # Accumulate trajectory
-            trjry[i + 1, 0] += Mx.sum()
-            trjry[i + 1, 1] += My.sum()
-            trjry[i + 1, 2] += Mz.sum()
-
-    def generateTrajectory_vectorized(self, verbose: bool = False):
+    def generateTrajectories(self, cleanup: bool = False, verbose: bool = False):
         """
         Generate trajectory of magnetization vector in Cartesian coordinate system
         based on kinetic simulation for Bloch equations.
         """
         # numFields = self.excField.B_vec.shape[0]
-        self.trjry = np.zeros((self.numSteps + 1, 3))
-        self.dMdt = np.zeros((self.numSteps, 3))
-        self.McrossB = np.zeros((self.numSteps, 3))
-        self.d2Mdt2 = np.zeros((self.numSteps, 3))
-        # print(f"{self.generateTrajectory_vectorized.__name__}: self.trjry.shape = ", self.trjry.shape)
-        # print(f"{self.generateTrajectory_vectorized.__name__}: self.trjry[0] = ", self.trjry[0])
-        [Mx0, My0, Mz0] = np.array(
-            [
-                self.init_M_amp
-                * np.sin(self.init_M_theta_rad)
-                * np.cos(self.init_M_phi_rad),
-                self.init_M_amp
-                * np.sin(self.init_M_theta_rad)
-                * np.sin(self.init_M_phi_rad),
-                self.init_M_amp * np.cos(self.init_M_theta_rad),
-            ]
-        )
-        M_init = np.array([Mx0, My0, Mz0])
-        # Magnetization at equilibrium
-        M0eqb = 1.0
-        #
-        # self.trjry[0] = M_init
-        tSqHalf = 0.5 * self.timeStep_s**2
-
-        # @record_runtime_YorN(RECORD_RUNTIME)
-        Simulation.generateTrajectory_vectorized_loop(
-            B_vec=self.excField.B_vec,
-            dBdt_vec=self.excField.dBdt_vec,
-            B_vals_T=self.magnet.B_vals_T,
-            ratios=self.magnet.ratios,
-            gamma=self.sample.gamma.value_in("Hz/T"),
-            timeStep=self.timeStep_s,
-            tSqHalf=tSqHalf,
-            T2=self.T2_s,
-            T1=self.T1_s,
-            RCF_freq_Hz=self.RCF_freq_Hz,
-            Mx0=Mx0,
-            My0=My0,
-            Mz0=Mz0,
-            M0eqb=M0eqb,
-            trjry=self.trjry,
-        )
-
-    def generateTrajectories(self, cleanup: bool = True, verbose: bool = False):
-        """
-        Generate trajectory of magnetization vector in Cartesian coordinate system
-        based on kinetic simulation for Bloch equations.
-        """
-        numFields = self.excField.B_vec.shape[0]
         # self.trjry = np.zeros((numFields, self.numSteps + 1, 3))
         # self.dMdt = np.zeros((numFields,self.numSteps, 3))
         # self.McrossB = np.zeros((numFields, self.numSteps, 3))
@@ -2865,138 +1707,138 @@ class Simulation(PhysicalObject):
             del self.excField.B_vec, self.excField.dBdt_vec
             del self.dMdt, self.McrossB, self.d2Mdt2
 
-    @njit(
-        [
-            "void(float64[:,:], float64[:,:], float64[:], float64[:], "
-            "float64, float64, float64, float64, float64, "
-            "float64, float64, float64, float64, float64, "
-            "float64[:,:])"
-        ],
-        nopython=True,
-    )
-    def generateTrajectory_vec2_loop(
-        B_vec,
-        dBdt_vec,
-        B_vals_T,
-        ratios,
-        gamma,
-        timeStep,
-        tSqHalf,
-        T1,
-        T2,
-        RCF_freq_Hz,
-        Mx0,
-        My0,
-        Mz0,
-        M0eqb,
-        trjry,
-    ):
-        # numFields = B_vec.shape[0]  # number of time steps
-        numTimeSteps = B_vec.shape[0]  # number of time steps
-        # K = B_vals_T.shape[0]  # number of ratios/B_vals
+    # @njit(
+    #     [
+    #         "void(float64[:,:], float64[:,:], float64[:], float64[:], "
+    #         "float64, float64, float64, float64, float64, "
+    #         "float64, float64, float64, float64, float64, "
+    #         "float64[:,:])"
+    #     ],
+    #     nopython=True,
+    # )
+    # def generateTrajectory_vec2_loop(
+    #     B_vec,
+    #     dBdt_vec,
+    #     B_vals_T,
+    #     ratios,
+    #     gamma,
+    #     timeStep,
+    #     tSqHalf,
+    #     T1,
+    #     T2,
+    #     RCF_freq_Hz,
+    #     Mx0,
+    #     My0,
+    #     Mz0,
+    #     M0eqb,
+    #     trjry,
+    # ):
+    #     # numFields = B_vec.shape[0]  # number of time steps
+    #     numTimeSteps = B_vec.shape[0]  # number of time steps
+    #     # K = B_vals_T.shape[0]  # number of ratios/B_vals
 
-        # Initialize magnetization for all spin packets
-        # M shape = (numPt)
-        Mx = ratios * Mx0
-        My = ratios * My0
-        Mz = ratios * Mz0
-        M0eqb_arr = ratios * M0eqb
+    #     # Initialize magnetization for all spin packets
+    #     # M shape = (numPt)
+    #     Mx = ratios * Mx0
+    #     My = ratios * My0
+    #     Mz = ratios * Mz0
+    #     M0eqb_arr = ratios * M0eqb
 
-        # Precompute B0z_rot_amp for all K
-        B0z_rot_amp = B_vals_T - RCF_freq_Hz / (gamma / (2 * np.pi))
+    #     # Precompute B0z_rot_amp for all K
+    #     B0z_rot_amp = B_vals_T - RCF_freq_Hz / (gamma / (2 * np.pi))
 
-        # Initialize trajectory array for accumulation
-        trjry[:, 0] = Mx0
-        trjry[:, 1] = My0
-        trjry[:, 2] = Mz0
+    #     # Initialize trajectory array for accumulation
+    #     trjry[:, 0] = Mx0
+    #     trjry[:, 1] = My0
+    #     trjry[:, 2] = Mz0
 
-        # Loop over time steps
-        for i in range(numTimeSteps):
-            # Extract B and dBdt at this time step
-            Bx = B_vec[i, 0]
-            By = B_vec[i, 1]
-            Bz_raw = B_vec[i, 2]
-            dBxdt = dBdt_vec[i, 0]
-            dBydt = dBdt_vec[i, 1]
-            dBzdt = dBdt_vec[i, 2]
+    #     # Loop over time steps
+    #     for i in range(numTimeSteps):
+    #         # Extract B and dBdt at this time step
+    #         Bx = B_vec[i, 0]
+    #         By = B_vec[i, 1]
+    #         Bz_raw = B_vec[i, 2]
+    #         dBxdt = dBdt_vec[i, 0]
+    #         dBydt = dBdt_vec[i, 1]
+    #         dBzdt = dBdt_vec[i, 2]
 
-            #
-            Bz = Bz_raw + B0z_rot_amp
+    #         #
+    #         Bz = Bz_raw + B0z_rot_amp
 
-            # First derivatives (vectorized over K)
-            dMxdt = gamma * (My * Bz - Mz * By) - Mx / T2
-            dMydt = gamma * (Mz * Bx - Mx * Bz) - My / T2
-            dMzdt = gamma * (Mx * By - My * Bx) - (Mz - M0eqb_arr) / T1
+    #         # First derivatives (vectorized over K)
+    #         dMxdt = gamma * (My * Bz - Mz * By) - Mx / T2
+    #         dMydt = gamma * (Mz * Bx - Mx * Bz) - My / T2
+    #         dMzdt = gamma * (Mx * By - My * Bx) - (Mz - M0eqb_arr) / T1
 
-            # Second derivatives (vectorized over K)
-            d2Mxdt2 = (
-                gamma * (dMydt * Bz + My * dBzdt - dMzdt * By - Mz * dBydt) - dMxdt / T2
-            )
-            d2Mydt2 = (
-                gamma * (dMzdt * Bx + Mz * dBxdt - dMxdt * Bz - Mx * dBzdt) - dMydt / T2
-            )
-            d2Mzdt2 = (
-                gamma * (dMxdt * By + Mx * dBydt - dMydt * Bx - My * dBxdt) - dMzdt / T1
-            )
+    #         # Second derivatives (vectorized over K)
+    #         d2Mxdt2 = (
+    #             gamma * (dMydt * Bz + My * dBzdt - dMzdt * By - Mz * dBydt) - dMxdt / T2
+    #         )
+    #         d2Mydt2 = (
+    #             gamma * (dMzdt * Bx + Mz * dBxdt - dMxdt * Bz - Mx * dBzdt) - dMydt / T2
+    #         )
+    #         d2Mzdt2 = (
+    #             gamma * (dMxdt * By + Mx * dBydt - dMydt * Bx - My * dBxdt) - dMzdt / T1
+    #         )
 
-            # Update M for all K
-            Mx += dMxdt * timeStep + tSqHalf * d2Mxdt2
-            My += dMydt * timeStep + tSqHalf * d2Mydt2
-            Mz += dMzdt * timeStep + tSqHalf * d2Mzdt2
+    #         # Update M for all K
+    #         Mx += dMxdt * timeStep + tSqHalf * d2Mxdt2
+    #         My += dMydt * timeStep + tSqHalf * d2Mydt2
+    #         Mz += dMzdt * timeStep + tSqHalf * d2Mzdt2
 
-            # Accumulate trajectory across K
-            # for f in range(numFields):
-            trjry[i + 1, 0] += Mx.sum()
-            trjry[i + 1, 1] += My.sum()
-            trjry[i + 1, 2] += Mz.sum()
+    #         # Accumulate trajectory across K
+    #         # for f in range(numFields):
+    #         trjry[i + 1, 0] += Mx.sum()
+    #         trjry[i + 1, 1] += My.sum()
+    #         trjry[i + 1, 2] += Mz.sum()
 
-    def generateTrajectory_vec2(self, verbose: bool = False):
-        """
-        Generate trajectory of magnetization vector in Cartesian coordinate system
-        based on kinetic simulation for Bloch equations.
-        """
-        # numFields = self.excField.B_vec.shape[0]
-        self.trjry = np.zeros((self.numSteps + 1, 3))
-        self.dMdt = np.zeros((self.numSteps, 3))
-        self.McrossB = np.zeros((self.numSteps, 3))
-        self.d2Mdt2 = np.zeros((self.numSteps, 3))
-        # print(f"{self.generateTrajectory_vectorized.__name__}: self.trjry.shape = ", self.trjry.shape)
-        # print(f"{self.generateTrajectory_vectorized.__name__}: self.trjry[0] = ", self.trjry[0])
-        M = self.init_M_amp
-        theta = self.init_M_theta_rad
-        phi = self.init_M_phi_rad
-        [Mx0, My0, Mz0] = np.array(
-            [
-                M * np.sin(theta) * np.cos(phi),
-                M * np.sin(theta) * np.sin(phi),
-                M * np.cos(theta),
-            ]
-        )
-        M_init = np.array([Mx0, My0, Mz0])
-        # Magnetization at equilibrium
-        M0eqb = 1.0
-        #
-        # self.trjry[0] = M_init
-        tSqHalf = 0.5 * self.timeStep_s**2
+    # def generateTrajectory_vec2(self, verbose: bool = False):
+    #     """
+    #     Generate trajectory of magnetization vector in Cartesian coordinate system
+    #     based on kinetic simulation for Bloch equations.
+    #     """
+    #     # numFields = self.excField.B_vec.shape[0]
+    #     self.trjry = np.zeros((self.numSteps + 1, 3))
+    #     self.dMdt = np.zeros((self.numSteps, 3))
+    #     self.McrossB = np.zeros((self.numSteps, 3))
+    #     self.d2Mdt2 = np.zeros((self.numSteps, 3))
+    #     # print(f"{self.generateTrajectory_vectorized.__name__}: self.trjry.shape = ", self.trjry.shape)
+    #     # print(f"{self.generateTrajectory_vectorized.__name__}: self.trjry[0] = ", self.trjry[0])
+    #     M = self.init_M_amp
+    #     theta = self.init_M_theta_rad
+    #     phi = self.init_M_phi_rad
+    #     [Mx0, My0, Mz0] = np.array(
+    #         [
+    #             M * np.sin(theta) * np.cos(phi),
+    #             M * np.sin(theta) * np.sin(phi),
+    #             M * np.cos(theta),
+    #         ]
+    #     )
+    #     M_init = np.array([Mx0, My0, Mz0])
+    #     # Magnetization at equilibrium
+    #     M0eqb = 1.0
+    #     #
+    #     # self.trjry[0] = M_init
+    #     tSqHalf = 0.5 * self.timeStep_s**2
 
-        # @record_runtime_YorN(RECORD_RUNTIME)
-        Simulation.generateTrajectory_vec2_loop(
-            B_vec=self.excField.B_vec,
-            dBdt_vec=self.excField.dBdt_vec,
-            B_vals_T=self.magnet.B_vals_T,
-            ratios=self.magnet.ratios,
-            gamma=self.sample.gamma.value_in("Hz/T"),
-            timeStep=self.timeStep_s,
-            tSqHalf=tSqHalf,
-            T2=self.T2_s,
-            T1=self.T1_s,
-            RCF_freq_Hz=self.RCF_freq_Hz,
-            Mx0=Mx0,
-            My0=My0,
-            Mz0=Mz0,
-            M0eqb=M0eqb,
-            trjry=self.trjry,
-        )
+    #     # @record_runtime_YorN(RECORD_RUNTIME)
+    #     Simulation.generateTrajectory_vec2_loop(
+    #         B_vec=self.excField.B_vec,
+    #         dBdt_vec=self.excField.dBdt_vec,
+    #         B_vals_T=self.magnet.B_vals_T,
+    #         ratios=self.magnet.ratios,
+    #         gamma=self.sample.gamma.value_in("Hz/T"),
+    #         timeStep=self.timeStep_s,
+    #         tSqHalf=tSqHalf,
+    #         T2=self.T2_s,
+    #         T1=self.T1_s,
+    #         RCF_freq_Hz=self.RCF_freq_Hz,
+    #         Mx0=Mx0,
+    #         My0=My0,
+    #         Mz0=Mz0,
+    #         M0eqb=M0eqb,
+    #         trjry=self.trjry,
+    #     )
 
     def monitorTrajectory(
         self,
@@ -3243,7 +2085,7 @@ class Simulation(PhysicalObject):
         fig = plt.figure(figsize=(15 * 0.8, 7 * 0.8), dpi=150)  #
         gs = gridspec.GridSpec(nrows=2, ncols=4)  #
         # fix the margins
-        left = 0.056
+        left = 0.083
         bottom = 0.1
         right = 0.985
         top = 0.924

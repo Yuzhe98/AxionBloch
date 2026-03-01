@@ -14,7 +14,10 @@ authors = [
     { name = "Yuzhe Zhang", email = "yuhzhang@uni-mainz.de" }
 ]
 readme = "README.md"
-license = { file = "LICENSE" }
+
+license = "MIT"
+license-files = ["LICENSE"]
+
 requires-python = ">=3.9"
 dependencies = [
     # see docs/requirements.txt)

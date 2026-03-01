@@ -62,7 +62,7 @@ ext_modules = []
 if not on_rtd:
     ext_modules = [
         Pybind11Extension(
-            "axionbloch._bloch_ext",
+            "axionbloch.blochsimulation",
             [
                 "blochsimulation_ext/bloch_wrapper.cpp",
                 "blochsimulation_ext/bloch.cpp",

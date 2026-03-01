@@ -1,72 +1,10 @@
-# src/AxionWind.py
+# axionbloch/AxionWind.py
 
 import numpy as np
 
-
-from astropy.time import Time
-
-# import TASSLE.tassle.axion_wind as wind
-
-from axionbloch.enphylope import PhysicalQuantity, c
-
-from axionbloch.utils import PhysicalObject
-
-
-class Station:
-    def __init__(
-        self,
-        name="Station name",
-        NSsemisphere=None,  # 'N' or 'S'
-        EWsemisphere=None,  # 'E' or 'W'
-        unit="deg",
-        latitude_deg=None,  # in [deg]
-        longitude_deg=None,  # in [deg]
-        elevation=None,  # in [m]
-        verbose=False,
-    ):
-        """
-        initialize a station on Earth
-        """
-        if name is None:
-            raise ValueError("name is None")
-
-        self.name = name
-        self.NSsemisphere = NSsemisphere
-        self.EWsemisphere = EWsemisphere
-        # if latitude is None:
-        #     raise ValueError('latitude is None')
-        self.latitude_deg = latitude_deg
-        self.longitude_deg = longitude_deg
-        # if NSsemisphere == 'N':
-        #     self.theta = np.pi/2 - self.latitude
-        # elif NSsemisphere == 'S':
-        #     self.theta = np.pi/2 + self.latitude
-        # else:
-        #     raise ValueError('NSsemisphere != \'N\' nor \'S\'')
-
-        # if EWsemisphere == 'E':
-        #     self.phi = self.longitude
-        # elif EWsemisphere == 'W':
-        #     self.phi = (-1.)* self.longitude
-        # else:
-        #     raise ValueError('NSsemisphere != \'N\' nor \'S\'')
-
-        # self.nvec = np.array([np.sin(self.theta)*np.cos(self.phi), np.sin(self.theta)*np.sin(self.phi), np.cos(self.theta)])
-        self.elevation = elevation
-        self.R = self.elevation + 6356.7523e3  # radius
-        # self.rvec = self.R * self.nvec
-
-
-Mainz = Station(
-    name="Mainz",
-    NSsemisphere="N",  # 'N' or 'S'
-    EWsemisphere="E",  # 'E' or 'W'
-    unit="deg",
-    latitude_deg=49.9916,  # in [deg]
-    longitude_deg=(8.0 + 16.0 / 60.0 + 26.2056 / 3600),  # in [deg]
-    elevation=130.0,
-    verbose=False,
-)
+from axionbloch.utils import PhysicalObject, axion_lineshape
+from axionbloch.enphylope import PhysicalQuantity
+from axionbloch.constants import c, hbar
 
 
 class AxionWind(PhysicalObject):
@@ -104,12 +42,6 @@ class AxionWind(PhysicalObject):
         self.nu_a = nu_a
         self.gaNN = gaNN
 
-        # self.year = year
-        # self.month = month
-        # self.day = day
-        # self.time_hms = time_hms
-        # self.timeastro = timeastro
-
         if Qa is None:
             self.Qa = (c / self.v_lab) ** 2.0
 
@@ -138,6 +70,101 @@ class AxionWind(PhysicalObject):
         # self.generalQuantities = {"RCF_freq": "Hz", "rate": "Hz", "duration": "s"}
         # self.Omega_a_rms = 0.5 * self.gaNN * (2 * hbar * c * self.rho_E_DM)**(1/2) * self.v_lab * np.cos(windAngle) * PhysicalQuantity(1e-15, "T")
         self.useCommonUnits()
+
+    def getRabiFreq(self, case="grad_perp", verbose=False) -> PhysicalQuantity:
+        """
+        get the Rabi frequency of the pseudomagnetic field amplitude in [Hz] for the specified case
+        case: "non-grad", "grad_par" or "grad_perp", determines the lineshape function to use
+        """
+        # if case == "non-grad":
+        #     Omega_rms = 0.5 * self.gaNN * (2 * c * self.rho_E_DM) ** (
+        #         1 / 2
+        #     ) * self.v_lab * np.cos(self.windAngle)
+        # elif case == "grad_par":
+        #     Omega_rms = 0.5 * self.gaNN * (2 * c * self.rho_E_DM) ** (
+        #         1 / 2
+        #     ) * self.v_lab * np.cos(self.windAngle) * self.FWHM**(1 / 2)
+        # el
+        if case == "grad_perp":
+            Omega_rms = (
+                0.5 * self.gaNN * (2 * hbar * c * self.rho_E_DM) ** (1 / 2) * self.v_lab
+            )
+            Omega_rms = Omega_rms.convert_to("Hz")
+        else:
+            raise ValueError(
+                f"case {case} not recognized, should be 'grad_perp'"
+            )  #  'non-grad', 'grad_par' or
+        if verbose:
+            print(f"axion wind Rabi frequency (case={case}): {Omega_rms}")
+        return Omega_rms
+
+    def getAmpSpectra(
+        self,
+        frequencies: np.ndarray,
+        case: str = "grad_perp",
+        numSpectra: int = 1,
+        rand_seed: int = None,
+        use_stoch: bool = True,
+        verbose: bool = False,
+    ) -> np.ndarray:
+        """
+        get the normalized axion wind spectrum / spectra at the specified frequencies
+        Parameters
+        ----------
+        frequencies: absolute frequencies at which to evaluate the axion wind spectrum, in [Hz]
+        case:  "non-grad", "grad_par" or "grad_perp", determines the lineshape function to use
+        """
+        # frequencies = np.linspace(
+        #     -0.5 / timeStep_s, 0.5 / timeStep_s, num=numSteps, endpoint=True
+        # )
+        # if verbose:
+        #     check(timeStep_s)
+        #     check(numSteps)
+
+        # tic = time.perf_counter()
+        avgPSD = axion_lineshape(
+            v_0_ms=self.v_0.value_in("m/s"),
+            v_lab_ms=self.v_lab.value_in("m/s"),
+            nu_a_Hz=self.nu_a.value_in("Hz"),
+            nu=frequencies,
+            case=case,
+            alpha=0.0,
+        )
+        # toc = time.perf_counter()
+        # timeConsumption = toc - tic
+        # if verbose:
+        #     print(f"axion_lineshape time consumption = {timeConsumption:.3e} s")
+        shape = (numSpectra, len(frequencies))
+        # tic = time.perf_counter()
+        rng = (
+            np.random.default_rng(seed=rand_seed)
+            if rand_seed is not None
+            else np.random.default_rng()
+        )
+
+        # phases over frequency
+        phases = np.exp(1j * 2 * np.pi * rng.random(shape))
+
+        # amplitude spectra (complex) over frequency, shape = (numFields, numSteps)
+        if use_stoch:
+            stochastic = rng.exponential(scale=1.0, size=shape)
+            ampSpectra = (
+                np.sqrt(stochastic * avgPSD) * phases
+            )  # shape = (numFields, numSteps)
+        else:
+            ampSpectra = np.sqrt(avgPSD) * phases  # shape = (numFields, numSteps)
+
+        # toc = time.perf_counter()
+        # timeConsumption = toc - tic
+        # if verbose:
+        #     print(f"rng time consumption = {timeConsumption:.3e} s")
+
+        # check(amp_freq.shape)  # shape = (numFields, numSteps)
+        # check(phase_freq.shape)  # shape = (numFields, numSteps)
+
+        # TODO optimize when only a small fraction of lineshapes is non-zero by using less lengths for amp and phase
+
+        return ampSpectra
 
     # def GetAxionWind(
     #     self,

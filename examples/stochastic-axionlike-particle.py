@@ -4,7 +4,7 @@ import os
 import numpy as np
 import time
 
-from axionbloch.AxionWind import AxionWind
+from axionbloch.axionwind import AxionWind
 from axionbloch.SimuTools import MagField, Simulations
 from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet
@@ -43,7 +43,9 @@ nu_a_array = np.array(
 mag_FWHMs = np.array([PhysicalQuantity(nu, "ppm") for nu in [1e1]])
 
 # set the strength of the pseudomagnetic field (rms of the field) Brms
-B_a_rms = PhysicalQuantity(1e-15, "T")
+B_a_rms = None
+# or by setting the axion-nucleon coupling strength gaNN
+gaNN = PhysicalQuantity(1.0e-9, "GeV**(-1)")
 
 # set number of simulation runs
 numFields = 1
@@ -64,6 +66,7 @@ for nu_a in nu_a_array:
         axion = AxionWind(
             name="axion",
             nu_a=nu_a,
+            gaNN=gaNN,
         )
 
         # set RCF frequency to it RCF_Freq_Hz = nu_a*(1+v_a^2/c^2)
@@ -81,6 +84,13 @@ for nu_a in nu_a_array:
         # initialize excitation field
         excField = MagField(name="ALP field gradient")
 
+        if B_a_rms is None:
+            if axion.gaNN is None:
+                raise ValueError("B_a_rms and gaNN cannot be both None")
+            else:
+                B_a_rms = axion.getRabiFreq(verbose=True) / (sample.gamma)
+                B_a_rms = B_a_rms.to("T")
+                print(f"Calculated B_a_rms from gaNN = {B_a_rms}", flush=True)
         key_info = {"mag_FWHM": mag_FWHM, "nu_a": axion.nu_a}
         params: SimuParams = {
             "key_info": key_info,
@@ -101,7 +111,9 @@ for nu_a in nu_a_array:
 
 simu_all = Simulations(name="ALP-proton_NMR-simulations", all_params=all_params)
 # print("simu_all.run started", flush=True)
-simu_all.run(autoStart=False, verbose=True)
+simu_all.run(autoStart=False, verbose=False)
+
+simu_all.pool[0]["simu"].monitorTrajectories()
 
 simu_all.saveToPkl(
     dir=os.path.dirname(os.path.abspath(__file__)), fname="new_simulation"

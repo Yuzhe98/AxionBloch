@@ -3,7 +3,8 @@ from typing import Optional
 
 from axionbloch.enphylope import (
     PhysicalQuantity,
-    _safe_convert,
+)
+from axionbloch.constants import (
     gamma_Xe129,
     gamma_p,
     mu_p,
@@ -12,7 +13,6 @@ from axionbloch.enphylope import (
     kB,
     mol_to_num,
 )
-
 from axionbloch.utils import PhysicalObject
 
 

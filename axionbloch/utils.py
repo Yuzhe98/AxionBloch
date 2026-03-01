@@ -2125,7 +2125,7 @@ def sanCheck(var, tag: str = None):
     print("")
 
 
-def axion_lineshape(v_0, v_lab, nu_a, nu, case="non-grad", alpha=0.0):
+def axion_lineshape(v_0_ms, v_lab_ms, nu_a_Hz, nu, case="non-grad", alpha=0.0):
     """
     Calculate analytical lineshapes.
     Be careful! nu should not be too far from nu_a (compared to the axion linewidth).
@@ -2146,7 +2146,7 @@ def axion_lineshape(v_0, v_lab, nu_a, nu, case="non-grad", alpha=0.0):
     # ----------- prepare to generate the axion lineshape ----------- #
     # return the lineshape under certain special circumstances
     c = 299792458.0  # Speed of light (in m/s)
-    v_0, v_lab = np.abs(v_0), np.abs(v_lab)
+    v_0_ms, v_lab_ms = np.abs(v_0_ms), np.abs(v_lab_ms)
     Qa = 1e6
     FWHM = 1/Qa
 
@@ -2156,7 +2156,7 @@ def axion_lineshape(v_0, v_lab, nu_a, nu, case="non-grad", alpha=0.0):
     ## Find the index of the first non-zero element
     ## the elements in the full_lineshape before nu_a are set to zeros
     # find the index corresponding to frequency > nu_a
-    positive_indices = np.where(nu > nu_a)[0]
+    positive_indices = np.where(nu > nu_a_Hz)[0]
     if positive_indices.size > 0:
         nu_a_indx = positive_indices[0]
     # if there is no element >= nu_a, return an array of zeros
@@ -2166,7 +2166,7 @@ def axion_lineshape(v_0, v_lab, nu_a, nu, case="non-grad", alpha=0.0):
 
     # cut off the array at ~10 axion linewidths
     # the elements in the full_lineshape after the cutoff are set to zeros
-    cutoff_indices = np.where(nu > (1 + 10 * FWHM) * nu_a)[0]
+    cutoff_indices = np.where(nu > (1 + 10 * FWHM) * nu_a_Hz)[0]
     if cutoff_indices.size > 0:
         cutoff_indx = cutoff_indices[0]
     # elsewise set the cutoff index to the last index of the array
@@ -2257,9 +2257,9 @@ def axion_lineshape(v_0, v_lab, nu_a, nu, case="non-grad", alpha=0.0):
     # ---------------- generate axion linshape ----------------- #
     # if RBW is smaller than axion_linewidth / 10,
     # then the script uses input frequencies to get the lineshape
-    if RBW <= 0.1 * FWHM * nu_a:
+    if RBW <= 0.1 * FWHM * nu_a_Hz:
         full_lineshape[nu_a_indx: cutoff_indx+1] += \
-        _axion_lineshape(v_0, v_lab, nu_a, nu[nu_a_indx: cutoff_indx+1], case, alpha)
+        _axion_lineshape(v_0_ms, v_lab_ms, nu_a_Hz, nu[nu_a_indx: cutoff_indx+1], case, alpha)
     # elsewise, use finer frequencies to get the lineshape first
     else:
         # chose the indices corresponding to a range
@@ -2267,19 +2267,19 @@ def axion_lineshape(v_0, v_lab, nu_a, nu, case="non-grad", alpha=0.0):
         start_idx = max(0, nu_a_indx - 1)
         freq_start = nu[start_idx]
         freq_stop = nu[cutoff_indx]
-        _factor = np.ceil(RBW /( 0.01 * FWHM * nu_a))
+        _factor = np.ceil(RBW /( 0.01 * FWHM * nu_a_Hz))
         fine_RBW = RBW / _factor
         fine_freqs = np.arange(
             start=freq_start, stop=freq_stop + RBW, step=fine_RBW
         )
         fine_lineshape = np.zeros_like(fine_freqs)
         # find the index corresponding to frequency > nu_a
-        positive_indices = np.where(fine_freqs > nu_a)[0]
+        positive_indices = np.where(fine_freqs > nu_a_Hz)[0]
         if positive_indices.size > 0:
             fine_nu_a_indx = positive_indices[0]
             # Compute finely-sampled lineshape
             fine_lineshape[fine_nu_a_indx:] += _axion_lineshape(
-                v_0, v_lab, nu_a, fine_freqs[fine_nu_a_indx:], case, alpha
+                v_0_ms, v_lab_ms, nu_a_Hz, fine_freqs[fine_nu_a_indx:], case, alpha
             )
             # Bin fine lineshape onto coarse grid
             for idx in range(start_idx, cutoff_indx + 1):

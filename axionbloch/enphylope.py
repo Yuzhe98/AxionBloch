@@ -272,6 +272,14 @@ class PhysicalQuantity:
             converted_quantity.magnitude, str(converted_quantity.units)
         )
 
+    def to(self, unit: str) -> "PhysicalQuantity":
+        """
+        Convert the quantity to a new unit.
+        :param unit: The new unit as a string
+        """
+        # converted_quantity = self.quantity.to(unit)
+        return self.convert_to(unit)
+
     def value_in(self, unit):
         """
         Convert the quantity to a new unit and return the value of the quantity.
