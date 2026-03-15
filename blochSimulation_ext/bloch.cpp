@@ -90,32 +90,6 @@ void _burkert_potential_vector(const double *r_vals, double *pot, const double a
         pot[i] = _burkert_potential(r_vals[i], amp, a);
 }
 
-/**
- * @brief Generate trajectories for the Bloch equations
- *
- * @param numFields
- * @param numTimeSteps
- * @param numSpinPkts
- * @param B_vec vector of B fields, shape (numFields, numTimeSteps, 3)
- *      B_vec[(f * numTimeSteps + t) * 3 + 0 or 1 or 2] is Bx or By or Bz for field f at time step t
- * @param dBdt_vec
- * @param B_vals_T
- * @param ratios
- * @param gamma
- * @param timeStep
- * @param tSqHalf
- * @param T1
- * @param T2
- * @param RCF_freq_Hz
- * @param Mx0
- * @param My0
- * @param Mz0
- * @param M0eqb
- * @param trjry
- * @param dMdt
- * @param McrossB
- * @param d2Mdt2
- */
 void _generateTrajectories(
     // input
     const int numFields, const int numTimeSteps, const int numSpinPkts,
@@ -144,14 +118,6 @@ void _generateTrajectories(
         double *Mz = (double *)malloc(numSpinPkts * sizeof(double));
         double *M0eq = (double *)malloc(numSpinPkts * sizeof(double));
         double *B0z_rot_amp = (double *)malloc(numSpinPkts * sizeof(double));
-
-        double *dMxdt = (double *)malloc(numSpinPkts * sizeof(double));
-        double *dMydt = (double *)malloc(numSpinPkts * sizeof(double));
-        double *dMzdt = (double *)malloc(numSpinPkts * sizeof(double));
-
-        double *d2Mxdt2 = (double *)malloc(numSpinPkts * sizeof(double));
-        double *d2Mydt2 = (double *)malloc(numSpinPkts * sizeof(double));
-        double *d2Mzdt2 = (double *)malloc(numSpinPkts * sizeof(double));
 
         // initialize spin packets
         for (int k = 0; k < numSpinPkts; k++) {
@@ -184,38 +150,32 @@ void _generateTrajectories(
 
             double sumMx = 0.0, sumMy = 0.0, sumMz = 0.0;
 
-            // 0th is current Mx, My, Mz (state is already stored)
-
-            // 1st derivative pass
+            // vectorized loop over spin packets
             for (int k = 0; k < numSpinPkts; k++) {
+
                 double Bz = Bz_raw + B0z_rot_amp[k];
 
-                dMxdt[k] = gamma * (My[k] * Bz - Mz[k] * By) - Mx[k] / T2;
-                dMydt[k] = gamma * (Mz[k] * Bx - Mx[k] * Bz) - My[k] / T2;
-                dMzdt[k] = gamma * (Mx[k] * By - My[k] * Bx) - (Mz[k] - M0eq[k]) / T1;
-            }
+                // first derivative
+                double dMxdt = gamma * (My[k] * Bz - Mz[k] * By) - Mx[k] / T2;
+                double dMydt = gamma * (Mz[k] * Bx - Mx[k] * Bz) - My[k] / T2;
+                double dMzdt = gamma * (Mx[k] * By - My[k] * Bx) - (Mz[k] - M0eq[k]) / T1;
 
-            // 2nd derivative pass
-            for (int k = 0; k < numSpinPkts; k++) {
-                double Bz = Bz_raw + B0z_rot_amp[k];
+                // second derivative
+                double d2Mxdt2 =
+                    gamma * (dMydt * Bz + My[k] * dBzdt - dMzdt * By - Mz[k] * dBydt) - dMxdt / T2;
 
-                d2Mxdt2[k] =
-                    gamma * (dMydt[k] * Bz + My[k] * dBzdt - dMzdt[k] * By - Mz[k] * dBydt) -
-                    dMxdt[k] / T2;
-                d2Mydt2[k] =
-                    gamma * (dMzdt[k] * Bx + Mz[k] * dBxdt - dMxdt[k] * Bz - Mx[k] * dBzdt) -
-                    dMydt[k] / T2;
-                d2Mzdt2[k] =
-                    gamma * (dMxdt[k] * By + Mx[k] * dBydt - dMydt[k] * Bx - My[k] * dBxdt) -
-                    dMzdt[k] / T1;
-            }
+                double d2Mydt2 =
+                    gamma * (dMzdt * Bx + Mz[k] * dBxdt - dMxdt * Bz - Mx[k] * dBzdt) - dMydt / T2;
 
-            // update M and accumulate
-            for (int k = 0; k < numSpinPkts; k++) {
-                Mx[k] += dMxdt[k] * timeStep + tSqHalf * d2Mxdt2[k];
-                My[k] += dMydt[k] * timeStep + tSqHalf * d2Mydt2[k];
-                Mz[k] += dMzdt[k] * timeStep + tSqHalf * d2Mzdt2[k];
+                double d2Mzdt2 =
+                    gamma * (dMxdt * By + Mx[k] * dBydt - dMydt * Bx - My[k] * dBxdt) - dMzdt / T1;
 
+                // update
+                Mx[k] += dMxdt * timeStep + tSqHalf * d2Mxdt2;
+                My[k] += dMydt * timeStep + tSqHalf * d2Mydt2;
+                Mz[k] += dMzdt * timeStep + tSqHalf * d2Mzdt2;
+
+                // accumulate
                 sumMx += Mx[k];
                 sumMy += My[k];
                 sumMz += Mz[k];
@@ -234,11 +194,5 @@ void _generateTrajectories(
         free(Mz);
         free(M0eq);
         free(B0z_rot_amp);
-        free(dMxdt);
-        free(dMydt);
-        free(dMzdt);
-        free(d2Mxdt2);
-        free(d2Mydt2);
-        free(d2Mzdt2);
     }
 }
