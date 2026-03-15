@@ -80,7 +80,6 @@ class MagField(PhysicalObject):
         B1: float,  # amplitude of the excitation pulse in (T)
         nu_rot: float,
         init_phase: float,
-        # direction: np.ndarray,  #  not needed now
         duty_func,
         verbose: bool = False,
     ):
@@ -155,6 +154,51 @@ class MagField(PhysicalObject):
         #     return duty_func(timeStamp) * B1 * np.sin(2 * np.pi * nu_e * timeStamp + init_phase)
         # return
 
+    def set90DegPulse(
+        self,
+        timeStamp: np.ndarray,
+        B1: float,  # amplitude of the excitation pulse in (T)
+        nu_rot: float,
+        init_phase: float,
+        t90_s: float,
+        verbose: bool = False,
+    ):
+        """
+        generate a 90 deg pulse in the rotating frame
+        """
+        envelope = np.zeros_like(timeStamp)
+        t90Len = int(np.round(t90_s / (timeStamp[1] - timeStamp[0])))
+        envelope[0:t90Len] = 0.5 * B1
+
+        # excitation along x-axis
+        Bx_envelope = np.multiply(
+            envelope, np.cos(2 * np.pi * nu_rot * timeStamp + init_phase)
+        )
+        Bx = np.outer(Bx_envelope, np.array([1, 0, 0]))
+
+        # excitation along y-axis
+        By_envelope = np.multiply(
+            envelope, np.sin(2 * np.pi * nu_rot * timeStamp + init_phase)
+        )
+        By = np.outer(By_envelope, np.array([0, 1, 0]))
+
+        # 1st order time-derivate of the excitation along x-axis
+        dBxdt_envelope = np.multiply(
+            envelope,
+            -2 * np.pi * nu_rot * np.sin(2 * np.pi * nu_rot * timeStamp + init_phase),
+        )
+        dBxdt = np.outer(dBxdt_envelope, np.array([1, 0, 0]))
+
+        # 1st order time-derivate of the excitation along y-axis
+        dBydt_envelope = np.multiply(
+            envelope,
+            2 * np.pi * nu_rot * np.cos(2 * np.pi * nu_rot * timeStamp + init_phase),
+        )
+        dBydt = np.outer(dBydt_envelope, np.array([0, 1, 0]))
+
+        self.B_vec = Bx + By
+        self.dBdt_vec = dBxdt + dBydt
+
     def setCPMGPulseTrain(
         self,
         timeStep_s: float,
@@ -171,8 +215,8 @@ class MagField(PhysicalObject):
         generate a CPMG pulse train in the rotating frame
         A schematic of the envelop of the pulse train can be found below.
           90deg pulse       180deg pulse                     180deg pulse                  180deg pulse
-            ┌───┐            ┌───────┐                       ┌───────┐                       ┌───────┐
-            |   |            |       |                       |       |                       |       |
+                             ┌───────┐                       ┌───────┐                       ┌───────┐
+            ┌───┐            |       |                       |       |                       |       |
             ┘   └────────────┘       └───────────────────────┘       └───────────────────────┘       └──────────────────────
             ↑   ↑            ↑       ↑                       ↑       ↑                       ↑       ↑
             0  t90          tau   tau+t180                  3tau   3tau+t180                5tau   5tau+t180
@@ -184,12 +228,12 @@ class MagField(PhysicalObject):
             print(f"t90Len = {t90Len} time steps")
         if t90Len < 3:
             print(f"WARNING: t90Len = {t90Len} < 3")
-        t180Len: int = 2 * (t90Len)
+        t180Len: int = 1 * (t90Len)
 
         t90_s: float = t90Len * timeStep_s
 
         B90_T = 1.0 * np.pi / (gamma_HzToT * t90_s)
-        B180_T = 1.0 * np.pi / (gamma_HzToT * t90_s)
+        B180_T = 2.0 * B90_T
 
         tauLen = int(np.round(tau_s / timeStep_s))
         if tauLen < 10 * t180Len:
@@ -1626,7 +1670,9 @@ class Simulation(PhysicalObject):
             start=0, stop=(self.timeLen) * self.timeStep_s, step=self.timeStep_s
         )
 
-    def generateTrajectories(self, cleanup: bool = False, verbose: bool = False):
+    def generateTrajectories(
+        self, cleanup: bool = False, integrator="RK4", verbose: bool = False
+    ):
         """
         Generate trajectory of magnetization vector in Cartesian coordinate system
         based on kinetic simulation for Bloch equations.
@@ -1634,6 +1680,8 @@ class Simulation(PhysicalObject):
         ----------
         cleanup : bool, optional
             whether to delete the intermediate variables after generating trajectories, by default False
+        integrator : str, optional
+            the numerical integrator to use, by default "RK4". Another option is "taylor"
         verbose : bool, optional
             whether to print time consumption, by default False
         Returns
@@ -1654,9 +1702,6 @@ class Simulation(PhysicalObject):
         # M_init = np.array([Mx0, My0, Mz0])
         # Magnetization at equilibrium
         M0eqb = 1.0
-        #
-        # self.trjry[0] = M_init
-        tSqHalf = 0.5 * self.timeStep_s**2
 
         # self.excField.B_vec and self.excField.dBdt_vec should have shape (numFields, numTimeSteps, 3)
         # if they are 1D arrays of shape (numSteps, 3),
@@ -1677,14 +1722,13 @@ class Simulation(PhysicalObject):
         # ------------------------------------------------------------------------------------------------
 
         # Use the kinetic simulation function from blochsimulation to generate trajectories
-        self.trjry, self.dMdt, self.McrossB, self.d2Mdt2 = bs.generateTrajectories(
+        self.trjry, self.dMdt, self.d2Mdt2 = bs.generateTrajectories(
             self.excField.B_vec,
             self.excField.dBdt_vec,
             self.magnet.B_vals_T,
             self.magnet.ratios,
             self.sample.gamma.value_in("Hz/T"),
             self.timeStep_s,
-            tSqHalf,
             self.T1_s,
             self.T2_s,
             self.RCF_freq_Hz,
@@ -1692,10 +1736,11 @@ class Simulation(PhysicalObject):
             My0,
             Mz0,
             M0eqb,
+            integrator,
         )
         if cleanup:
             del self.excField.B_vec, self.excField.dBdt_vec
-            del self.dMdt, self.McrossB, self.d2Mdt2
+            del self.dMdt, self.d2Mdt2
 
     def monitorTrajectory(
         self,
@@ -1870,7 +1915,6 @@ class Simulation(PhysicalObject):
         )
         d2Mxydt_ax.legend(loc="upper right")
         d2Mxydt_ax.grid()
-        # McrossBxy_ax.set_xlabel('time (s)')
         d2Mxydt_ax.set_ylabel("")
 
         d2Mzdt_ax.plot(
@@ -2053,6 +2097,12 @@ class Simulation(PhysicalObject):
             label="$M_z$",
             color="tab:pink",
         )
+        Mz_ax.scatter(
+            timeStamp_s[0:lastIndx:plotIntv],
+            self.trjry_mean[0:lastIndx:plotIntv, 2],
+            # label="$M_z$",
+            color="tab:pink",
+        )
         Mz_ax.legend(loc="upper right")
         Mz_ax.grid()
         Mz_ax.set_xlabel("time (s)")
@@ -2106,7 +2156,6 @@ class Simulation(PhysicalObject):
         # )
         # d2Mxydt_ax.legend(loc="upper right")
         # d2Mxydt_ax.grid()
-        # # McrossBxy_ax.set_xlabel('time (s)')
         # d2Mxydt_ax.set_ylabel("")
 
         # d2Mzdt_ax.plot(
