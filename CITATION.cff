@@ -1,7 +1,7 @@
-cff-version: 0.1.0
-title: "Axion-NMR-simulator"
+cff-version: 0.1.1
+title: "AxionBloch"
 authors:
   - family-names: Zhang
     given-names: Yuzhe
-version: 0.1.0
+version: 0.1.1
 # doi: 

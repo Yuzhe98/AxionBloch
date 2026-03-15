@@ -1,4 +1,4 @@
-v0.1.1 (2026-01-18)
+v0.1.1 (2026-03-15)
 --------------
 
 - updates in the example scripts
