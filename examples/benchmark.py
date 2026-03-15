@@ -120,10 +120,10 @@ simu_all.saveToPkl(
 )
 
 # On Yuzhe's Ryzen 5600G PC
-# [setAxionFields] time consumption = 0.942975 s = 0.02 min
-# [setAxionFields] individual step time consumption = 2.038e-07 s
-# [generateTrajectories] time consumption = 41 s = 0.7 min
-# [generateTrajectories] individual step time consumption = 1.51e-09 s
+# [setAxionFields] time consumption = 0.762547 s = 0.01 min
+# [setAxionFields] individual step time consumption = 1.648e-07 s
+# [generateTrajectories] time consumption = 32 s = 0.5 min
+# [generateTrajectories] individual step time consumption = 1.20e-09 s
 # # ---------------------------------------------------- #
-# Total runtime = 0.696 min
+# Total runtime = 0.55 min
 # # ---------------------------------------------------- #
