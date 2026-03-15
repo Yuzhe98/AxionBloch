@@ -8,13 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from matplotlib.ticker import ScalarFormatter, FuncFormatter
 
-# import matplotlib.ticker as mticker
 from mpl_toolkits.mplot3d import Axes3D  # for type hinting
-
-# from tqdm import tqdm
-
-# import numba as nb
-# from numba import njit
 
 from scipy.stats import uniform, expon
 from scipy.fft import ifft
@@ -31,6 +25,7 @@ from axionbloch.utils import (
     giveDateAndTime,
     sci_fmt,
 )
+
 # from axionbloch.DataAnalysis import Signal
 from axionbloch.Sample import Sample
 
@@ -41,7 +36,7 @@ from axionbloch.axionstream import AxionStream
 from axionbloch.SimuTypes import SimuParams, SimuEntry
 from axionbloch.station import Station
 
-import axionbloch.blochsimulation as bh
+import axionbloch.blochsimulation as bs
 
 RECORD_RUNTIME = True
 
@@ -185,14 +180,16 @@ class MagField(PhysicalObject):
         """
         timeStamp_s = timeStep_s * np.arange(timeLen - 1)
         t90Len = int(np.round(t90_s / timeStep_s))
+        if verbose:
+            print(f"t90Len = {t90Len} time steps")
         if t90Len < 3:
             print(f"WARNING: t90Len = {t90Len} < 3")
+        t180Len: int = 2 * (t90Len)
 
         t90_s: float = t90Len * timeStep_s
-        t180Len: int = 2 * t90Len
 
-        B90_T = 1.01 * np.pi / (gamma_HzToT * t90_s)
-        B180_T = (1 - 0.00005) * np.pi / (gamma_HzToT * t90_s)
+        B90_T = 1.0 * np.pi / (gamma_HzToT * t90_s)
+        B180_T = 1.0 * np.pi / (gamma_HzToT * t90_s)
 
         tauLen = int(np.round(tau_s / timeStep_s))
         if tauLen < 10 * t180Len:
@@ -234,36 +231,6 @@ class MagField(PhysicalObject):
                 break
             for j, B in enumerate([Bx, By, dBxdt, dBydt]):
                 B[(1 + i * 2) * tauLen : (1 + i * 2) * tauLen + t180Len] = piPulses[j]
-
-        # set pulse amplitude
-
-        # # excitation along x-axis
-        # Bx = np.multiply(
-        #     envelope, np.cos(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase)
-        # )
-
-        # # excitation along y-axis
-        # By = np.multiply(
-        #     envelope, np.sin(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase)
-        # )
-
-        # # 1st order time-derivate of the excitation along x-axis
-        # dBxdt = np.multiply(
-        #     envelope,
-        #     -2
-        #     * np.pi
-        #     * nu_rot_Hz
-        #     * np.sin(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase),
-        # )
-
-        # # 1st order time-derivate of the excitation along y-axis
-        # dBydt = np.multiply(
-        #     envelope,
-        #     2
-        #     * np.pi
-        #     * nu_rot_Hz
-        #     * np.cos(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase),
-        # )
 
         self.B_vec = np.zeros((1, len(Bx), 3))
         self.dBdt_vec = np.zeros((1, len(Bx), 3))
@@ -967,7 +934,7 @@ class MagField(PhysicalObject):
             )
 
             freq = np.fft.fftfreq(numSteps, timeStep_s)  # shape = (numSteps)
-            
+
             if makePlot:
                 fig = plt.figure(figsize=(6.0, 4.0), dpi=150)  # initialize a figure
                 gs = gridspec.GridSpec(
@@ -975,10 +942,9 @@ class MagField(PhysicalObject):
                 )  # create grid for multiple figures
                 axPSD = fig.add_subplot(gs[0, 0])
 
-
                 axPSD.scatter(
                     frequencies,
-                    np.abs(ampSpectra)**2,
+                    np.abs(ampSpectra) ** 2,
                     # label="Average ALP-field gradient PSD",
                     # linestyle="--",zorder=3,
                 )
@@ -994,7 +960,7 @@ class MagField(PhysicalObject):
                 else:
                     axPSD.plot(
                         frequencies,
-                        np.abs(ampSpectra)**2,
+                        np.abs(ampSpectra) ** 2,
                         label="Average ALP-field gradient PSD",
                         color="tab:orange",
                         linestyle="--",
@@ -1010,7 +976,6 @@ class MagField(PhysicalObject):
             if verbose:
                 tic = time.perf_counter()
 
-            
             # ttic = time.perf_counter()
             ax_AS_pos_neg: np.ndarray = np.fft.fftshift(ax_AS, axes=1)
             # ttoc = time.perf_counter()
@@ -1018,9 +983,7 @@ class MagField(PhysicalObject):
 
             # ttic = time.perf_counter()
             # Ba_t = np.fft.ifft(ax_AS_pos_neg, axis=1)
-            B_t: np.ndarray = ifft(
-                ax_AS_pos_neg, axis=1
-            )  # batch IFFT along time axis
+            B_t: np.ndarray = ifft(ax_AS_pos_neg, axis=1)  # batch IFFT along time axis
             # ttoc = time.perf_counter()
             # ifft_runtimes.append(ttoc - ttic)
 
@@ -1220,7 +1183,7 @@ class Simulations:
         # run simulations
         for i, params in enumerate(self.all_params):
             simu: Simulation = self.pool[i]["simu"]
-            
+
             # set fields
             tic = time.perf_counter()
             simu.excField.setAxionFields(
@@ -1260,7 +1223,7 @@ class Simulations:
             # print("simu.numSteps =", simu.numSteps, flush=True)
             # print("len(simu.excField.B_vec) =", (simu.excField.B_vec.shape), flush=True)
 
-            simu.excType = "ALP"
+            # simu.excType = "ALP"
 
             # ------------------------------------
             tic = time.perf_counter()
@@ -1658,18 +1621,26 @@ class Simulation(PhysicalObject):
         rate_Hz = np.amax([21 * nuL_Hz_abs_max, 10 * T2Rate, 10 * RBW])
         return PhysicalQuantity(rate_Hz, "Hz")
 
+    def getTimeStamp(self):
+        return np.arange(
+            start=0, stop=(self.timeLen) * self.timeStep_s, step=self.timeStep_s
+        )
+
     def generateTrajectories(self, cleanup: bool = False, verbose: bool = False):
         """
         Generate trajectory of magnetization vector in Cartesian coordinate system
         based on kinetic simulation for Bloch equations.
+        Parameters
+        ----------
+        cleanup : bool, optional
+            whether to delete the intermediate variables after generating trajectories, by default False
+        verbose : bool, optional
+            whether to print time consumption, by default False
+        Returns
+        -------
+        None
+            The generated trajectories are stored in self.trjry with shape (numFields, numSteps
         """
-        # numFields = self.excField.B_vec.shape[0]
-        # self.trjry = np.zeros((numFields, self.numSteps + 1, 3))
-        # self.dMdt = np.zeros((numFields,self.numSteps, 3))
-        # self.McrossB = np.zeros((numFields, self.numSteps, 3))
-        # self.d2Mdt2 = np.zeros((numFields, self.numSteps, 3))
-        # print(f"{self.generateTrajectory_vectorized.__name__}: self.trjry.shape = ", self.trjry.shape)
-        # print(f"{self.generateTrajectory_vectorized.__name__}: self.trjry[0] = ", self.trjry[0])
         M = self.init_M_amp
         theta = self.init_M_theta_rad
         phi = self.init_M_phi_rad
@@ -1687,7 +1658,26 @@ class Simulation(PhysicalObject):
         # self.trjry[0] = M_init
         tSqHalf = 0.5 * self.timeStep_s**2
 
-        self.trjry, self.dMdt, self.McrossB, self.d2Mdt2 = bh.generateTrajectories(
+        # self.excField.B_vec and self.excField.dBdt_vec should have shape (numFields, numTimeSteps, 3)
+        # if they are 1D arrays of shape (numSteps, 3),
+        # reshape them to (1, numSteps, 3) so that they can be used in the loop without error
+        if self.excField.B_vec.ndim == 2 and self.excField.B_vec.shape[1] == 3:
+            self.excField.B_vec = self.excField.B_vec[np.newaxis, :, :]
+        elif self.excField.B_vec.ndim != 3 or self.excField.B_vec.shape[2] != 3:
+            raise ValueError(
+                f"excField.B_vec has invalid shape {self.excField.B_vec.shape}, expected (numFields, numSteps, 3) or (numSteps, 3)"
+            )
+
+        if self.excField.dBdt_vec.ndim == 2 and self.excField.dBdt_vec.shape[1] == 3:
+            self.excField.dBdt_vec = self.excField.dBdt_vec[np.newaxis, :, :]
+        elif self.excField.dBdt_vec.ndim != 3 or self.excField.dBdt_vec.shape[2] != 3:
+            raise ValueError(
+                f"excField.dBdt_vec has invalid shape {self.excField.dBdt_vec.shape}, expected (numFields, numSteps, 3) or (numSteps, 3)"
+            )
+        # ------------------------------------------------------------------------------------------------
+
+        # Use the kinetic simulation function from blochsimulation to generate trajectories
+        self.trjry, self.dMdt, self.McrossB, self.d2Mdt2 = bs.generateTrajectories(
             self.excField.B_vec,
             self.excField.dBdt_vec,
             self.magnet.B_vals_T,
@@ -1706,139 +1696,6 @@ class Simulation(PhysicalObject):
         if cleanup:
             del self.excField.B_vec, self.excField.dBdt_vec
             del self.dMdt, self.McrossB, self.d2Mdt2
-
-    # @njit(
-    #     [
-    #         "void(float64[:,:], float64[:,:], float64[:], float64[:], "
-    #         "float64, float64, float64, float64, float64, "
-    #         "float64, float64, float64, float64, float64, "
-    #         "float64[:,:])"
-    #     ],
-    #     nopython=True,
-    # )
-    # def generateTrajectory_vec2_loop(
-    #     B_vec,
-    #     dBdt_vec,
-    #     B_vals_T,
-    #     ratios,
-    #     gamma,
-    #     timeStep,
-    #     tSqHalf,
-    #     T1,
-    #     T2,
-    #     RCF_freq_Hz,
-    #     Mx0,
-    #     My0,
-    #     Mz0,
-    #     M0eqb,
-    #     trjry,
-    # ):
-    #     # numFields = B_vec.shape[0]  # number of time steps
-    #     numTimeSteps = B_vec.shape[0]  # number of time steps
-    #     # K = B_vals_T.shape[0]  # number of ratios/B_vals
-
-    #     # Initialize magnetization for all spin packets
-    #     # M shape = (numPt)
-    #     Mx = ratios * Mx0
-    #     My = ratios * My0
-    #     Mz = ratios * Mz0
-    #     M0eqb_arr = ratios * M0eqb
-
-    #     # Precompute B0z_rot_amp for all K
-    #     B0z_rot_amp = B_vals_T - RCF_freq_Hz / (gamma / (2 * np.pi))
-
-    #     # Initialize trajectory array for accumulation
-    #     trjry[:, 0] = Mx0
-    #     trjry[:, 1] = My0
-    #     trjry[:, 2] = Mz0
-
-    #     # Loop over time steps
-    #     for i in range(numTimeSteps):
-    #         # Extract B and dBdt at this time step
-    #         Bx = B_vec[i, 0]
-    #         By = B_vec[i, 1]
-    #         Bz_raw = B_vec[i, 2]
-    #         dBxdt = dBdt_vec[i, 0]
-    #         dBydt = dBdt_vec[i, 1]
-    #         dBzdt = dBdt_vec[i, 2]
-
-    #         #
-    #         Bz = Bz_raw + B0z_rot_amp
-
-    #         # First derivatives (vectorized over K)
-    #         dMxdt = gamma * (My * Bz - Mz * By) - Mx / T2
-    #         dMydt = gamma * (Mz * Bx - Mx * Bz) - My / T2
-    #         dMzdt = gamma * (Mx * By - My * Bx) - (Mz - M0eqb_arr) / T1
-
-    #         # Second derivatives (vectorized over K)
-    #         d2Mxdt2 = (
-    #             gamma * (dMydt * Bz + My * dBzdt - dMzdt * By - Mz * dBydt) - dMxdt / T2
-    #         )
-    #         d2Mydt2 = (
-    #             gamma * (dMzdt * Bx + Mz * dBxdt - dMxdt * Bz - Mx * dBzdt) - dMydt / T2
-    #         )
-    #         d2Mzdt2 = (
-    #             gamma * (dMxdt * By + Mx * dBydt - dMydt * Bx - My * dBxdt) - dMzdt / T1
-    #         )
-
-    #         # Update M for all K
-    #         Mx += dMxdt * timeStep + tSqHalf * d2Mxdt2
-    #         My += dMydt * timeStep + tSqHalf * d2Mydt2
-    #         Mz += dMzdt * timeStep + tSqHalf * d2Mzdt2
-
-    #         # Accumulate trajectory across K
-    #         # for f in range(numFields):
-    #         trjry[i + 1, 0] += Mx.sum()
-    #         trjry[i + 1, 1] += My.sum()
-    #         trjry[i + 1, 2] += Mz.sum()
-
-    # def generateTrajectory_vec2(self, verbose: bool = False):
-    #     """
-    #     Generate trajectory of magnetization vector in Cartesian coordinate system
-    #     based on kinetic simulation for Bloch equations.
-    #     """
-    #     # numFields = self.excField.B_vec.shape[0]
-    #     self.trjry = np.zeros((self.numSteps + 1, 3))
-    #     self.dMdt = np.zeros((self.numSteps, 3))
-    #     self.McrossB = np.zeros((self.numSteps, 3))
-    #     self.d2Mdt2 = np.zeros((self.numSteps, 3))
-    #     # print(f"{self.generateTrajectory_vectorized.__name__}: self.trjry.shape = ", self.trjry.shape)
-    #     # print(f"{self.generateTrajectory_vectorized.__name__}: self.trjry[0] = ", self.trjry[0])
-    #     M = self.init_M_amp
-    #     theta = self.init_M_theta_rad
-    #     phi = self.init_M_phi_rad
-    #     [Mx0, My0, Mz0] = np.array(
-    #         [
-    #             M * np.sin(theta) * np.cos(phi),
-    #             M * np.sin(theta) * np.sin(phi),
-    #             M * np.cos(theta),
-    #         ]
-    #     )
-    #     M_init = np.array([Mx0, My0, Mz0])
-    #     # Magnetization at equilibrium
-    #     M0eqb = 1.0
-    #     #
-    #     # self.trjry[0] = M_init
-    #     tSqHalf = 0.5 * self.timeStep_s**2
-
-    #     # @record_runtime_YorN(RECORD_RUNTIME)
-    #     Simulation.generateTrajectory_vec2_loop(
-    #         B_vec=self.excField.B_vec,
-    #         dBdt_vec=self.excField.dBdt_vec,
-    #         B_vals_T=self.magnet.B_vals_T,
-    #         ratios=self.magnet.ratios,
-    #         gamma=self.sample.gamma.value_in("Hz/T"),
-    #         timeStep=self.timeStep_s,
-    #         tSqHalf=tSqHalf,
-    #         T2=self.T2_s,
-    #         T1=self.T1_s,
-    #         RCF_freq_Hz=self.RCF_freq_Hz,
-    #         Mx0=Mx0,
-    #         My0=My0,
-    #         Mz0=Mz0,
-    #         M0eqb=M0eqb,
-    #         trjry=self.trjry,
-    #     )
 
     def monitorTrajectory(
         self,
@@ -2079,8 +1936,8 @@ class Simulation(PhysicalObject):
                 (self.excField.B_vec[0], [self.excField.B_vec[0][-1]]),
                 axis=0,
             )
-
-        timeStamp_s = self.timeStep_s * np.arange(self.timeLen)
+        BfieldTimeStamp_s = self.timeStep_s * np.arange(BALP_array_step.shape[0])
+        timeStamp_s = self.timeStep_s * np.arange(self.M_mean.shape[0])
 
         fig = plt.figure(figsize=(15 * 0.8, 7 * 0.8), dpi=150)  #
         gs = gridspec.GridSpec(nrows=2, ncols=4)  #
@@ -2096,7 +1953,7 @@ class Simulation(PhysicalObject):
         )
 
         Ba_ax = fig.add_subplot(gs[0, 0])
-        M_ax = fig.add_subplot(gs[1, 0])
+        Mabs_ax = fig.add_subplot(gs[1, 0], sharex=Ba_ax)
         Mxy_ax = fig.add_subplot(gs[0, 1], sharex=Ba_ax)
         Mz_ax = fig.add_subplot(gs[1, 1], sharex=Ba_ax)
         dMxydt_ax = fig.add_subplot(gs[0, 2], sharex=Ba_ax)
@@ -2115,21 +1972,21 @@ class Simulation(PhysicalObject):
         # print("np.std(self.trjry[:, 0]) =", np.std(self.trjry[:, 0]))
         # print("np.std(self.trjry[:, 1]) =", np.std(self.trjry[:, 1]))
         Ba_ax.plot(
-            timeStamp_s[0:lastIndx:plotIntv],
+            BfieldTimeStamp_s[0:lastIndx:plotIntv],
             BALP_array_step[0:lastIndx:plotIntv, 0],
             label="$B_{x}$",
             color="tab:blue",
             alpha=0.7,
         )
         Ba_ax.plot(
-            timeStamp_s[0:lastIndx:plotIntv],
+            BfieldTimeStamp_s[0:lastIndx:plotIntv],
             BALP_array_step[0:lastIndx:plotIntv, 1],
             label="$B_{y}$",
             color="tab:orange",
             alpha=0.7,
         )
         Ba_ax.plot(
-            timeStamp_s[0:lastIndx:plotIntv],
+            BfieldTimeStamp_s[0:lastIndx:plotIntv],
             BALP_array_step[0:lastIndx:plotIntv, 2],
             label="$B_{z}$",
             color="tab:green",
@@ -2140,7 +1997,7 @@ class Simulation(PhysicalObject):
         Ba_ax.set_xlabel("time (s)")
         Ba_ax.legend(loc="upper right")
 
-        M_ax.plot(
+        Mabs_ax.plot(
             timeStamp_s[0:lastIndx:plotIntv],
             self.M_mean[0:lastIndx:plotIntv],
             label="mean",
@@ -2149,7 +2006,7 @@ class Simulation(PhysicalObject):
             zorder=7,
         )
         if self.M_std is not None:
-            M_ax.errorbar(
+            Mabs_ax.errorbar(
                 x=timeStamp_s[0:lastIndx:plotIntv],
                 y=self.M_mean[0:lastIndx:plotIntv],
                 yerr=self.M_std[0:lastIndx:plotIntv],
@@ -2158,9 +2015,9 @@ class Simulation(PhysicalObject):
                 alpha=1,
             )
 
-        M_ax.set_ylabel("$M_{xy}$")
-        M_ax.set_xlabel("time (s)")
-        M_ax.legend(loc="upper right")
+        Mabs_ax.set_ylabel("$M_{xy}$")
+        Mabs_ax.set_xlabel("time (s)")
+        Mabs_ax.legend(loc="upper right")
 
         Mxy_ax.plot(
             timeStamp_s[0:lastIndx:plotIntv],
@@ -2200,7 +2057,7 @@ class Simulation(PhysicalObject):
         Mz_ax.grid()
         Mz_ax.set_xlabel("time (s)")
         Mz_ax.set_ylabel("")
-        Mz_ax.set_ylim(0, 1.1)
+        # Mz_ax.set_ylim(top=1.1)
 
         # dMxydt_ax.plot(
         #     self.timeStamp_s[0:lastIndx:plotIntv],
@@ -2389,7 +2246,7 @@ class Simulation(PhysicalObject):
 
     def visualizeTrajectory3D(
         self,
-        plotrate: float,  # [Hz]
+        plotrate: float = None,  # [Hz]
         # rotframe=True,
         verbose=False,
     ):

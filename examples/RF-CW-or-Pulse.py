@@ -186,7 +186,7 @@ for j, nu_a_offset in enumerate((nu_a_offsets)):
         else:
             raise ValueError("excitation_type not found. ")
 
-        simu.excType = excitation_type
+        # simu.excType = excitation_type
         # toc = time.perf_counter()
         # print(f"setALP_Field() time consumption = {toc-tic:.3f} s")
 

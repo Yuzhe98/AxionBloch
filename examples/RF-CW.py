@@ -158,7 +158,7 @@ for j, nu_a_offset in enumerate((nu_a_offsets)):
             duty_func=partial(gate, start=0, stop=simu.duration_s),
         )
 
-        simu.excType = "pulse NMR"
+        # simu.excType = "pulse NMR"
         # toc = time.perf_counter()
         # print(f"setALP_Field() time consumption = {toc-tic:.3f} s")
 

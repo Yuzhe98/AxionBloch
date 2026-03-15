@@ -2,13 +2,12 @@
 import numpy as np
 from functools import partial
 import time
-from tqdm import tqdm
 
 from axionbloch.SimuTools import MagField, Simulation, gate
 from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet
-from axionbloch.utils import giveDateAndTime
-from axionbloch.enphylope import PhysicalQuantity, gamma_p, mu_p
+from axionbloch.enphylope import PhysicalQuantity
+from axionbloch.constants import gamma_p, mu_p
 
 
 RCF_Freq_Hz = 1e6
@@ -52,13 +51,11 @@ sample = Sample(
 # set detection magnet
 magnet_det = Magnet(
     name="detection magnet",
-    B0=PhysicalQuantity(RCF_Freq_Hz - 0, "Hz") / (sample.gamma / (2 * np.pi)),
+    B0=PhysicalQuantity(RCF_Freq_Hz - 5, "Hz") / (sample.gamma / (2 * np.pi)),
     FWHM=PhysicalQuantity(1 / (np.pi * Tdelta_s) / RCF_Freq_Hz, ""),
     nFWHM=20.0,
 )
 magnet_det.setHomogeneity(
-    # numPt=1,
-    # numPt=400,
     numPt=int(
         11
         + duration.value_in("s")
@@ -69,6 +66,10 @@ magnet_det.setHomogeneity(
         * 1
     ),
 )
+print(f"numPt for magnet homogeneity = {magnet_det.numPt}")
+# magnet_det.setHomogeneity(
+#     numPt=1000,
+# )
 
 # set excitation field
 excField = MagField(name="RF pulse")
@@ -86,7 +87,7 @@ simu = Simulation(
 
 # set excitation pulse: 90 degree hard pulse
 simu.excField.setXYPulse(
-    timeStamp=simu.timeStamp_s,
+    timeStamp=simu.getTimeStamp(),
     B1=2
     * np.pi
     / 2.0
@@ -98,14 +99,18 @@ simu.excField.setXYPulse(
     duty_func=partial(gate, start=0, stop=5 * simu.timeStep_s),
 )
 
-simu.excType = "pulse NMR"
+
+# print(simu.timeLen)
+# print(simu.excField.B_vec.shape)
+
+# simu.excType = "pulse NMR"
 
 tic = time.perf_counter()
-simu.generateTrajectory_1LoopByNb(verbose=False)
+simu.generateTrajectories(verbose=False)
 toc = time.perf_counter()
 print(f"GenerateTrajectory time consumption = {toc-tic:.6f} s")
 
-simu.monitorTrajectory(verbose=True)
-simu.visualizeTrajectory3D(
-    verbose=False,
-)
+simu.monitorTrajectories(verbose=True)
+# simu.visualizeTrajectory3D(
+#     verbose=False,
+# )
