@@ -127,3 +127,21 @@ simu_all.saveToPkl(
 # # ---------------------------------------------------- #
 # Total runtime = 0.55 min
 # # ---------------------------------------------------- #
+
+# after changing the simulation algorithm from Taylor expansion to RK4: ~2.5 times time consumption for trajectory generation
+# [setAxionFields] time consumption = 0.873892 s = 0.01 min
+# [setAxionFields] individual step time consumption = 1.889e-07 s
+# [generateTrajectories] time consumption = 78 s = 1 min
+# [generateTrajectories] individual step time consumption = 2.91e-09 s
+# # ---------------------------------------------------- #
+# Total runtime = 1.32 min
+# # ---------------------------------------------------- #
+
+# after some minor optimizations, now the trajectory generation time is reduced to approx. 2 times of taylor expansion method
+# [setAxionFields] time consumption = 0.940335 s = 0.02 min
+# [setAxionFields] individual step time consumption = 2.032e-07 s
+# [generateTrajectories] time consumption = 66 s = 1 min
+# [generateTrajectories] individual step time consumption = 2.46e-09 s
+# # ---------------------------------------------------- #
+# Total runtime = 1.12 min
+# # ---------------------------------------------------- #
