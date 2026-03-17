@@ -32,14 +32,14 @@ class SimuParams(TypedDict):
     sample: Sample  # NMR sample
     magnet: Magnet  # magnetic field apparatus
     excField: MagField  # excitation (magnetic) field
-    B_a_rms: PhysicalQuantity  # RMS axion-induced magnetic field
+    B_a_rms: PhysicalQuantity | None  # RMS axion-induced magnetic field
     numFields: int  # number of magnetic fields
     rand_seed: int  # random seed for reproducibility
     init_M: PhysicalQuantity  # initial magnetization magnitude
     init_M_theta: PhysicalQuantity  # initial polar angle of magnetization
     init_M_phi: PhysicalQuantity  # initial azimuthal angle of magnetization
-    rate: PhysicalQuantity  # simulation rate
-    duration: PhysicalQuantity  # simulation duration
+    rate: PhysicalQuantity | None  # simulation rate
+    duration: PhysicalQuantity | None  # simulation duration
 
 
 # -------------------------------------------------------------------

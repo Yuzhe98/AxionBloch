@@ -24,20 +24,15 @@ sample = Sample(
     massDensity=PhysicalQuantity(0.792, "g / cm**3 "),
     molarMass=PhysicalQuantity(32.04, "g / mol"),  # molar mass
     numOfSpinsPerMolecule=PhysicalQuantity(4, ""),  # number of spins per molecule
-    T2=PhysicalQuantity(1, "s"), 
-    T1=PhysicalQuantity(3, "s"), 
+    T2=PhysicalQuantity(1, "s"),
+    T1=PhysicalQuantity(3, "s"),
     vol=PhysicalQuantity(1, "cm**3"),
     mu=mu_p,  # magnetic dipole moment
     verbose=False,
 )
 
 # axion Compton frequency
-nu_a_array = np.array(
-    [
-        PhysicalQuantity(nu, "Hz")
-        for nu in [1e6]
-    ]
-)
+nu_a_array = np.array([PhysicalQuantity(nu, "Hz") for nu in [1e6]])
 
 # set magnet homogeneity
 mag_FWHMs = np.array([PhysicalQuantity(nu, "ppm") for nu in [1e1]])
@@ -111,9 +106,9 @@ for nu_a in nu_a_array:
 
 simu_all = Simulations(name="ALP-proton_NMR-simulations", all_params=all_params)
 # print("simu_all.run started", flush=True)
-simu_all.run(autoStart=False, verbose=False)
+simu_all.run(autoStart=True, verbose=False)
 
-simu_all.pool[0]["simu"].monitorTrajectories()
+simu_all.pool[0].simu.monitorTrajectories()
 
 simu_all.saveToPkl(
     dir=os.path.dirname(os.path.abspath(__file__)), fname="new_simulation"

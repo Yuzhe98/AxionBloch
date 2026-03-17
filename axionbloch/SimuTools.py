@@ -1142,7 +1142,7 @@ class Simulations:
                 duration=duration,
                 verbose=verbose,
             )
-            self.pool.append({"simu": simu, "params": params})
+            self.pool.append(SimuEntry(simu=simu, params=params))
 
             if verbose:
                 print("", flush=True)
@@ -1219,7 +1219,7 @@ class Simulations:
 
         # run simulations
         for i, params in enumerate(self.all_params):
-            simu: Simulation = self.pool[i]["simu"]
+            simu: Simulation = self.pool[i].simu
             
             # set fields
             tic = time.perf_counter()
@@ -1278,7 +1278,7 @@ class Simulations:
                     flush=True,
                 )
             # ------------------------------------
-            # simu.keepMeanStd()
+            # simu.keepMeanStd(debug=verbose)
 
         if verbose:
             actu_runtime = actu_setFields_s + actu_trjry_s
@@ -1303,7 +1303,7 @@ class Simulations:
                 data_file_name += "-"
                 data_file_name += key
                 data_file_name += f"={pq.value:g}" + pq.unit
-            pool_item["simu"].saveToH5(path=data_file_name)
+            pool_item.simu.saveToH5(path=data_file_name)
 
     def loadFromH5(self, paths: list[str] = None, verbose: bool = False):
         """
@@ -1367,7 +1367,7 @@ class Simulations:
         #         data_file_name += "-"
         #         data_file_name += key
         #         data_file_name += f"={pq.value:g}" + pq.unit
-        #     pool_item["simu"].saveToH5(path=data_file_name)
+        #     pool_item.simu.saveToH5(path=data_file_name)
 
     @classmethod
     def loadFromPkl(cls, path: str, verbose: bool = False):
@@ -2090,7 +2090,7 @@ class Simulation(PhysicalObject):
         right = 0.985
         top = 0.924
         wspace = 0.313
-        hspace = 0.127
+        hspace = 0.271
         fig.subplots_adjust(
             left=left, top=top, right=right, bottom=bottom, wspace=wspace, hspace=hspace
         )
@@ -2270,16 +2270,16 @@ class Simulation(PhysicalObject):
         # plt.tight_layout()
         plt.show()
 
-    def keepMeanStd(self):
+    def keepMeanStd(self, debug:bool=False):
         """
-        Docstring for keepMeanStd
+        Keep the mean values and standard deviations of the results
 
         :param self: Description
         """
-        Mxy_magnitudes = np.sqrt(self.trjry[:, :, 0] ** 2 + self.trjry[:, :, 1] ** 2)
-        Mx_magnitudes = np.abs(self.trjry[:, :, 0])
-        My_magnitudes = np.abs(self.trjry[:, :, 1])
-        Mz_magnitudes = np.abs(self.trjry[:, :, 2])
+        Mxy_magnitudes: np.ndarray  = np.sqrt(self.trjry[:, :, 0] ** 2 + self.trjry[:, :, 1] ** 2)
+        Mx_magnitudes: np.ndarray = np.abs(self.trjry[:, :, 0])
+        My_magnitudes: np.ndarray  = np.abs(self.trjry[:, :, 1])
+        Mz_magnitudes: np.ndarray = np.abs(self.trjry[:, :, 2])
 
         # mean of root of squares
         self.Mxy_mrs = Mxy_magnitudes.mean(axis=0)
@@ -2296,8 +2296,8 @@ class Simulation(PhysicalObject):
 
         self.Mz_mrs = Mz_magnitudes.mean(axis=0)
         self.Mz_srs = Mz_magnitudes.std(axis=0)
-
-        del self.trjry, Mxy_magnitudes, Mx_magnitudes, My_magnitudes, Mz_magnitudes
+        if not debug:
+            del self.trjry, Mxy_magnitudes, Mx_magnitudes, My_magnitudes, Mz_magnitudes
 
     def displayTrjry(
         self,
