@@ -43,9 +43,10 @@ void _burkert_potential_vector(const double *r_vals, double *pot, const double a
 
 /**
  * _generateTrajectories
- *
- * Computes magnetization trajectories for multiple independent fields,
- * vectorized over spin packets, and parallelized over fields using OpenMP.
+ * Use Runge–Kutta 4 (RK4) method to compute magnetization trajectories for multiple independent
+ * fields, vectorized over spin packets, and parallelized over fields using OpenMP. Computes
+ * magnetization trajectories for multiple independent fields, vectorized over spin packets, and
+ * parallelized over fields using OpenMP.
  */
 void _generateTrajectories(
     // input
@@ -54,14 +55,36 @@ void _generateTrajectories(
     const double *dBdt_vec, // shape (numFields, numTimeSteps, 3)
     const double *B_vals_T, // shape (numSpinPkts)
     const double *ratios,   // shape (numSpinPkts)
-    const double gamma, const double timeStep, const double tSqHalf,
+    const double gamma, const double timeStep,
     const double T1, const double T2, const double RCF_freq_Hz,
     const double Mx0, const double My0, const double Mz0, const double M0eqb,
 
     // output
     double *trjry,   // shape (numFields, numTimeSteps+1, 3)
     double *dMdt,    // shape (numFields, numTimeSteps, 3)
-    double *McrossB, // shape (numFields, numTimeSteps, 3)
+    double *d2Mdt2   // shape (numFields, numTimeSteps, 3)
+);
+
+/**
+ * _generateTrajectories_TE
+ * Use 2nd order Taylor expansion for solving the Bloch equations, which is faster than RK4 but less accurate (really?).
+ * Computes magnetization trajectories for multiple independent fields,
+ * vectorized over spin packets, and parallelized over fields using OpenMP.
+ */
+void _generateTrajectories_TE(
+    // input
+    const int numFields, const int numTimeSteps, const int numSpinPkts,
+    const double *B_vec,    // shape (numFields, numTimeSteps, 3)
+    const double *dBdt_vec, // shape (numFields, numTimeSteps, 3)
+    const double *B_vals_T, // shape (numSpinPkts)
+    const double *ratios,   // shape (numSpinPkts)
+    const double gamma, const double timeStep, const double T1,
+    const double T2, const double RCF_freq_Hz, const double Mx0, const double My0, const double Mz0,
+    const double M0eqb,
+
+    // output
+    double *trjry,   // shape (numFields, numTimeSteps+1, 3)
+    double *dMdt,    // shape (numFields, numTimeSteps, 3)
     double *d2Mdt2   // shape (numFields, numTimeSteps, 3)
 );
 
