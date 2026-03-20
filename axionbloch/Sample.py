@@ -71,13 +71,13 @@ class Sample(PhysicalObject):
         assert self.molarMass is not None
         self.spinNumDensity = (
             self.numOfSpinsPerMolecule * self.massDensity / self.molarMass * mol_to_num
-        ).convert_to("cm**(-3)")
+        ).to("cm**(-3)")
 
         self.T2 = T2
         self.T1 = T1
         self.vol = vol
 
-        self.totalNumOfSpins = (self.spinNumDensity * self.vol).convert_to("")
+        self.totalNumOfSpins = (self.spinNumDensity * self.vol).to("")
 
         self.mu = mu
         self.temp = temp
@@ -108,7 +108,7 @@ class Sample(PhysicalObject):
         """
         # pol = hbar * self.gamma * B_pol / (2 * k * temp)  # approximate
         pol = np.tanh(hbar * self.gamma * B_pol / (2 * kB * temp))  # exact
-        pol = pol.convert_to("")
+        pol = pol.to("")
         # check(pol)
         return pol
 
@@ -119,8 +119,8 @@ class Sample(PhysicalObject):
         """
         compute magnetization M0
         """
-        M0 = (self.mu * pol * self.totalNumOfSpins).convert_to("A/m")
-        # self.M0_SPN = (self.mu * ns_SPN).convert_to("A/m")
+        M0 = (self.mu * pol * self.totalNumOfSpins).to("A/m")
+        # self.M0_SPN = (self.mu * ns_SPN).to("A/m")
         return M0
 
 
