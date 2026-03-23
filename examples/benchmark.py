@@ -4,7 +4,7 @@ import os
 import numpy as np
 import time
 
-from axionbloch.axionwind import AxionWind
+from axionbloch.MilkyWayAxionHalo import AxionWind
 from axionbloch.SimuTools import MagField, Simulations
 from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet

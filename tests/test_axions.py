@@ -1,4 +1,4 @@
-from axionbloch.axionwind import AxionWind
+from axionbloch.MilkyWayAxionHalo import AxionWind
 
 import numpy as np
 

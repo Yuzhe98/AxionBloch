@@ -1,5 +1,3 @@
-# src/AxionStream.py
-
 import numpy as np
 
 from axionbloch.enphylope import PhysicalQuantity

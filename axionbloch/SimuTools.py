@@ -31,8 +31,8 @@ from axionbloch.Sample import Sample
 
 from axionbloch.Apparatus import Magnet
 from axionbloch.enphylope import PhysicalQuantity
-from axionbloch.axionwind import AxionWind
-from axionbloch.axionstream import AxionStream
+from axionbloch.MilkyWayAxionHalo import AxionWind
+from axionbloch.FineGrainedAxionStream import AxionStream
 from axionbloch.SimuTypes import SimuParams, SimuEntry
 from axionbloch.station import Station
 
@@ -46,7 +46,7 @@ T_SETFIELD_S = 1.2e-7
 T_SIMUSTEP_S = 1.2e-09
 
 
-def gate(x: float | np.ndarray, start: float, stop: float) -> float:
+def gate(x: float | np.ndarray, start: float, stop: float) -> np.ndarray:
     """
     Returns 1 if start <= x <= stop, else returns 0.
 
@@ -230,7 +230,7 @@ class MagField(PhysicalObject):
             print(f"WARNING: t90Len = {t90Len} < 3")
         t180Len: int = 1 * (t90Len)
 
-        t90_s: float = t90Len * timeStep_s
+        t90_s = t90Len * timeStep_s
 
         B90_T = 1.0 * np.pi / (gamma_HzToT * t90_s)
         B180_T = 2.0 * B90_T
@@ -869,9 +869,10 @@ class MagField(PhysicalObject):
 
             # ttic = time.perf_counter()
             # Ba_t = np.fft.ifft(ax_FFT_0_pos_neg, axis=1)
-            Ba_t: np.ndarray = ifft(
+            # reveal_type(ifft(ax_FFT_0_pos_neg, axis=1))
+            Ba_t = np.asarray(ifft(
                 ax_FFT_0_pos_neg, axis=1
-            )  # batch IFFT along time axis
+            ))  # batch IFFT along time axis
             # ttoc = time.perf_counter()
             # ifft_runtimes.append(ttoc - ttic)
 
@@ -882,7 +883,7 @@ class MagField(PhysicalObject):
 
             # ttic = time.perf_counter()
             # dBadt = np.fft.ifft(dBadt_FFT, axis=1)
-            dBadt = ifft(dBadt_FFT, axis=1)
+            dBadt = np.asarray(ifft(dBadt_FFT, axis=1))
             # ttoc = time.perf_counter()
             # ifft_runtimes.append(ttoc - ttic)
 
@@ -1027,7 +1028,7 @@ class MagField(PhysicalObject):
 
             # ttic = time.perf_counter()
             # Ba_t = np.fft.ifft(ax_AS_pos_neg, axis=1)
-            B_t: np.ndarray = ifft(ax_AS_pos_neg, axis=1)  # batch IFFT along time axis
+            B_t = np.asarray(ifft(ax_AS_pos_neg, axis=1))  # batch IFFT along time axis
             # ttoc = time.perf_counter()
             # ifft_runtimes.append(ttoc - ttic)
 
@@ -1038,7 +1039,7 @@ class MagField(PhysicalObject):
 
             # ttic = time.perf_counter()
             # dBadt = np.fft.ifft(dBadt_FFT, axis=1)
-            dBdt: np.ndarray = ifft(dBdt_FFT, axis=1)
+            dBdt: np.ndarray = np.asarray(ifft(dBdt_FFT, axis=1))
             # ttoc = time.perf_counter()
             # ifft_runtimes.append(ttoc - ttic)
 
