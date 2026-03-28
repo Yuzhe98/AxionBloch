@@ -8,14 +8,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "axionbloch"
-version = "0.1.0"
+version = "0.1.1"
 description = "Simulation tool for axion-induced spin dynamics."
 authors = [
     { name = "Yuzhe Zhang", email = "yuhzhang@uni-mainz.de" }
 ]
 readme = "README.md"
 
-license = "MIT"
 license-files = ["LICENSE"]
 
 requires-python = ">=3.9"
