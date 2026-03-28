@@ -5,7 +5,7 @@ from axionbloch.constants import c as c_SI
 from axionbloch.utils import PhysicalObject
 
 
-class AxionStream(PhysicalObject):
+class FineGrainedAxionStream(PhysicalObject):
     # Create the "axion stream" (axion field) object
     # you can get properties of the axion field, computed based on the input information
     def __init__(
@@ -32,7 +32,7 @@ class AxionStream(PhysicalObject):
         """
         initialize axion stream object
         Parameters
-        ----------  
+        ----------
         nu_a: axion Compton frequency in Hz
         gaNN: axion-nucleon coupling in 1/GeV
         Qa: axion quality factor (dimensionless)

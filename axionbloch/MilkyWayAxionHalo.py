@@ -1,4 +1,4 @@
-# axionbloch/AxionWind.py
+# 
 
 import numpy as np
 
@@ -7,7 +7,7 @@ from axionbloch.enphylope import PhysicalQuantity
 from axionbloch.constants import c, hbar
 
 
-class AxionWind(PhysicalObject):
+class MilkyWayAxionHalo(PhysicalObject):
     # Create the "axion wind" (axion field) object
     # you can get propeties of the axion field, computed based on the input information
     def __init__(

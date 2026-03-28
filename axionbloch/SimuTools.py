@@ -27,14 +27,13 @@ from axionbloch.utils import (
 )
 
 # from axionbloch.DataAnalysis import Signal
-from axionbloch.Sample import Sample
-
-from axionbloch.Apparatus import Magnet
 from axionbloch.enphylope import PhysicalQuantity
-from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
-from axionbloch.FineGrainedAxionStream import AxionStream
+from axionbloch.Sample import Sample
+from axionbloch.Apparatus import Magnet
 from axionbloch.SimuTypes import SimuParams, SimuEntry
-from axionbloch.station import Station
+from axionbloch.Station import Station
+from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
+from axionbloch.FineGrainedAxionStream import FineGrainedAxionStream
 
 import axionbloch.blochsimulation as bs
 
@@ -936,7 +935,7 @@ class MagField(PhysicalObject):
     def setAxionFields(
         self,
         # method: str,  # 'inverse-FFT'
-        axion: MilkyWayAxionHalo | AxionStream,
+        axion: MilkyWayAxionHalo | FineGrainedAxionStream,
         timeStep_s: float,
         timeLen: int,
         simuRate_Hz: float,
@@ -1960,7 +1959,7 @@ class Simulation(PhysicalObject):
         # )  # or
         if numFields > 1:
             self.trjry_mean = self.trjry.mean(axis=0)
-            self.M_mean = np.sqrt(
+            self.Mabs_mean = np.sqrt(
                 self.trjry[:, :, 0] ** 2 + self.trjry[:, :, 1] ** 2
             ).mean(axis=0)
             self.M_std = np.sqrt(
@@ -1975,14 +1974,14 @@ class Simulation(PhysicalObject):
             )
         else:
             self.trjry_mean = self.trjry[0]
-            self.M_mean = np.sqrt(self.trjry[0, :, 0] ** 2 + self.trjry[0, :, 1] ** 2)
+            self.Mabs_mean = np.sqrt(self.trjry[0, :, 0] ** 2 + self.trjry[0, :, 1] ** 2)
             self.M_std = None
             BALP_array_step = np.concatenate(
                 (self.excField.B_vec[0], [self.excField.B_vec[0][-1]]),
                 axis=0,
             )
         BfieldTimeStamp_s = self.timeStep_s * np.arange(BALP_array_step.shape[0])
-        timeStamp_s = self.timeStep_s * np.arange(self.M_mean.shape[0])
+        timeStamp_s = self.timeStep_s * np.arange(self.Mabs_mean.shape[0])
 
         fig = plt.figure(figsize=(15 * 0.8, 7 * 0.8), dpi=150)  #
         gs = gridspec.GridSpec(nrows=2, ncols=4)  #
@@ -2044,7 +2043,7 @@ class Simulation(PhysicalObject):
 
         Mabs_ax.plot(
             timeStamp_s[0:lastIndx:plotIntv],
-            self.M_mean[0:lastIndx:plotIntv],
+            self.Mabs_mean[0:lastIndx:plotIntv],
             label="mean",
             color="tab:orange",
             alpha=1,
@@ -2053,7 +2052,7 @@ class Simulation(PhysicalObject):
         if self.M_std is not None:
             Mabs_ax.errorbar(
                 x=timeStamp_s[0:lastIndx:plotIntv],
-                y=self.M_mean[0:lastIndx:plotIntv],
+                y=self.Mabs_mean[0:lastIndx:plotIntv],
                 yerr=self.M_std[0:lastIndx:plotIntv],
                 label="standard deviation",
                 color="tab:blue",
@@ -2080,7 +2079,7 @@ class Simulation(PhysicalObject):
         )
         Mxy_ax.plot(
             timeStamp_s[0:lastIndx:plotIntv],
-            self.M_mean[0:lastIndx:plotIntv],
+            self.Mabs_mean[0:lastIndx:plotIntv],
             label="$|M_\\mathrm{transverse}|$",
             color="tab:brown",
             alpha=1.0,

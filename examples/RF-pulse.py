@@ -1,16 +1,21 @@
 # example script to simulate RF-pulse NMR experiment
 import numpy as np
-from functools import partial
 import time
 
-from axionbloch.SimuTools import MagField, Simulation, gate
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+from matplotlib import font_manager
+
+from axionbloch.SimuTools import MagField, Simulation
 from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet
 from axionbloch.enphylope import PhysicalQuantity
 from axionbloch.constants import gamma_p, mu_p
+from axionbloch.utils import check
 
 
 RCF_Freq_Hz = 1e6
+signalFreqRot_Hz = 2
 T1_s = 1e6
 
 # short Tdelta, long T2
@@ -51,21 +56,22 @@ sample = Sample(
 # set detection magnet
 magnet = Magnet(
     name="detection magnet",
-    B0=PhysicalQuantity(RCF_Freq_Hz - 0, "Hz") / (sample.gamma / (2 * np.pi)),
+    B0=PhysicalQuantity(RCF_Freq_Hz - signalFreqRot_Hz, "Hz")
+    / (sample.gamma / (2 * np.pi)),
     FWHM=PhysicalQuantity(1 / (np.pi * Tdelta_s) / RCF_Freq_Hz, ""),
     nFWHM=20.0,
 )
-magnet.setHomogeneity(
-    numPt=int(
-        11
-        + duration.value_in("s")
-        * 2
-        * magnet.nFWHM
-        * magnet.FWHM_T
-        * sample.gamma.value_in("Hz/T")
-        * 1
-    ),
-)
+# magnet.setHomogeneity(
+#     numPt=int(
+#         11
+#         + duration.value_in("s")
+#         * 2
+#         * magnet.nFWHM
+#         * magnet.FWHM_T
+#         * sample.gamma.value_in("Hz/T")
+#         * 1
+#     ),
+# )
 magnet.setHomogeneity(
     numPt=100,
 )
@@ -95,14 +101,14 @@ simu.excField.set90DegPulse(
     / 2.0
     / simu.gamma_HzToT
     / (t90_s),  # amplitude of the excitation pulse in [T]
-    nu_rot=0,
+    nu_rot=-signalFreqRot_Hz,
     init_phase=0,
     t90_s=t90_s,
 )
 
 tic = time.perf_counter()
-simu.generateTrajectories(integrator="taylor")
-# simu.generateTrajectories(integrator="RK4")
+# simu.generateTrajectories(integrator="taylor")
+simu.generateTrajectories(integrator="RK4")
 toc = time.perf_counter()
 print(f"GenerateTrajectory time consumption = {toc-tic:.6f} s")
 
@@ -110,3 +116,14 @@ simu.monitorTrajectories(verbose=True)
 # simu.visualizeTrajectory3D(
 #     verbose=False,
 # )
+save_data = False
+if save_data:
+    timeStamp_s = simu.getTimeStamp()
+    check(simu.excField.B_vec.shape)
+    check(simu.trjry.shape)
+    np.savez(
+        "RF_pulse_simu.npz",
+        timeStamp_s=timeStamp_s,
+        B_vec=simu.excField.B_vec,
+        trjry=simu.trjry,
+    )

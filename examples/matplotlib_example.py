@@ -217,7 +217,7 @@ ax00.quiver(
 
 
 # Add zoom-in inset
-ax00_zoomin: plt.Axes = inset_axes(
+ax00_zoomin = inset_axes(
     ax00,  # parent axis
     bbox_to_anchor=(0.0, 0.0, 0.2, 1),  # (x0, y0, width, height)
     width="50%",

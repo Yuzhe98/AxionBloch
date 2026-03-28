@@ -101,7 +101,7 @@ void _generateTrajectories_TE(
     const double RCF_freq_Hz, const double Mx0, const double My0, const double Mz0,
     const double M0eqb,
     // output
-    double *trjry, // shape (numFields, numTimeSteps+1, 3) -> 1D
+    double *M_t, // shape (numFields, numTimeSteps+1, 3) -> 1D
     double *dMdt,  // shape (numFields, numTimeSteps, 3) -> 1D
     double *d2Mdt2 // shape (numFields, numTimeSteps, 3) -> 1D
 ) {
@@ -127,12 +127,12 @@ void _generateTrajectories_TE(
             B0z_rot_amp[k] = B_vals_T[k] - RCF_freq_Hz / gamma2pi;
         }
 
-        // write initial values in trjry
+        // write initial values in M_t
         // in the array (f-th, numTimeSteps + 1, 3)
         int idx0 = (f * (numTimeSteps + 1) + 0) * 3;
-        trjry[idx0 + 0] = Mx0;
-        trjry[idx0 + 1] = My0;
-        trjry[idx0 + 2] = Mz0;
+        M_t[idx0 + 0] = Mx0;
+        M_t[idx0 + 1] = My0;
+        M_t[idx0 + 2] = Mz0;
 
         // time loop
         for (int t = 0; t < numTimeSteps; t++) {
@@ -183,9 +183,9 @@ void _generateTrajectories_TE(
             // store trajectory for field f
             // write in the array (f-th, t+1, :)
             int idxOut = (f * (numTimeSteps + 1) + (t + 1)) * 3;
-            trjry[idxOut + 0] = sumMx;
-            trjry[idxOut + 1] = sumMy;
-            trjry[idxOut + 2] = sumMz;
+            M_t[idxOut + 0] = sumMx;
+            M_t[idxOut + 1] = sumMy;
+            M_t[idxOut + 2] = sumMz;
         }
 
         free(Mx);
@@ -211,7 +211,7 @@ void _generateTrajectories(
     const double T2, const double RCF_freq_Hz, const double Mx0, const double My0, const double Mz0,
     const double M0eqb,
     // output
-    double *trjry,   // shape (numFields, numTimeSteps+1, 3) -> 1D
+    double *M_t,   // shape (numFields, numTimeSteps+1, 3) -> 1D
     double *dMdt,    // shape (numFields, numTimeSteps, 3) -> 1D
     double *d2Mdt2   // shape (numFields, numTimeSteps, 3) -> 1D
 ) {
@@ -253,12 +253,12 @@ void _generateTrajectories(
             inhomoOz_vec[k] = inhomoOmega_vec[k] - RCF_freq_Hz * 2 * M_PI;
         }
 
-        // write initial values in trjry
+        // write initial values in M_t
         // in the array (f-th, numTimeSteps + 1, 3)
         int idx0 = (f * (numTimeSteps + 1) + 0) * 3;
-        trjry[idx0 + 0] = Mx0;
-        trjry[idx0 + 1] = My0;
-        trjry[idx0 + 2] = Mz0;
+        M_t[idx0 + 0] = Mx0;
+        M_t[idx0 + 1] = My0;
+        M_t[idx0 + 2] = Mz0;
 
         // time loop
         for (int t = 0; t < numTimeSteps; t++) {
@@ -328,9 +328,9 @@ void _generateTrajectories(
             // store trajectory for field f
             // write in the array (f-th, t+1, :)
             int idxOut = (f * (numTimeSteps + 1) + (t + 1)) * 3;
-            trjry[idxOut + 0] = sumMx;
-            trjry[idxOut + 1] = sumMy;
-            trjry[idxOut + 2] = sumMz;
+            M_t[idxOut + 0] = sumMx;
+            M_t[idxOut + 1] = sumMy;
+            M_t[idxOut + 2] = sumMz;
         }
 
         free(Mx);
