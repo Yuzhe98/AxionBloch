@@ -4,7 +4,7 @@ import os
 import numpy as np
 import time
 
-from axionbloch.MilkyWayAxionHalo import AxionWind
+from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
 from axionbloch.SimuTools import MagField, Simulations
 from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet
@@ -24,20 +24,15 @@ sample = Sample(
     massDensity=PhysicalQuantity(0.792, "g / cm**3 "),
     molarMass=PhysicalQuantity(32.04, "g / mol"),  # molar mass
     numOfSpinsPerMolecule=PhysicalQuantity(4, ""),  # number of spins per molecule
-    T2=PhysicalQuantity(1, "s"), 
-    T1=PhysicalQuantity(3, "s"), 
+    T2=PhysicalQuantity(1, "s"),
+    T1=PhysicalQuantity(3, "s"),
     vol=PhysicalQuantity(1, "cm**3"),
     mu=mu_p,  # magnetic dipole moment
     verbose=False,
 )
 
 # axion Compton frequency
-nu_a_array = np.array(
-    [
-        PhysicalQuantity(nu, "Hz")
-        for nu in [1e6]
-    ]
-)
+nu_a_array = np.array([PhysicalQuantity(nu, "Hz") for nu in [1e6]])
 
 # set magnet homogeneity
 mag_FWHMs = np.array([PhysicalQuantity(nu, "ppm") for nu in [1e1]])
@@ -63,7 +58,7 @@ for nu_a in nu_a_array:
         nu_a_Hz = nu_a.value_in("Hz")
         print("Axion Compton frequency =", nu_a, flush=True)
         time.sleep(0.1)
-        axion = AxionWind(
+        axion = MilkyWayAxionHalo(
             name="axion",
             nu_a=nu_a,
             gaNN=gaNN,

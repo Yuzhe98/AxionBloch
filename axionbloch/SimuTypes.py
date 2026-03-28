@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 # Import physical quantities and modules used in simulation
 from axionbloch.enphylope import PhysicalQuantity  # physical quantity with units
-from axionbloch.MilkyWayAxionHalo import AxionWind  # axion field information
+from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo  # axion field information
 from axionbloch.Sample import Sample  # NMR sample
 from axionbloch.Apparatus import Magnet  # magnet
 
@@ -28,7 +28,7 @@ from axionbloch.Apparatus import Magnet  # magnet
 # TypedDict allows static type checking for keys and value types.
 class SimuParams(TypedDict):
     key_info: object  # key information for the simulation
-    axion: AxionWind  # axion field object
+    axion: MilkyWayAxionHalo  # axion field object
     sample: Sample  # NMR sample
     magnet: Magnet  # magnetic field apparatus
     excField: MagField  # excitation (magnetic) field

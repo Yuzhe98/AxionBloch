@@ -4,7 +4,7 @@ import os
 import numpy as np
 import time
 
-from axionbloch.MilkyWayAxionHalo import AxionWind
+from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
 from axionbloch.SimuTools import MagField, Simulations
 from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet
@@ -58,7 +58,7 @@ for nu_a in nu_a_array:
         nu_a_Hz = nu_a.value_in("Hz")
         print("Axion Compton frequency =", nu_a, flush=True)
         time.sleep(0.1)
-        axion = AxionWind(
+        axion = MilkyWayAxionHalo(
             name="axion",
             nu_a=nu_a,
             gaNN=gaNN,

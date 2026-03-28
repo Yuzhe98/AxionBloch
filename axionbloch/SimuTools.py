@@ -31,7 +31,7 @@ from axionbloch.Sample import Sample
 
 from axionbloch.Apparatus import Magnet
 from axionbloch.enphylope import PhysicalQuantity
-from axionbloch.MilkyWayAxionHalo import AxionWind
+from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
 from axionbloch.FineGrainedAxionStream import AxionStream
 from axionbloch.SimuTypes import SimuParams, SimuEntry
 from axionbloch.station import Station
@@ -870,9 +870,9 @@ class MagField(PhysicalObject):
             # ttic = time.perf_counter()
             # Ba_t = np.fft.ifft(ax_FFT_0_pos_neg, axis=1)
             # reveal_type(ifft(ax_FFT_0_pos_neg, axis=1))
-            Ba_t = np.asarray(ifft(
-                ax_FFT_0_pos_neg, axis=1
-            ))  # batch IFFT along time axis
+            Ba_t = np.asarray(
+                ifft(ax_FFT_0_pos_neg, axis=1)
+            )  # batch IFFT along time axis
             # ttoc = time.perf_counter()
             # ifft_runtimes.append(ttoc - ttic)
 
@@ -936,7 +936,7 @@ class MagField(PhysicalObject):
     def setAxionFields(
         self,
         # method: str,  # 'inverse-FFT'
-        axion: AxionWind | AxionStream,
+        axion: MilkyWayAxionHalo | AxionStream,
         timeStep_s: float,
         timeLen: int,
         simuRate_Hz: float,
@@ -1228,7 +1228,7 @@ class Simulations:
         # run simulations
         for i, params in enumerate(self.all_params):
             simu: Simulation = self.pool[i].simu
-            
+
             # set fields
             tic = time.perf_counter()
             simu.excField.setAxionFields(
@@ -1426,7 +1426,7 @@ class Simulation(PhysicalObject):
     def __init__(
         self,
         name: str = "NMR simulation",
-        axion: Optional[AxionWind] = None,
+        axion: Optional[MilkyWayAxionHalo] = None,
         sample: Optional[Sample] = None,
         magnet: Optional[Magnet] = None,
         excField: Optional[MagField] = None,
@@ -2177,15 +2177,17 @@ class Simulation(PhysicalObject):
         # plt.tight_layout()
         plt.show()
 
-    def keepMeanStd(self, debug:bool=False):
+    def keepMeanStd(self, debug: bool = False):
         """
         Keep the mean values and standard deviations of the results
 
         :param self: Description
         """
-        Mxy_magnitudes: np.ndarray  = np.sqrt(self.trjry[:, :, 0] ** 2 + self.trjry[:, :, 1] ** 2)
+        Mxy_magnitudes: np.ndarray = np.sqrt(
+            self.trjry[:, :, 0] ** 2 + self.trjry[:, :, 1] ** 2
+        )
         Mx_magnitudes: np.ndarray = np.abs(self.trjry[:, :, 0])
-        My_magnitudes: np.ndarray  = np.abs(self.trjry[:, :, 1])
+        My_magnitudes: np.ndarray = np.abs(self.trjry[:, :, 1])
         Mz_magnitudes: np.ndarray = np.abs(self.trjry[:, :, 2])
 
         # mean of root of squares

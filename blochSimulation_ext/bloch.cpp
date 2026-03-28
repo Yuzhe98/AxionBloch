@@ -216,7 +216,7 @@ void _generateTrajectories(
     double *d2Mdt2   // shape (numFields, numTimeSteps, 3) -> 1D
 ) {
     double dt = timeStep;
-    double dt_2 = 0.5 * dt; // half timestep
+    double dtHalf = 0.5 * dt; // half timestep
     double dt_6 = dt / 6.0; // for final RK4 update
 
     const int FT3 = numFields * numTimeSteps * 3;
@@ -288,18 +288,18 @@ void _generateTrajectories(
                 double k1z = (Mx[k] * Oy - My[k] * Ox) - (Mz[k] - M0eq[k]) / T1;
 
                 // Step 2: compute k2
-                double Mx_tmp = Mx[k] + dt_2 * k1x;
-                double My_tmp = My[k] + dt_2 * k1y;
-                double Mz_tmp = Mz[k] + dt_2 * k1z;
+                double Mx_tmp = Mx[k] + dtHalf * k1x;
+                double My_tmp = My[k] + dtHalf * k1y;
+                double Mz_tmp = Mz[k] + dtHalf * k1z;
 
                 double k2x = (My_tmp * Oz - Mz_tmp * Oy) - Mx_tmp / T2;
                 double k2y = (Mz_tmp * Ox - Mx_tmp * Oz) - My_tmp / T2;
                 double k2z = (Mx_tmp * Oy - My_tmp * Ox) - (Mz_tmp - M0eq[k]) / T1;
 
                 // Step 3: compute k3
-                Mx_tmp = Mx[k] + dt_2 * k2x;
-                My_tmp = My[k] + dt_2 * k2y;
-                Mz_tmp = Mz[k] + dt_2 * k2z;
+                Mx_tmp = Mx[k] + dtHalf * k2x;
+                My_tmp = My[k] + dtHalf * k2y;
+                Mz_tmp = Mz[k] + dtHalf * k2z;
 
                 double k3x = (My_tmp * Oz - Mz_tmp * Oy) - Mx_tmp / T2;
                 double k3y = (Mz_tmp * Ox - Mx_tmp * Oz) - My_tmp / T2;
