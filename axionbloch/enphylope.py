@@ -9,12 +9,18 @@ import numpy as np
 # Create a Unit Registry for managing units
 ureg = UnitRegistry()
 # Define units
+ureg.define("Gauss = 1e-4 * tesla = G")  # Gauss
 ureg.define(
     "parsec = 30856775814913673 * meter = pc"
 )  # Parsec. The built-in parsec is not precise
 ureg.define("solar_mass = 1.98847e30 * kilogram = M_sun")  # Solar Mass
+ureg.define("earth_mass = 5.9722e24 * kilogram = M_earth")  # Earth Mass
 ureg.define("ppb = 1e-9")  # parts per billion
-
+ureg.define("ppt = 1e-12")  # parts per trillion
+ureg.define("ppq = 1e-15")  # parts per quadrillion
+ureg.define("ppqu = 1e-18")  # parts per quintillion
+ureg.define("ppmu = 1e-21")  # parts per sextillion
+ureg.define("ppbmu = 1e-24")  # parts per septillion
 
 class PhysicalQuantity:
     """
