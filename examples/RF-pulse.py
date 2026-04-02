@@ -73,7 +73,7 @@ magnet = Magnet(
 #     ),
 # )
 magnet.setHomogeneity(
-    numPt=100,
+    numPt=500,
 )
 print(f"numPt for magnet homogeneity = {magnet.numPt}")
 
@@ -83,7 +83,7 @@ excField = MagField(name="RF pulse")
 
 simu = Simulation(
     name="simulation template",
-    sample=sample, 
+    sample=sample,
     magnet=magnet,
     excField=excField,
     RCF_freq=PhysicalQuantity(RCF_Freq_Hz, "Hz"),
@@ -93,17 +93,13 @@ simu = Simulation(
 )
 
 # set excitation pulse: 90 degree hard pulse
-t90_s = 10 * simu.timeStep_s
+# t90_s = 10 * simu.timeStep_s
 simu.excField.set90DegPulse(
-    timeStamp=simu.getTimeStamp(),
-    B1=2
-    * np.pi
-    / 2.0
-    / simu.gamma_HzToT
-    / (t90_s),  # amplitude of the excitation pulse in [T]
-    nu_rot=-signalFreqRot_Hz,
-    init_phase=0,
-    t90_s=t90_s,
+    timeStep_s=simu.timeStep_s,
+    timeLen=simu.timeLen,
+    gamma_HzToT=simu.gamma_HzToT,
+    t90_s=10 * simu.timeStep_s,
+    nu_rot_Hz=signalFreqRot_Hz,
 )
 
 tic = time.perf_counter()
@@ -126,4 +122,6 @@ if save_data:
         timeStamp_s=timeStamp_s,
         B_vec=simu.excField.B_vec,
         trjry=simu.trjry,
+        T2_s=T2_s,
+        Tdelta_s=Tdelta_s,
     )

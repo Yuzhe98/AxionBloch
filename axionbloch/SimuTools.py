@@ -73,7 +73,7 @@ class MagField(PhysicalObject):
         self.name = name
         self.nu_Hz = None
 
-    def setXYPulse(
+    def setXYPulse_old(
         self,
         timeStamp: np.ndarray,
         B1: float,  # amplitude of the excitation pulse in (T)
@@ -153,45 +153,111 @@ class MagField(PhysicalObject):
         #     return duty_func(timeStamp) * B1 * np.sin(2 * np.pi * nu_e * timeStamp + init_phase)
         # return
 
-    def set90DegPulse(
+    def setXYPulse(
         self,
-        timeStamp: np.ndarray,
-        B1: float,  # amplitude of the excitation pulse in (T)
-        nu_rot: float,
-        init_phase: float,
-        t90_s: float,
+        timeStep_s: float,
+        timeLen: int,
+        # gamma_HzToT: float,  # amplitude of the excitation pulse in (T)
+        B1_T: float,
+        nu_rot_Hz: float,
+        init_phase: float = 0.0,
         verbose: bool = False,
     ):
         """
         generate a 90 deg pulse in the rotating frame
         """
-        envelope = np.zeros_like(timeStamp)
-        t90Len = int(np.round(t90_s / (timeStamp[1] - timeStamp[0])))
-        envelope[0:t90Len] = 0.5 * B1
+        startDelayLen = 0  # this should stay 0.
+        timeStamp_s = timeStep_s * np.arange(timeLen - 1)
+        envelope = np.zeros_like(timeStamp_s)
+
+        envelope[ startDelayLen: ] = 0.5 * B1_T
 
         # excitation along x-axis
         Bx_envelope = np.multiply(
-            envelope, np.cos(2 * np.pi * nu_rot * timeStamp + init_phase)
+            envelope, np.cos(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase)
         )
         Bx = np.outer(Bx_envelope, np.array([1, 0, 0]))
 
         # excitation along y-axis
         By_envelope = np.multiply(
-            envelope, np.sin(2 * np.pi * nu_rot * timeStamp + init_phase)
+            envelope, np.sin(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase)
         )
         By = np.outer(By_envelope, np.array([0, 1, 0]))
 
         # 1st order time-derivate of the excitation along x-axis
         dBxdt_envelope = np.multiply(
             envelope,
-            -2 * np.pi * nu_rot * np.sin(2 * np.pi * nu_rot * timeStamp + init_phase),
+            -2
+            * np.pi
+            * nu_rot_Hz
+            * np.sin(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase),
         )
         dBxdt = np.outer(dBxdt_envelope, np.array([1, 0, 0]))
 
         # 1st order time-derivate of the excitation along y-axis
         dBydt_envelope = np.multiply(
             envelope,
-            2 * np.pi * nu_rot * np.cos(2 * np.pi * nu_rot * timeStamp + init_phase),
+            2
+            * np.pi
+            * nu_rot_Hz
+            * np.cos(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase),
+        )
+        dBydt = np.outer(dBydt_envelope, np.array([0, 1, 0]))
+
+        self.B_vec = Bx + By
+        self.dBdt_vec = dBxdt + dBydt
+
+    def set90DegPulse(
+        self,
+        timeStep_s: float,
+        timeLen: int,
+        gamma_HzToT: float,  # amplitude of the excitation pulse in (T)
+        t90_s: float,
+        nu_rot_Hz: float,
+        init_phase: float = 0.0,
+        verbose: bool = False,
+    ):
+        """
+        generate a 90 deg pulse in the rotating frame
+        """
+        startDelayLen = 0  # this should stay 0. It does not help in anything
+        timeStamp_s = timeStep_s * np.arange(timeLen - 1)
+        t90Len = int(np.round(t90_s / timeStep_s))
+        B90_T = 1.0 * np.pi / (gamma_HzToT * t90_s)
+        envelope = np.zeros_like(timeStamp_s)
+        t90Len = int(np.round(t90_s / (timeStamp_s[1] - timeStamp_s[0])))
+
+        envelope[startDelayLen:startDelayLen + t90Len] = 0.5 * B90_T
+
+        # excitation along x-axis
+        Bx_envelope = np.multiply(
+            envelope, np.cos(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase)
+        )
+        Bx = np.outer(Bx_envelope, np.array([1, 0, 0]))
+
+        # excitation along y-axis
+        By_envelope = np.multiply(
+            envelope, np.sin(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase)
+        )
+        By = np.outer(By_envelope, np.array([0, 1, 0]))
+
+        # 1st order time-derivate of the excitation along x-axis
+        dBxdt_envelope = np.multiply(
+            envelope,
+            -2
+            * np.pi
+            * nu_rot_Hz
+            * np.sin(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase),
+        )
+        dBxdt = np.outer(dBxdt_envelope, np.array([1, 0, 0]))
+
+        # 1st order time-derivate of the excitation along y-axis
+        dBydt_envelope = np.multiply(
+            envelope,
+            2
+            * np.pi
+            * nu_rot_Hz
+            * np.cos(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase),
         )
         dBydt = np.outer(dBydt_envelope, np.array([0, 1, 0]))
 
@@ -207,7 +273,7 @@ class MagField(PhysicalObject):
         tau_s: float,
         numEcho: int,
         nu_rot_Hz: float,
-        init_phase: float,
+        init_phase: float = 0.0,
         verbose: bool = False,
     ):
         """
@@ -225,7 +291,7 @@ class MagField(PhysicalObject):
         t90Len = int(np.round(t90_s / timeStep_s))
         if verbose:
             print(f"t90Len = {t90Len} time steps")
-        if t90Len < 3:
+        if t90Len < 2:
             print(f"WARNING: t90Len = {t90Len} < 3")
         t180Len: int = 1 * (t90Len)
 
@@ -1974,7 +2040,9 @@ class Simulation(PhysicalObject):
             )
         else:
             self.trjry_mean = self.trjry[0]
-            self.Mabs_mean = np.sqrt(self.trjry[0, :, 0] ** 2 + self.trjry[0, :, 1] ** 2)
+            self.Mabs_mean = np.sqrt(
+                self.trjry[0, :, 0] ** 2 + self.trjry[0, :, 1] ** 2
+            )
             self.M_std = None
             BALP_array_step = np.concatenate(
                 (self.excField.B_vec[0], [self.excField.B_vec[0][-1]]),
@@ -2097,6 +2165,12 @@ class Simulation(PhysicalObject):
             label="$M_z$",
             color="tab:pink",
         )
+        # Mz_ax.plot(
+        #     timeStamp_s[0:lastIndx:plotIntv],
+        #     self.trjry_mean[0:lastIndx:plotIntv, 2]-np.cos(2 * np.pi * (1/0.08) * timeStamp_s[0:lastIndx:plotIntv]),
+        #     label="cosine line - ",
+        #     color="k",
+        # )
         Mz_ax.scatter(
             timeStamp_s[0:lastIndx:plotIntv],
             self.trjry_mean[0:lastIndx:plotIntv, 2],

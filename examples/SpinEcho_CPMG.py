@@ -1,4 +1,5 @@
 # $env:PYTHONPATH = "your:\path\here;$env:PYTHONPATH”
+# $env:PYTHONPATH = "C:\Users\zhenf\D\Yu0702\axionbloch;$env:PYTHONPATH”
 
 import numpy as np
 import time
@@ -12,12 +13,12 @@ from axionbloch.constants import gamma_p, mu_p
 
 
 RCF_Freq_Hz = 1e6
-
-T1_s = 1e8
+signalFreqRot_Hz = 1
+T1_s = 1e6
 
 # short Tdelta
-Tdelta_s = 0.1
-T2_s = 5.0
+Tdelta_s = 1.0
+T2_s = 10.0
 
 # CH3CH2OH
 sample = Sample(
@@ -33,11 +34,13 @@ sample = Sample(
     verbose=False,
 )
 
+# set detection magnet
 magnet = Magnet(
     name="detection magnet",
-    B0=PhysicalQuantity(RCF_Freq_Hz, "Hz") / (sample.gamma / (2 * np.pi)),
+    B0=PhysicalQuantity(RCF_Freq_Hz - signalFreqRot_Hz, "Hz")
+    / (sample.gamma / (2 * np.pi)),
     FWHM=PhysicalQuantity(1 / (np.pi * Tdelta_s) / RCF_Freq_Hz, ""),
-    nFWHM=10.0,
+    nFWHM=20.0,
 )
 
 
@@ -50,7 +53,8 @@ simu = Simulation(
     sample=sample,
     magnet=magnet,
     excField=excField,
-    rate=PhysicalQuantity(1000, "Hz"),  #
+    rate=PhysicalQuantity(500, "Hz"),  #
+    RCF_freq=PhysicalQuantity(RCF_Freq_Hz, "Hz"),
     duration=PhysicalQuantity(20, "s"),
     verbose=True,
 )
@@ -76,10 +80,10 @@ simu.excField.setCPMGPulseTrain(
     timeStep_s=simu.timeStep_s,
     timeLen=simu.timeLen,
     gamma_HzToT=simu.gamma_HzToT,
-    t90_s=3 * simu.timeStep_s,
-    tau_s=10 * Tdelta_s,
-    numEcho=10,
-    nu_rot_Hz=0,
+    t90_s=10 * simu.timeStep_s,
+    tau_s=6 * Tdelta_s,
+    numEcho=1,
+    nu_rot_Hz=signalFreqRot_Hz,
     init_phase=0,
     verbose=True,
 )
@@ -101,3 +105,17 @@ print(f"{simu.generateTrajectories.__name__} time consumption = {toc-tic:.3g} s"
 # RK4 with magnet.numPt = 100 gives unstable result
 
 simu.monitorTrajectories(verbose=True)
+
+save_data = True
+if save_data:
+    timeStamp_s = simu.getTimeStamp()
+    check(simu.excField.B_vec.shape)
+    check(simu.trjry.shape)
+    np.savez(
+        "SpinEcho_CPMG_simu.npz",
+        timeStamp_s=timeStamp_s,
+        B_vec=simu.excField.B_vec,
+        trjry=simu.trjry,
+        T2_s=T2_s,
+        Tdelta_s=Tdelta_s,
+    )
