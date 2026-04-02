@@ -106,7 +106,7 @@ print(f"{simu.generateTrajectories.__name__} time consumption = {toc-tic:.3g} s"
 
 simu.monitorTrajectories(verbose=True)
 
-save_data = True
+save_data = False
 if save_data:
     timeStamp_s = simu.getTimeStamp()
     check(simu.excField.B_vec.shape)
