@@ -38,6 +38,7 @@ class Sample(PhysicalObject):
         vol: Optional[PhysicalQuantity] = None,  # volume
         mu: Optional[PhysicalQuantity] = None,  # magnetic dipole moment
         temp: Optional[PhysicalQuantity] = None,
+        pol: Optional[PhysicalQuantity] = None,
         verbose: bool = False,
     ):
         """
@@ -81,6 +82,7 @@ class Sample(PhysicalObject):
 
         self.mu = mu
         self.temp = temp
+        self.pol = pol
         # Specify all physical quantities with units
         self.physicalQuantities = {
             "gamma": "Hz/T",
@@ -94,6 +96,7 @@ class Sample(PhysicalObject):
             "mu": "J/T",
             "temp": "K",
             "totalNumOfSpins": "",
+            "pol": "",
         }
         # make sure that we use common units for quantities
         self.useCommonUnits()
@@ -101,26 +104,40 @@ class Sample(PhysicalObject):
     def getThermalPol(
         self,
         B_pol: PhysicalQuantity,
-        temp: PhysicalQuantity,
+        temp: Optional[PhysicalQuantity] = None,
+        verbose: bool = False,
     ):
         """
         return thermal polarization
         """
         # pol = hbar * self.gamma * B_pol / (2 * k * temp)  # approximate
+        if temp is None:
+            temp = self.temp
         pol = np.tanh(hbar * self.gamma * B_pol / (2 * kB * temp))  # exact
         pol = pol.to("")
         # check(pol)
+        if verbose:
+            print(
+                f"Thermal polarization at B_pol={B_pol} and temp={temp} is {pol}"
+            )
         return pol
 
     def getM0(
         self,
-        pol,
+        pol: Optional[PhysicalQuantity] = None,
+        verbose: bool = False,
+
     ):
         """
         compute magnetization M0
         """
-        M0 = (self.mu * pol * self.totalNumOfSpins).to("A/m")
+        if pol is None:
+            pol = self.pol
+        assert pol is not None, "Polarization is required to compute M0. Please provide pol or set it in the Sample object."
+        M0 = (self.mu * pol * self.totalNumOfSpins / self.vol).to("A/m")
         # self.M0_SPN = (self.mu * ns_SPN).to("A/m")
+        if verbose:
+            print(f"Magnetization M0 is {M0}")
         return M0
 
 

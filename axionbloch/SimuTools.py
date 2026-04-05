@@ -1496,9 +1496,7 @@ class Simulation(PhysicalObject):
         magnet: Optional[Magnet] = None,
         excField: Optional[MagField] = None,
         station: Optional[Station] = None,
-        init_M: Optional[PhysicalQuantity] = PhysicalQuantity(
-            1.0, ""
-        ),  # initial magnetization vector amplitude
+        init_M: Optional[PhysicalQuantity] = None,  # initial magnetization vector amplitude
         init_M_theta: Optional[PhysicalQuantity] = PhysicalQuantity(0, "rad"),
         init_M_phi: Optional[PhysicalQuantity] = PhysicalQuantity(0, "rad"),
         RCF_freq: Optional[PhysicalQuantity] = None,
@@ -1558,6 +1556,15 @@ class Simulation(PhysicalObject):
         #
         self.gamma_HzToT = self.sample.gamma.value_in("Hz/T")
 
+        # compute the initial magnetization
+        self.M0_init = self.sample.getM0(verbose=True)
+        # get the equilibrium magnetization M0
+        self.M0eqb = self.sample.getM0(pol=self.sample.getThermalPol(B_pol=self.magnet.B0, verbose=True), verbose=True)
+        # normalize the magnetization by the equilibrium magnetization M0, so that init_M is dimensionless and represents the initial polarization
+        if init_M is None:
+            init_M = (self.M0_init / self.M0eqb).to("")
+            check(init_M)
+        
         self.init_M = init_M
         self.init_M_theta = init_M_theta
         self.init_M_phi = init_M_phi
@@ -1766,8 +1773,8 @@ class Simulation(PhysicalObject):
             ]
         )
         # M_init = np.array([Mx0, My0, Mz0])
-        # Magnetization at equilibrium
-        M0eqb = 1.0
+        # normalized magnetization at equilibrium
+        M0eqb_norm = 1.0
 
         # self.excField.B_vec and self.excField.dBdt_vec should have shape (numFields, numTimeSteps, 3)
         # if they are 1D arrays of shape (numSteps, 3),
@@ -1801,7 +1808,7 @@ class Simulation(PhysicalObject):
             Mx0,
             My0,
             Mz0,
-            M0eqb,
+            M0eqb_norm,
             integrator,
         )
         if cleanup:

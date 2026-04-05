@@ -2,9 +2,9 @@
 import numpy as np
 import time
 
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-from matplotlib import font_manager
+# import matplotlib.pyplot as plt
+# import matplotlib.gridspec as gridspec
+# from matplotlib import font_manager
 
 from axionbloch.SimuTools import MagField, Simulation
 from axionbloch.Sample import Sample
@@ -16,11 +16,11 @@ from axionbloch.utils import check
 
 RCF_Freq_Hz = 1e6
 signalFreqRot_Hz = 1
-T1_s = 1e10
+T1_s = 1.0
 
 # short Tdelta, long T2
-Tdelta_s = 1.0
-T2_s = 10.0
+Tdelta_s = 1.0e-1
+T2_s = 1.0e-1
 
 # # short T2, long Tdelta
 # Tdelta_s = 10.0
@@ -50,6 +50,8 @@ sample = Sample(
     T1=PhysicalQuantity(T1_s, "s"),  #
     vol=PhysicalQuantity(1, "cm**3"),
     mu=mu_p,  # magnetic dipole moment
+    temp=PhysicalQuantity(300, "K"),  # room temperature
+    pol=PhysicalQuantity(1e-2, ""),  # polarization
     verbose=False,
 )
 
@@ -97,7 +99,8 @@ simu = Simulation(
 simu.excField.setXYPulse(
     timeStep_s=simu.timeStep_s,
     timeLen=simu.timeLen,
-    B1_T=1.0e-11,
+    # B1_T=1.0e-11,
+    B1_T=0,
     nu_rot_Hz=signalFreqRot_Hz,
 )
 
@@ -111,16 +114,19 @@ simu.monitorTrajectories(verbose=True)
 # simu.visualizeTrajectory3D(
 #     verbose=False,
 # )
-save_data = False
+save_data = True
 if save_data:
     timeStamp_s = simu.getTimeStamp()
     check(simu.excField.B_vec.shape)
     check(simu.trjry.shape)
     np.savez(
-        "RF_CW_simu.npz",
+        "C:\\Users\\zhenf\\D\\Yu0702\\CASPEr-Collaboration\\AxionBloch-paper/figures/RF_CW_hyperpolarized.npz",
         timeStamp_s=timeStamp_s,
         B_vec=simu.excField.B_vec,
         trjry=simu.trjry,
         T2_s=T2_s,
         Tdelta_s=Tdelta_s,
+        T_1_s=T1_s,
+        pol=sample.pol,
+        init_M = simu.init_M.value_in(""),
     )
