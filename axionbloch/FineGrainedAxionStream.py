@@ -58,11 +58,11 @@ class FineGrainedAxionStream(PhysicalObject):
 
         #
         self.nu_a_eff = self.nu_a * (PhysicalQuantity(1, "") + self.v_lab**2 / c_SI**2)
-        self.nu_a_eff = self.nu_a_eff.convert_to("Hz")
+        self.nu_a_eff = self.nu_a_eff.to("Hz")
 
         # coherence time (estimated)
         self.tau_a_est = 1.0 / (np.pi * self.FWHM * self.nu_a_eff)
-        self.tau_a_est = self.tau_a_est.convert_to("s")
+        self.tau_a_est = self.tau_a_est.to("s")
 
         # Specify all physical quantities with units
         self.physicalQuantities = {

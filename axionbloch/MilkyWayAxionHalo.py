@@ -1,4 +1,4 @@
-# 
+#
 
 import numpy as np
 
@@ -49,11 +49,11 @@ class MilkyWayAxionHalo(PhysicalObject):
 
         #
         self.nu_a_eff = self.nu_a * (PhysicalQuantity(1, "") + self.v_lab**2 / c**2)
-        self.nu_a_eff = self.nu_a_eff.convert_to("Hz")
+        self.nu_a_eff = self.nu_a_eff.to("Hz")
 
         # coherence time (estimated)
         self.tau_a_est = 1.0 / (np.pi * self.FWHM * self.nu_a_eff)
-        self.tau_a_est = self.tau_a_est.convert_to("s")
+        self.tau_a_est = self.tau_a_est.to("s")
 
         # Specify all physical quantities with units
         self.physicalQuantities = {
@@ -89,7 +89,7 @@ class MilkyWayAxionHalo(PhysicalObject):
             Omega_rms = (
                 0.5 * self.gaNN * (2 * hbar * c * self.rho_E_DM) ** (1 / 2) * self.v_lab
             )
-            Omega_rms = Omega_rms.convert_to("Hz")
+            Omega_rms = Omega_rms.to("Hz")
         else:
             raise ValueError(
                 f"case {case} not recognized, should be 'grad_perp'"

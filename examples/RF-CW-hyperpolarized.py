@@ -36,7 +36,7 @@ T2_s = 1.0e-1
 
 simuRate = PhysicalQuantity(500, "Hz")  #
 duration = PhysicalQuantity(20, "s")
-timeLen = int((simuRate * duration).convert_to("").value)
+timeLen = int((simuRate * duration).to("").value)
 
 
 # CH3CH2OH
@@ -128,5 +128,5 @@ if save_data:
         Tdelta_s=Tdelta_s,
         T_1_s=T1_s,
         pol=sample.pol,
-        init_M = simu.init_M.value_in(""),
+        init_M=simu.init_M.value_in(""),
     )

@@ -36,7 +36,7 @@ T2_s = 10.0
 
 simuRate = PhysicalQuantity(500, "Hz")  #
 duration = PhysicalQuantity(20, "s")
-timeLen = int((simuRate * duration).convert_to("").value)
+timeLen = int((simuRate * duration).to("").value)
 
 
 # CH3CH2OH

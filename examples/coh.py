@@ -36,7 +36,7 @@ nu_a = PhysicalQuantity(1, "MHz")
 # axion mass
 m_a = nu_a * h_Planck / c_SI**2
 print("axion Compton frequency =", nu_a)
-print("axion mass =", m_a.convert_to("kg"), " =", m_a.convert_to("eV/c**2"))
+print("axion mass =", m_a.to("kg"), " =", m_a.to("eV/c**2"))
 
 eigenEnergies_eV = 1e-15 * np.random.uniform(0, 1, 1_0000)
 # eigenEnergies_eV = 1e-16 * np.linspace(0, 1, 1_000)
@@ -58,7 +58,7 @@ for i, eigenE_eV in enumerate(eigenEnergies_eV[:]):
     amp = 1 / len(eigenEnergies_eV)  # amplitude for each eigenstate
     # amp = np.random.uniform(0, 1)  # random amp for each eigenstate
     phase = np.random.uniform(0, 2 * np.pi)  # random initial phase for each eigenstate
-    
+
     # phase = 0
     # print(nu_a_eff.value_in("Hz"))
     axion_field += amp * np.exp(

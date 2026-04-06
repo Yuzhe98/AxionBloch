@@ -37,7 +37,7 @@ nu_a = PhysicalQuantity(1, "MHz")
 # axion mass
 m_a = nu_a * h_Planck / c_SI**2
 print("axion Compton frequency =", nu_a)
-print("axion mass =", m_a.convert_to("kg"), " =", m_a.convert_to("eV/c**2"))
+print("axion mass =", m_a.to("kg"), " =", m_a.to("eV/c**2"))
 
 
 duration_s = 1e2  # in seconds
@@ -48,7 +48,7 @@ dt = timeStamp_s[1] - timeStamp_s[0]  # sampling interval in seconds
 
 freq = np.fft.fftfreq(dataLen, d=dt)
 freq_shifted = np.fft.fftshift(freq)
-FWHM_Hz = .1
+FWHM_Hz = 0.1
 spectrum = Lorentzian(freq_shifted, center=0, FWHM=FWHM_Hz) * np.exp(
     -1j * np.random.uniform(0, 2 * np.pi, dataLen)
 )

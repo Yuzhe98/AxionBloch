@@ -15,10 +15,12 @@ from mpl_toolkits.mplot3d import proj3d
 from functools import partial
 
 from axionbloch.enphylope import PhysicalQuantity, _safe_convert
+from axionbloch.constants import hbar, kB, c, h_Planck
 from typing import Sequence
 
 import h5py
 
+earth_radius_m = 6371.0e3  # [m]
 
 def giveDateAndTime():
     timestr = time.strftime("%Y%m%d_%H%M%S")
@@ -2958,3 +2960,56 @@ def coh_time_g1(x, dt):
             category=UserWarning,
         )
     return tau
+
+
+def boltzmann_probabilities(
+    energies: Sequence[PhysicalQuantity], T: PhysicalQuantity
+) -> np.ndarray:
+    """
+    Compute Boltzmann probabilities for a set of energy eigenstates.
+
+    Parameters
+    ----------
+    energies : sequence of PhysicalQuantity
+        energies with units of energy
+    T : PhysicalQuantity
+        Temperature (must be > 0)
+
+    Returns
+    -------
+    np.ndarray
+        Dimensionless probabilities
+    """
+
+    assert T.value_in("K") > 0
+
+    # energies = np.array(energies)
+    # energies = np.array([E.to(energies[0].unit) for E in energies])
+    energies_eV = np.array([E.value_in("eV") for E in energies])
+
+    # beta = 1 / (kB * T)
+    beta_eV_1 = (1.0 / (kB * T)).value_in("eV**(-1)")
+
+    E_min = energies_eV.min()
+    scaled_energies_eV = [E - E_min for E in energies_eV]
+
+    exponents = np.array([(-beta_eV_1 * E) for E in scaled_energies_eV])
+
+    weights = np.exp(exponents)
+    probabilities = weights / np.sum(weights)
+
+    return probabilities
+
+
+def deBroglie_wavelength(
+    mass: PhysicalQuantity, speed: PhysicalQuantity
+) -> PhysicalQuantity:
+    """
+    Calculate the de Broglie wavelength of a particle given its mass and speed.
+    Here we adopt SI units.
+    """
+    mass = mass.to("eV/c**2")
+    speed = speed.to("km/s")
+    gamma = 1 / np.sqrt(1 - (speed.value_in("km/s") / c.value_in("km/s")) ** 2)
+    lambda_db = (h_Planck / (gamma * mass * speed)).to("m")
+    return lambda_db
