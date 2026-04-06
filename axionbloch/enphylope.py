@@ -2,6 +2,7 @@
 # for unit management and physical calculation
 ##############################################
 
+from dataclasses import dataclass
 from pint import UnitRegistry
 from typing import Optional
 import numpy as np
@@ -15,6 +16,7 @@ ureg.define(
 )  # Parsec. The built-in parsec is not precise
 ureg.define("solar_mass = 1.98847e30 * kilogram = M_sun")  # Solar Mass
 ureg.define("earth_mass = 5.9722e24 * kilogram = M_earth")  # Earth Mass
+
 ureg.define("ppb = 1e-9")  # parts per billion
 ureg.define("ppt = 1e-12")  # parts per trillion
 ureg.define("ppq = 1e-15")  # parts per quadrillion
@@ -22,6 +24,11 @@ ureg.define("ppqu = 1e-18")  # parts per quintillion
 ureg.define("ppmu = 1e-21")  # parts per sextillion
 ureg.define("ppbmu = 1e-24")  # parts per septillion
 
+# atomic units
+ureg.define("tau = 2.4188843265863416e-17 second")
+
+
+@dataclass
 class PhysicalQuantity:
     """
     1. Base Units
@@ -141,7 +148,7 @@ class PhysicalQuantity:
         """
         assert isinstance(other, PhysicalQuantity)
         result = self.quantity + other.quantity
-        return PhysicalQuantity(result.magnitude, str(result.units))
+        return self.__class__(result.magnitude, str(result.units))
 
     def __sub__(self, other):
         """
@@ -149,7 +156,7 @@ class PhysicalQuantity:
         """
         assert isinstance(other, PhysicalQuantity)
         result = self.quantity - other.quantity
-        return PhysicalQuantity(result.magnitude, str(result.units))
+        return self.__class__(result.magnitude, str(result.units))
 
     def __mul__(self, other):
         """
@@ -158,10 +165,10 @@ class PhysicalQuantity:
         if isinstance(other, PhysicalQuantity):
             result = self.quantity * other.quantity
         elif isinstance(other, (int, float)):  #
-            result = PhysicalQuantity(other * self.value, str(self.unit)).quantity
+            result = self.__class__(other * self.value, str(self.unit)).quantity
         else:
             TypeError(f"Unsupported multiplication with type {type(other)}")
-        return PhysicalQuantity(result.magnitude, str(result.units))
+        return self.__class__(result.magnitude, str(result.units))
 
     def __rmul__(self, other):
         """
@@ -170,10 +177,10 @@ class PhysicalQuantity:
         if isinstance(other, PhysicalQuantity):
             result = self.quantity * other.quantity
         elif isinstance(other, (int, float)):  #
-            result = PhysicalQuantity(self.value * other, str(self.unit)).quantity
+            result = self.__class__(self.value * other, str(self.unit)).quantity
         else:
             TypeError(f"Unsupported multiplication with type {type(other)}")
-        return PhysicalQuantity(result.magnitude, str(result.units))
+        return self.__class__(result.magnitude, str(result.units))
 
     def __truediv__(self, other):
         """
@@ -182,29 +189,29 @@ class PhysicalQuantity:
         if isinstance(other, PhysicalQuantity):
             result = self.quantity / other.quantity
         elif isinstance(other, (int, float)):  # Division by scalar (right-hand side)
-            result = PhysicalQuantity(self.value / other, str(self.unit)).quantity
+            result = self.__class__(self.value / other, str(self.unit)).quantity
         else:
             TypeError(f"Unsupported right-hand division with type {type(other)}")
-        return PhysicalQuantity(result.magnitude, str(result.units))
+        return self.__class__(result.magnitude, str(result.units))
 
     def __rtruediv__(self, other):
         if isinstance(other, PhysicalQuantity):
             result = self.quantity / other.quantity
         elif isinstance(other, (int, float)):  # Division by scalar (left-hand side)
-            result = PhysicalQuantity(
+            result = self.__class__(
                 other / self.value,
                 "(" + str(self.unit) + ")**-1",
             ).quantity
         else:
             raise TypeError(f"Unsupported left-hand division with type {type(other)}")
-        return PhysicalQuantity(result.magnitude, str(result.units))
+        return self.__class__(result.magnitude, str(result.units))
 
     def __pow__(self, power):
         """
         Raise a physical quantity to a power.
         """
         result = self.quantity**power
-        return PhysicalQuantity(result.magnitude, str(result.units))
+        return self.__class__(result.magnitude, str(result.units))
 
     def __abs__(self):
         """
@@ -216,7 +223,7 @@ class PhysicalQuantity:
         q1 = PhysicalQuantity(-3.5, "T")
         print(abs(q1))  # PhysicalQuantity(3.5, 'T')
         """
-        return PhysicalQuantity(abs(self.value), self.unit)
+        return self.__class__(abs(self.value), self.unit)
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
         """
@@ -242,18 +249,17 @@ class PhysicalQuantity:
         if ufunc in (np.exp, np.tanh, np.sin, np.cos, np.sinh, np.cosh):
             # Convert all inputs to dimensionless before computation
             dimless_magnitudes = [
-                x.convert_to("").value if isinstance(x, PhysicalQuantity) else x
-                for x in inputs
+                x.to("").value if isinstance(x, PhysicalQuantity) else x for x in inputs
             ]
             result = ufunc(*dimless_magnitudes)
-            return PhysicalQuantity(result, "")  # Result is dimensionless
+            return self.__class__(result, "")  # Result is dimensionless
 
         elif ufunc in (np.add, np.subtract):
             # For add/subtract, units must match
             if len(units) > 1:
                 raise ValueError("Cannot add/subtract quantities with different units.")
             result = ufunc(*magnitudes)
-            return PhysicalQuantity(result, units.pop())
+            return self.__class__(result, units.pop())
 
         elif ufunc in (np.multiply, np.divide):
             # Combine units roughly
@@ -263,36 +269,92 @@ class PhysicalQuantity:
                 # crude example for division
                 combined_unit = "/".join(u for u in units if u)
             result = ufunc(*magnitudes)
-            return PhysicalQuantity(result, combined_unit)
+            return self.__class__(result, combined_unit)
 
         # If not handled, let NumPy fall back
         return NotImplemented
-
-    def convert_to(self, unit: str) -> "PhysicalQuantity":
-        """
-        Convert the quantity to a new unit.
-        :param unit: The new unit as a string
-        """
-        converted_quantity = self.quantity.to(unit)
-        return PhysicalQuantity(
-            converted_quantity.magnitude, str(converted_quantity.units)
-        )
 
     def to(self, unit: str) -> "PhysicalQuantity":
         """
         Convert the quantity to a new unit.
         :param unit: The new unit as a string
         """
-        # converted_quantity = self.quantity.to(unit)
-        return self.convert_to(unit)
+        converted = self.quantity.to(unit)
+        return self.__class__(converted.magnitude, str(converted.units))
 
-    def value_in(self, unit):
+    def value_in(self, unit: str):
         """
         Convert the quantity to a new unit and return the value of the quantity.
         :param unit: The new unit as a string
         """
-        converted_quantity = self.quantity.to(unit)
-        return converted_quantity.magnitude
+        converted = self.quantity.to(unit)
+        return converted.magnitude
+
+    def to_atomic_units(self) -> "PhysicalQuantity":
+        """
+        Convert SI quantity into atomic units (Hartree system).
+
+        Atomic units are defined such that certain fundamental physical constants are set to 1:
+        hbar = 1, m_e = 1, e = 1, 4 pi varepsilon_0 = 1
+
+        Works by decomposing into SI base units and rescaling.
+        [mass] 1 kg -> 1.0977691057577634e30 m_e
+        [length] 1 m -> 1.8897261246257702e10 a_0
+        [time] 1 s -> 2.418884326505380e16 tau
+        [current] 1 A -> 1.052917793633333e-19 e/tau
+        [temperature] 1 K -> 3.166815459444444e-6 e/k_B
+        """
+
+        q = self.quantity.to_base_units()
+
+        # ---- atomic unit definitions ----
+        m_e = ureg.m_e
+        a0 = ureg.a_0
+        tau = ureg.tau
+        e = ureg.e
+        Eh = ureg.Eh
+        k_B = ureg.k_B
+
+        # ---- convert using dimensional exponents ----
+        # Pint exposes dimensionality like:
+        # {'[mass]': 1, '[length]': 2, '[time]': -2, ...}
+        dim = q.dimensionality
+        mass_exp = dim.get("[mass]", 0)
+        length_exp = dim.get("[length]", 0)
+        time_exp = dim.get("[time]", 0)
+        current_exp = dim.get("[current]", 0)
+        temperature_exp = dim.get("[temperature]", 0)
+
+        # ---- build SI → AU scaling factor ----
+        # A = e / tau  → current contributes both charge and time scaling
+        scale = (
+            (m_e) ** mass_exp
+            * (a0) ** length_exp
+            * (tau) ** time_exp
+            * (e / tau) ** current_exp
+            * (Eh / k_B) ** temperature_exp
+        )
+        unit = f"m_e**{mass_exp} * a_0**{length_exp} * tau**{time_exp} * (e/tau)**{current_exp} * (Eh/k_B)**{temperature_exp}"
+        # ---- convert value ----
+        q_unity = (q / scale).to("")
+
+        return self.__class__(q_unity.magnitude, unit)
+
+    def to_base_units(self) -> "PhysicalQuantity":
+        """
+        Convert the quantity to SI base units (kg, m, s, A, K, mol, cd).
+        Returns a new PhysicalQuantity.
+        """
+        converted = self.quantity.to_base_units()
+        return self.__class__(converted.magnitude, str(converted.units))
+
+    def to_compact(self) -> "PhysicalQuantity":
+        """
+        Convert the quantity to a more compact, human-readable unit if possible (e.g., 1000 m -> 1 km).
+        Returns a new PhysicalQuantity.
+        """
+        converted = self.quantity.to_compact()
+        return self.__class__(converted.magnitude, str(converted.units))
 
 
 def _safe_convert(
@@ -302,7 +364,7 @@ def _safe_convert(
     convert quantities to a new unit
     return None if the quantity is None
     """
-    return quantity.convert_to(unit) if quantity is not None else None
+    return quantity.to(unit) if quantity is not None else None
 
 
 """
