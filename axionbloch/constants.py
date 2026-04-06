@@ -1,41 +1,37 @@
+# Physical constants
 from .enphylope import PhysicalQuantity
 
-# Electron charge
-e = PhysicalQuantity(-1.602176634e-19, "coulomb")
+# Electron charge / "elementary_charge" in pint: 1.602176634e-19 coulomb
+e = PhysicalQuantity(1, "e")
 
 # mol to number by Avogadro's number
 mol_to_num = PhysicalQuantity(6e23, "mol**(-1)")
 
-# Constants
-
-# Light speed  speed_of_light
-# c = PhysicalQuantity(299792458, "m / s")
+# Light speed  speed_of_light: 299792458 (m / s)
 c = PhysicalQuantity(1, "c")
 
-# Atomic mass unit
-u = PhysicalQuantity(931.49410242, "MeV / c**2")
+# Atomic mass unit: 931.4941037185688 megaelectron_volt / speed_of_light ** 2
+u = PhysicalQuantity(1, "unified_atomic_mass_unit")
 
 # Boltzmann constant in eV K^-1
 kB = PhysicalQuantity(8.617333262145e-5, "eV / kelvin")
-# Boltzmann constant in J K^-1
-# kB = PhysicalQuantity(1.380649e-23, "joule / kelvin")
-
-# Planck constant
-h_Planck = PhysicalQuantity(4.135667696e-15, "eV * s")
 
 # Reduced Planck constant
 hbar = PhysicalQuantity(1, "hbar")
 
+# Planck constant: 4.135667696e-15 (eV * s)
+h_Planck = PhysicalQuantity(1, "planck_constant")
+
 # Masses of electron, proton, and neutron
-m_e = PhysicalQuantity(0.51099895000, "MeV / c**2")
-m_p = PhysicalQuantity(938.27208816, "MeV / c**2")
-m_n = PhysicalQuantity(939.56542052, "MeV / c**2")
+m_e = PhysicalQuantity(1, "m_e")
+m_p = PhysicalQuantity(1, "m_p")
+m_n = PhysicalQuantity(1, "m_n")
 
-# Bohr magneton
-mu_B = PhysicalQuantity(5.7883818012e-5, "eV / tesla")
+# Bohr magneton: 5.788381798194462e-05 (eV / tesla)
+mu_B = PhysicalQuantity(1, "mu_B")
 
-# Magnetic permeability of free space
-mu_0 = PhysicalQuantity(1.25663706212e-6, "henry / m")
+# vacuum permeability: 1.25663706212e-6 (henry / m)
+mu_0 = PhysicalQuantity(1, "mu_0")
 
 
 # Nuclear magneton
@@ -56,3 +52,7 @@ mu_Xe129 = PhysicalQuantity(-0.777969, "dimensionless") * mu_N(m_p)
 
 # Gyromagnetic ratio of Xe129
 gamma_Xe129 = PhysicalQuantity(-7.441e7, "hertz / tesla")
+
+
+# Earth radius
+earth_radius = PhysicalQuantity(6.371e6, "meter")
