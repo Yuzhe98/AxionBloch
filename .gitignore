@@ -38,3 +38,6 @@ venv/
 
 # Ignore internal files
 _internal/
+
+.pdf
+.PDF
