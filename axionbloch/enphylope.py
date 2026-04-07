@@ -16,6 +16,7 @@ ureg.define(
 )  # Parsec. The built-in parsec is not precise
 ureg.define("solar_mass = 1.98847e30 * kilogram = M_sun")  # Solar Mass
 ureg.define("earth_mass = 5.9722e24 * kilogram = M_earth")  # Earth Mass
+ureg.define("earth_radius = 6.371e6 * meter = R_earth")  # Earth radius
 
 ureg.define("ppb = 1e-9")  # parts per billion
 ureg.define("ppt = 1e-12")  # parts per trillion
@@ -292,6 +293,7 @@ class PhysicalQuantity:
 
     def to_atomic_units(self) -> "PhysicalQuantity":
         """
+        TODO: this functions is not complete. For example, it does not convert a energy quantity to the unit of Eh. 
         Convert SI quantity into atomic units (Hartree system).
 
         Atomic units are defined such that certain fundamental physical constants are set to 1:

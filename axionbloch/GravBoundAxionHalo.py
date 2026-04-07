@@ -20,6 +20,9 @@ from axionbloch.utils import earth_radius_m, high_contrast_extended as colors
 
 
 class GravBoundAxionHalo:
+    """
+    A class to solve the time-independent Schrodinger equation for axions gravitationally bound to to objects like Earth or Sun. 
+    """
     # Note: input / output units are in SI, while internal calculations are in atomic units.
 
     # Map l to labels (s, p, d, f, ...)
