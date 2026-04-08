@@ -35,7 +35,7 @@ class SimuParams(TypedDict):
     B_a_rms: PhysicalQuantity | None  # RMS axion-induced magnetic field
     numFields: int  # number of magnetic fields
     rand_seed: int  # random seed for reproducibility
-    init_M: PhysicalQuantity  # initial magnetization magnitude
+    init_M: PhysicalQuantity | None  # initial magnetization magnitude
     init_M_theta: PhysicalQuantity  # initial polar angle of magnetization
     init_M_phi: PhysicalQuantity  # initial azimuthal angle of magnetization
     rate: PhysicalQuantity | None  # simulation rate

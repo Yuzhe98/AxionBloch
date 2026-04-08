@@ -247,7 +247,7 @@ class Signal:
         # print filelist before sorting
         if verbose:
             print(
-                f"[{self.SortFiles.__name__}] filelist and creation_times before sorting:"
+                f"[{self.__class__.__name__}.{self.SortFiles.__name__}] filelist and creation_times before sorting:"
             )
             print((self.fileList, self.creation_times))
 
@@ -262,7 +262,7 @@ class Signal:
 
         # print filelist after sorting
         if verbose:
-            print(f"[{self.SortFiles.__name__}] filelist after sorting:")
+            print(f"[{self.__class__.__name__}.{self.SortFiles.__name__}] filelist after sorting:")
             print((self.fileList, self.creation_times))
 
     # def LoadStream(

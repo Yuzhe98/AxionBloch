@@ -16,7 +16,7 @@ from scipy.interpolate import RegularGridInterpolator
 
 from axionbloch.enphylope import PhysicalQuantity as PQ
 from axionbloch.constants import hbar, c, h_Planck, Eh, AtomicUnits as AU
-from axionbloch.utils import earth_radius_m, high_contrast_extended as colors
+from axionbloch.utils import high_contrast_extended as colors
 
 
 class GravBoundAxionHalo:
@@ -33,7 +33,7 @@ class GravBoundAxionHalo:
         name="Gravitationally Bound Axion Halo",
         nu_a: PQ = None,  # axion Compton frequency
         N: int = int(2**12),
-        extent: PQ = PQ(128.0 * earth_radius_m, "m"),
+        extent: PQ = PQ(128.0, "earth_radius"), 
         Phi_func=None,
         mass_enclosed: PQ = None,
         g_aNN: PQ = None,

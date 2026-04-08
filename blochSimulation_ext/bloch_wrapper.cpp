@@ -197,7 +197,7 @@ py::tuple generateTrajectories(py::array_t<double> B_vec, py::array_t<double> dB
             pBvals,                        // shape (numSpinPkts)
             pratios,                       // shape (numSpinPkts)
             gamma, timeStep, T1, T2, RCF_freq_Hz, Mx0, My0, Mz0,
-            M0eqb, // initial magnetization
+            M0eqb, // equilibrium magnetization
             // ouputs
             ptrj, pdM, pd2M);
     } else if (integrator == "taylor") {
@@ -210,7 +210,7 @@ py::tuple generateTrajectories(py::array_t<double> B_vec, py::array_t<double> dB
             pBvals,                        // shape (numSpinPkts)
             pratios,                       // shape (numSpinPkts)
             gamma, timeStep, T1, T2, RCF_freq_Hz, Mx0, My0, Mz0,
-            M0eqb, // initial magnetization
+            M0eqb, // equilibrium magnetization
             // ouputs
             ptrj, pdM, pd2M);
     }

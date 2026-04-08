@@ -20,7 +20,6 @@ from typing import Sequence
 
 import h5py
 
-earth_radius_m = 6371.0e3  # [m]
 
 def giveDateAndTime():
     timestr = time.strftime("%Y%m%d_%H%M%S")
@@ -2876,11 +2875,11 @@ class PhysicalObject:
 
         if verbose:
             print(
-                f"[{self.saveToH5group.__name__}] self.physicalQuantities = ",
+                f"[{self.__class__.__name__}.{self.saveToH5group.__name__}] self.physicalQuantities = ",
                 self.physicalQuantities,
             )
             print(
-                f"[{self.saveToH5group.__name__}] self.generalQuantities = ",
+                f"[{self.__class__.__name__}.{self.saveToH5group.__name__}] self.generalQuantities = ",
                 self.generalQuantities,
             )
 

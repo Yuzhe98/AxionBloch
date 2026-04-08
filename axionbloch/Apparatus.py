@@ -20,6 +20,7 @@ class Magnet(PhysicalObject):
         self,
         name=None,
         B0: Optional[PhysicalQuantity] = None,
+        direction: Optional[list] = None,
         FWHM: Optional[PhysicalQuantity] = None,
         numPt: float = 1,
         nFWHM: float = 10.0,
@@ -35,6 +36,7 @@ class Magnet(PhysicalObject):
         assert nFWHM >= 0
         self.nFWHM = nFWHM
         self.B0 = B0
+        self.direction = direction
         self.FWHM = FWHM
         self.B0_nW = self.nFWHM * self.FWHM * self.B0
         self.numPt = numPt

@@ -95,7 +95,9 @@ class MilkyWayAxionHalo(PhysicalObject):
                 f"case {case} not recognized, should be 'grad_perp'"
             )  #  'non-grad', 'grad_par' or
         if verbose:
-            print(f"axion wind Rabi frequency (case={case}): {Omega_rms}")
+            print(
+                f"[{self.__class__.__name__}.{self.getRabiFreq.__name__}] axion wind Rabi frequency (case={case}): {Omega_rms}"
+            )
         return Omega_rms
 
     def getAmpSpectra(

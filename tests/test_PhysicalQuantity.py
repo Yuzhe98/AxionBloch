@@ -40,9 +40,6 @@ def test_SI2AtomicUnit():
     c_AU = 137.035999083818
     α_AU = 0.0072973525693
 
-    # earth profiles
-    earth_radius_au_AU = 6371.0e3 * m_AU  #
-
     km_AU = 1.8897261246257702e13
 
     # Oneh = PhysicalQuantity(1, "planck_constant")

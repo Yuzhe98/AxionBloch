@@ -10,8 +10,8 @@ mol_to_num = PQ(6e23, "mol**(-1)")
 # Light speed  speed_of_light: 299792458 (m / s)
 c = PQ(1, "c")
 
-# Atomic mass unit: 931.4941037185688 megaelectron_volt / speed_of_light ** 2
-u = PQ(1, "unified_atomic_mass_unit")
+# # Atomic mass unit: 931.4941037185688 megaelectron_volt / speed_of_light ** 2
+# u = PQ(1, "unified_atomic_mass_unit")
 
 # Boltzmann constant in eV K^-1
 # k_B = kB = PQ(8.617333262145e-5, "eV / kelvin")
@@ -24,7 +24,7 @@ hbar = PQ(1, "hbar")
 h_Planck = PQ(1, "planck_constant")
 
 # Hartree energy in eV
-Eh = PQ(1, "Eh")
+Eh = E_hartree = PQ(1, "Eh")
 
 # Masses of electron, proton, and neutron
 m_e = PQ(1, "m_e")
