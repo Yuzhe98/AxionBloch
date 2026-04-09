@@ -14,7 +14,7 @@ class MilkyWayAxionHalo(PhysicalObject):
         self,
         name="axion",
         nu_a: PhysicalQuantity = None,  # compton frequency
-        gaNN: PhysicalQuantity = None,  #
+        g_aNN: PhysicalQuantity = None,  #
         Qa: PhysicalQuantity = None,
         v_0: PhysicalQuantity = PhysicalQuantity(
             220.0, "km/s"
@@ -40,7 +40,7 @@ class MilkyWayAxionHalo(PhysicalObject):
 
         self.rho_E_DM = rho_E_DM
         self.nu_a = nu_a
-        self.gaNN = gaNN
+        self.gaNN = g_aNN
 
         if Qa is None:
             self.Qa = (c / self.v_lab) ** 2.0

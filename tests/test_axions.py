@@ -7,7 +7,7 @@ from axionbloch.enphylope import PhysicalQuantity
 axion = MilkyWayAxionHalo(
     name="axion",
     nu_a=PhysicalQuantity(1.0e6, "Hz"),  # compton frequency
-    gaNN=PhysicalQuantity(1.0e-9, "GeV**(-1)"),  #
+    g_aNN=PhysicalQuantity(1.0e-9, "GeV**(-1)"),  #
     Qa=None,
     v_0=PhysicalQuantity(
         220.0, "km/s"

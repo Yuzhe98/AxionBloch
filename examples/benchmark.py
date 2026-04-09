@@ -61,7 +61,7 @@ for nu_a in nu_a_array:
         axion = MilkyWayAxionHalo(
             name="axion",
             nu_a=nu_a,
-            gaNN=gaNN,
+            g_aNN=gaNN,
         )
 
         # set RCF frequency to it RCF_Freq_Hz = nu_a*(1+v_a^2/c^2)

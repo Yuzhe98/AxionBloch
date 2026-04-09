@@ -5,7 +5,8 @@ import numpy as np
 import time
 
 from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
-from axionbloch.utils import check, dualLorentzian
+
+# from axionbloch.utils import check, dualLorentzian
 from axionbloch.SimuTools import MagField, Simulation, Simulations
 from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet
@@ -25,8 +26,8 @@ sample = Sample(
     massDensity=PQ(3.1, "g / cm**3 "),  # mass density at STP
     molarMass=PQ(131.29, "g / mol"),  # molar mass [g/mol]
     numOfSpinsPerMolecule=PQ(1, ""),  # number of spins per molecule
-    T2=PQ(10, "minute"),  #
-    T1=PQ(15, "minute"),  #
+    T2=PQ(355, "s"),  #
+    T1=PQ(1800, "s"),  #
     vol=PQ(1, "cm**3"),
     mu=mu_Xe129,  # magnetic dipole moment
     temp=PQ(300, "K"),  # room temperature
@@ -47,7 +48,7 @@ B_a_rms = None
 gaNN = PQ(1.0e-9, "GeV**(-1)")
 
 # set number of simulation runs
-numFields = 1000
+numFields = 1
 
 init_M = PQ(1.0, "")  # initial magnetization vector amplitude
 # init_M = None # if None, it will be set to the magnetization determined by the sample polarization
@@ -66,7 +67,7 @@ for nu_a in nu_a_array:
         axion = MilkyWayAxionHalo(
             name="axion",
             nu_a=nu_a,
-            gaNN=gaNN,
+            g_aNN=gaNN,
         )
 
         # set RCF frequency to it RCF_Freq_Hz = nu_a*(1+v_a^2/c^2)
@@ -123,21 +124,21 @@ simu_all.run(autoStart=False, verbose=True)
 for i in range(len(simu_all.pool)):
     simu_all.pool[i].simu.keepMeanStd()
     simu_all.pool[i].simu.displayTrjries()
-    check(simu_all.pool[i].simu.T2star_s)
-    check(simu_all.pool[i].simu.Tdelta_s)
-    check(simu_all.pool[i].simu.T2_s)
+    # check(simu_all.pool[i].simu.T2star_s)
+    # check(simu_all.pool[i].simu.Tdelta_s)
+    # check(simu_all.pool[i].simu.T2_s)
 simu_all.saveToPkl(
-    dir=os.path.dirname(os.path.abspath(__file__))#, fname="new_simulation"
+    dir=os.path.dirname(os.path.abspath(__file__))  # , fname="new_simulation"
 )
 save_data = True
 if save_data:
-    i=0
+    i = 0
     simu: Simulation = simu_all.pool[i].simu
     timeStamp_s = simu.getTimeStamp()
     # check(simu.excField.B_vec.shape)
     # check(simu.trjry.shape)
     np.savez(
-        "C:\\Users\\zhenf\\D\\Yu0702\\CASPEr-Collaboration\\AxionBloch-paper/figures/Axion-Xe_NMR-simulations.npz",
+        "C:\\Users\\zhenf\\D\\Yu0702\\CASPEr-Collaboration\\AxionBloch-paper/figures/Axion-Xe_NMR-simulations-1.npz",
         timeStamp_s=timeStamp_s,
         B_vec_mean=simu.excField.B_vec_mean,
         B_vec_std=simu.excField.B_vec_std,
