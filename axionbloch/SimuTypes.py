@@ -27,7 +27,7 @@ from axionbloch.Apparatus import Magnet  # magnet
 # This defines the **structure of a parameter dictionary** passed to a simulation.
 # TypedDict allows static type checking for keys and value types.
 class SimuParams(TypedDict):
-    key_info: object  # key information for the simulation
+    key_info: object | None = {}  # key information for the simulation
     axion: MilkyWayAxionHalo  # axion field object
     sample: Sample  # NMR sample
     magnet: Magnet  # magnetic field apparatus

@@ -18,7 +18,7 @@ class Magnet(PhysicalObject):
 
     def __init__(
         self,
-        name=None,
+        name="magnet",
         B0: Optional[PhysicalQuantity] = None,
         direction: Optional[list] = None,
         FWHM: Optional[PhysicalQuantity] = None,
