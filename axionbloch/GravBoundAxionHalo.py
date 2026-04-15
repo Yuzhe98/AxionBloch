@@ -1,3 +1,4 @@
+from re import S
 import stat
 import time
 
@@ -14,6 +15,7 @@ from scipy.linalg import eigh
 from scipy.special import sph_harm_y
 from scipy.interpolate import RegularGridInterpolator
 
+from axionbloch.Station import Station
 from axionbloch.enphylope import PhysicalQuantity as PQ
 from axionbloch.constants import hbar, c, h_Planck, Eh, AtomicUnits as AU
 from axionbloch.utils import high_contrast_extended as colors
@@ -218,7 +220,7 @@ class GravBoundAxionHalo:
     def getStateNames(self):
         return [state["name"] for state in self.states.values()]
 
-    def findGradients(self, stateNames=[]):
+    def findGradients(self, stateNames=[], station:Station=None):
         # avoid r=0 singularity
         start_index = self.N // 2 + 5
         stop_index = start_index + 2**7  # TODO: this should not be a number, but a radius range
@@ -251,7 +253,6 @@ class GravBoundAxionHalo:
             # print(name, state["E_eV"], "eV")
             state = self.states[name]
             n_r, l, m = state["n_r"], state["l"], 0
-            # c = state["c"]
             c = 1.0
             E_eV = state["E_eV"]
             # radial part (interpolated onto grid)
@@ -275,15 +276,9 @@ class GravBoundAxionHalo:
         grad_theta = dWF_dtheta / R_grid
         grad_phi = dWF_dphi / (R_grid * np.sin(Theta_grid) + 1e-12)
 
-        # project the spherical gradient onto a specific direction (from the center of the sphere to Mainz)
-
-        # Mainz coordinates
-        # TODO: make this more modular, e.g. allow user to input lat/lon
-        lat = 49.9929  # degrees
-        lon = 8.2473  # degrees
-
-        theta_station = np.pi / 2 - np.radians(lat)  # polar angle
-        phi_station = np.radians(lon)  # azimuthal angle
+        # project the spherical gradient onto a specific direction (from the center of the sphere to the station)
+        theta_station_rad = station.theta.value_in("rad")  # polar angle
+        phi_station_rad = station.phi.value_in("rad")  # azimuthal angle
 
         # R_grid.shape = (Nr, Ntheta, Nphi)
         # grad_r.shape = same
@@ -306,7 +301,7 @@ class GravBoundAxionHalo:
         r_line = np.linspace(r[0], 3 * AU.earth_radius, Nr_plot)
 
         # points = [[r, theta_station, phi_station], ...]
-        points = np.array([[ri, theta_station, phi_station] for ri in r_line])
+        points = np.array([[ri, theta_station_rad, phi_station_rad] for ri in r_line])
 
         tic = time.time()
         grad_r_line = np.asarray(interp_r(points))
