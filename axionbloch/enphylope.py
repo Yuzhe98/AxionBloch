@@ -247,7 +247,7 @@ class PhysicalQuantity:
                 units.add("")
 
         # Handle specific ufuncs
-        if ufunc in (np.exp, np.tanh, np.sin, np.cos, np.sinh, np.cosh):
+        if ufunc in (np.exp, np.tanh, np.sin, np.cos, np.sinh, np.cosh, np.abs):
             # Convert all inputs to dimensionless before computation
             dimless_magnitudes = [
                 x.to("").value if isinstance(x, PhysicalQuantity) else x for x in inputs
