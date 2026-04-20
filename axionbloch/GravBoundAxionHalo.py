@@ -55,7 +55,7 @@ class GravBoundAxionHalo:
 
         # axion mass in atomic units
         self.ma = ma.value_in("m_e")  # 1 MHz axion mass: 7e-45 kilogram
-
+        
         self.N = N
         self.extent = extent.value_in("a_0")
         self.dr = self.extent / self.N
@@ -64,7 +64,7 @@ class GravBoundAxionHalo:
             -self.extent / 2, self.extent / 2, self.N
         )  # starts at dr (not zero)
         # Phi_func = earth_grav_potential_earth_center_au()
-        # TODO: Try to use the infinity as the reference point
+        # TODO: Try also to use the infinity as the reference point
         # factor = 1e0
         # gravitational potential
         self.pot = self.ma * Phi_func(self.r)
@@ -78,7 +78,7 @@ class GravBoundAxionHalo:
 
     def solve_TISE_3D_l(
         self,
-        l: int = 3,  # angular momentum quantum number
+        l: int,  # angular momentum quantum number
         showPlot: bool = False,
         max_n_r: int = 10,  # maximum radial quantum number to plot
         verbose: bool = False,
@@ -219,6 +219,9 @@ class GravBoundAxionHalo:
 
     def getStateNames(self):
         return [state["name"] for state in self.states.values()]
+
+    def getStateEnergies(self):
+        return [state["eigenE_eV"] for state in self.states.values()]
 
     def findGradients(self, stateNames=[], station:Station=None):
         # avoid r=0 singularity

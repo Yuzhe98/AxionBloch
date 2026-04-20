@@ -12,7 +12,7 @@ from scipy.interpolate import interp1d
 
 
 from axionbloch.enphylope import PhysicalQuantity as PQ
-from axionbloch.constants import c, h_Planck, AtomicUnits as AU
+from axionbloch.constants import c, h_Planck, grav_const, AtomicUnits as AU
 from axionbloch.utils import check
 from axionbloch.GravBoundAxionHalo import GravBoundAxionHalo
 
@@ -450,6 +450,74 @@ def solid_sphere_grav_potential_earth_center_au():
     )
     # check(np.amax(r_sym_sorted) / m)
     return Phi_func
+
+
+def earth_grav_potential_earth_center_():
+    """
+    Returns a function Phi(r), valid both inside and outside Earth.
+    Uses PREM-like model for interior, point-mass approximation for exterior.
+    """
+    # Load the data (assumed to return a DataFrame with 'radius_m' and 'density_kg_m3')
+    data = loadPEMdata()
+
+    # Extract radius and density
+    r = data["radius_m"]
+    rho = data["density_kg_m3"]
+
+    # Compute shell thickness
+    dr = np.gradient(r)
+
+    # Shell volume and mass
+    dV = 4 * np.pi * r**2 * dr
+    dm = rho * dV
+
+    # Cumulative mass
+    M_r = np.cumsum(dm)
+    M_total = M_r[-1]
+
+    # Gravitational constant
+    G = grav_const.value_in("m**3/kg/s**2")   # m³/kg/s²
+
+    # Extend to radii beyond Earth's surface
+    r_max = r[-1]
+    r_outside = np.linspace(
+        r_max, 1000 * r_max, 100000
+    )  # from surface to 1000 Earth radii
+    Phi_outside = -G * M_total / r_outside
+
+    # Compute gravitational potential inside Earth
+    Phi_inside = np.zeros_like(r)
+    Phi_inside[1:] = 2 * Phi_outside[0] + G * M_r[1:] / r[1:]
+    Phi_inside[0] = 2 * Phi_outside[0] + G * M_r[1] / r[1]  # avoid zero-division
+
+    # Combine inside and outside
+    r_full = np.concatenate([r, r_outside])
+    Phi_full = np.concatenate([Phi_inside, Phi_outside])
+    # Phi_full -= np.amin(Phi_full)
+
+    # Enforce symmetry: add negative r values
+    r_sym = np.concatenate([-r_full[::-1], r_full])  # mirror and append
+    Phi_sym = np.concatenate([Phi_full[::-1], Phi_full])  # symmetric values
+
+    # Optional: sort to ensure increasing r (for interp1d)
+    sorted_indices = np.argsort(r_sym)
+    r_sym_sorted = r_sym[sorted_indices]
+    Phi_sym_sorted = Phi_sym[sorted_indices]
+    Phi_sym_sorted -= np.amin(Phi_sym_sorted)
+
+    # Interpolation function: now Phi_func(-r) = Phi_func(r)
+    # TODO make this more modular
+    Phi_func = interp1d(
+        r_sym_sorted,
+        Phi_sym_sorted,
+        kind="linear",
+        fill_value="extrapolate",
+        bounds_error=False,
+    )
+    r_unit = PQ(1, "meter")
+    Phi_unit = PQ(1, "m**3/kg/s**2") * PQ(1, "kg") / PQ(1, "meter")  #  = PQ(1, "joule / kilogram")
+    # print(Phi_unit.to("joule / kilogram"))
+    return Phi_func, r_unit, Phi_unit
 
 
 class EarthBoundAxionHalo(GravBoundAxionHalo):
