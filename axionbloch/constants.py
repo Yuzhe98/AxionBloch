@@ -57,6 +57,7 @@ mu_Xe129 = PQ(-0.777969, "dimensionless") * mu_N(m_p)
 # Gyromagnetic ratio of Xe129
 gamma_Xe129 = PQ(-7.441e7, "hertz / tesla")
 
+grav_const = gravitational_constant = PQ(1, "gravitational_constant")
 
 # Earth radius: 6.371e6 (meter)
 earth_radius = PQ(1, "earth_radius")
