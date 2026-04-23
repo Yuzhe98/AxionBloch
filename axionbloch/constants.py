@@ -1,66 +1,28 @@
 # Physical constants
-from axionbloch.enphylope import PhysicalQuantity as PQ
-
-# Electron charge / "elementary_charge" in pint: 1.602176634e-19 coulomb
-e = PQ(1, "e")
-
-# mol to number by Avogadro's number
-mol_to_num = PQ(6e23, "mol**(-1)")
-
-# Light speed  speed_of_light: 299792458 (m / s)
-c = PQ(1, "c")
-
-# # Atomic mass unit: 931.4941037185688 megaelectron_volt / speed_of_light ** 2
-# u = PQ(1, "unified_atomic_mass_unit")
-
-# Boltzmann constant in eV K^-1
-# k_B = kB = PQ(8.617333262145e-5, "eV / kelvin")
-k_B = kB = PQ(1, "k_B")
-
-# Reduced Planck constant
-hbar = PQ(1, "hbar")
-
-# Planck constant: 4.135667696e-15 (eV * s)
-h_Planck = PQ(1, "planck_constant")
-
-# Hartree energy in eV
-Eh = E_hartree = PQ(1, "Eh")
-
-# Masses of electron, proton, and neutron
-m_e = PQ(1, "m_e")
-m_p = PQ(1, "m_p")
-m_n = PQ(1, "m_n")
-
-# Bohr magneton: 5.788381798194462e-05 (eV / tesla)
-mu_B = PQ(1, "mu_B")
-
-# vacuum permeability: 1.25663706212e-6 (henry / m)
-mu_0 = PQ(1, "mu_0")
-
+from astropy import units as unit
+from astropy.constants import codata2018 as const
 
 # Nuclear magneton
 def mu_N(m):
-    return (-1.0 * e * hbar) / (2 * m)  # * c **2?? TODO: check the unit of mu_N
+    return (const.e * const.hbar) / (2 * m)
 
 
 # Magnetic dipole moment of proton
-g_p = PQ(5.585694713, "")
-I_p = PQ(1 / 2, "") * hbar
-mu_p = g_p * mu_N(m_p) * I_p / hbar
+g_p = 5.585694713
+I_p = 0.5 * const.hbar
+mu_p = g_p * mu_N(const.m_p) * I_p / const.hbar
 
 # Gyromagnetic ratio of proton
-gamma_p = PQ(2.6752218708e8, "hertz / tesla")
+gamma_p = 2.6752218708e8 * unit.Hz / unit.T
 
 # Magnetic dipole moment of Xe nucleus
-mu_Xe129 = PQ(-0.777969, "dimensionless") * mu_N(m_p)
+mu_Xe129 = -0.777969 * mu_N(const.m_p)
 
 # Gyromagnetic ratio of Xe129
-gamma_Xe129 = PQ(-7.441e7, "hertz / tesla")
-
-grav_const = gravitational_constant = PQ(1, "gravitational_constant")
+gamma_Xe129 = -7.441e7 * unit.Hz / unit.T
 
 # Earth radius: 6.371e6 (meter)
-earth_radius = PQ(1, "earth_radius")
+earth_radius = 1 * unit.R_earth
 
 
 # atomic unit

@@ -10,7 +10,7 @@ import numpy as np
 # Create a Unit Registry for managing units
 ureg = UnitRegistry()
 # Define units
-ureg.define("Gauss = 1e-4 * tesla = G")  # Gauss
+ureg.define("gauss_SI = 1e-4 * tesla = G")  # Gauss
 ureg.define(
     "parsec = 30856775814913673 * meter = pc"
 )  # Parsec. The built-in parsec is not precise

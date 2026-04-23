@@ -15,7 +15,9 @@ from mpl_toolkits.mplot3d import proj3d
 from functools import partial
 
 from axionbloch.enphylope import PhysicalQuantity, _safe_convert
-from axionbloch.constants import hbar, kB, c, h_Planck
+# Physical constants
+from astropy import units as unit
+from astropy.constants import codata2018 as const
 from typing import Sequence
 
 import h5py
@@ -3101,7 +3103,7 @@ def boltzmann_probabilities(
     energies_eV = np.array([E.value_in("eV") for E in energies])
 
     # beta = 1 / (kB * T)
-    beta_eV_1 = (1.0 / (kB * T)).value_in("eV**(-1)")
+    beta_eV_1 = (1.0 / (const.kB * T)).value_in("eV**(-1)")
 
     E_min = energies_eV.min()
     scaled_energies_eV = [E - E_min for E in energies_eV]
@@ -3123,6 +3125,6 @@ def deBroglie_wavelength(
     """
     mass = mass.to("eV/c**2")
     speed = speed.to("km/s")
-    gamma = 1 / np.sqrt(1 - (speed.value_in("km/s") / c.value_in("km/s")) ** 2)
-    lambda_db = (h_Planck / (gamma * mass * speed)).to("m")
+    gamma = 1 / np.sqrt(1 - (speed.value_in("km/s") / const.c)) ** 2
+    lambda_db = (const.h / (gamma * mass * speed)).to("m")
     return lambda_db

@@ -8,7 +8,7 @@ from axionbloch.SimuTools import MagField, Simulation
 from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet
 from axionbloch.utils import check
-from axionbloch.enphylope import PhysicalQuantity
+from axionbloch.enphylope import PhysicalQuantity as PQ
 from axionbloch.constants import gamma_p, mu_p
 
 
@@ -24,22 +24,23 @@ T2_s = 10.0
 sample = Sample(
     name="Ethanol",  # name of the sample
     gamma=gamma_p,  # [Hz/T]. Remember input it with 2 * np.pi
-    massDensity=PhysicalQuantity(0.78945, "g / cm**3 "),
-    molarMass=PhysicalQuantity(46.069, "g / mol"),  # molar mass
-    numOfSpinsPerMolecule=PhysicalQuantity(6, ""),  # number of spins per molecule
-    T2=PhysicalQuantity(T2_s, "s"),  #
-    T1=PhysicalQuantity(T1_s, "s"),  #
-    vol=PhysicalQuantity(1, "cm**3"),
+    massDensity=PQ(0.78945, "g / cm**3 "),
+    molarMass=PQ(46.069, "g / mol"),  # molar mass
+    numOfSpinsPerMolecule=PQ(6, ""),  # number of spins per molecule
+    T2=PQ(T2_s, "s"),  #
+    T1=PQ(T1_s, "s"),  #
+    vol=PQ(1, "cm**3"),
     mu=mu_p,  # magnetic dipole moment
+    temp=PQ(300, "K"),
     verbose=False,
 )
 
 # set detection magnet
 magnet = Magnet(
     name="detection magnet",
-    B0=PhysicalQuantity(RCF_Freq_Hz - signalFreqRot_Hz, "Hz")
+    B0=PQ(RCF_Freq_Hz - signalFreqRot_Hz, "Hz")
     / (sample.gamma / (2 * np.pi)),
-    FWHM=PhysicalQuantity(1 / (np.pi * Tdelta_s) / RCF_Freq_Hz, ""),
+    FWHM=PQ(1 / (np.pi * Tdelta_s) / RCF_Freq_Hz, ""),
     nFWHM=20.0,
 )
 
@@ -53,9 +54,9 @@ simu = Simulation(
     sample=sample,
     magnet=magnet,
     excField=excField,
-    rate=PhysicalQuantity(500, "Hz"),  #
-    RCF_freq=PhysicalQuantity(RCF_Freq_Hz, "Hz"),
-    duration=PhysicalQuantity(20, "s"),
+    rate=PQ(500, "Hz"),  #
+    RCF_freq=PQ(RCF_Freq_Hz, "Hz"),
+    duration=PQ(20, "s"),
     verbose=True,
 )
 
@@ -81,15 +82,15 @@ simu.excField.setCPMGPulseTrain(
     timeLen=simu.timeLen,
     gamma_HzToT=simu.gamma_HzToT,
     t90_s=10 * simu.timeStep_s,
-    tau_s=6 * Tdelta_s,
-    numEcho=1,
+    tau_s=4 * Tdelta_s,
+    numEcho=2,
     nu_rot_Hz=signalFreqRot_Hz,
     init_phase=0,
     verbose=True,
 )
 
 tic = time.perf_counter()
-simu.generateTrajectories(integrator="taylor")
+# simu.generateTrajectories(integrator="taylor")
 simu.generateTrajectories(integrator="RK4")
 toc = time.perf_counter()
 print(f"{simu.generateTrajectories.__name__} time consumption = {toc-tic:.3g} s")
@@ -106,7 +107,7 @@ print(f"{simu.generateTrajectories.__name__} time consumption = {toc-tic:.3g} s"
 
 simu.monitorTrajectories(verbose=True)
 
-save_data = False
+save_data = True
 if save_data:
     timeStamp_s = simu.getTimeStamp()
     check(simu.excField.B_vec.shape)
