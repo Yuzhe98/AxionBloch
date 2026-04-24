@@ -1,5 +1,6 @@
 import time
 from axionbloch.enphylope import PhysicalQuantity as PQ
+from astropy import units as unit
 from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo, loadPEMdata, earth_grav_potential_earth_center_
 from axionbloch.Station import Mainz, Baltimore, Sanya
 # data = loadPEMdata()

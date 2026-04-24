@@ -1,6 +1,7 @@
 # axionbloch/Station.py
 import numpy as np
-from axionbloch.enphylope import PhysicalQuantity as PQ
+from astropy import units as unit
+from astropy.units import Quantity
 from axionbloch.constants import earth_radius
 
 
@@ -11,9 +12,9 @@ class Station:
         *,
         NSsemisphere: str,  # 'N' or 'S'
         EWsemisphere: str,  # 'E' or 'W'
-        latitude: PQ,
-        longitude: PQ,
-        elevation: PQ,
+        latitude: Quantity,
+        longitude: Quantity,
+        elevation: Quantity,
         verbose: bool = False,
     ):
         """
@@ -44,9 +45,9 @@ class Station:
             )
 
         if NSsemisphere == "N":
-            self.theta = PQ(np.pi / 2, "rad") - self.latitude
+            self.theta = (np.pi / 2) * unit.rad - self.latitude
         elif NSsemisphere == "S":
-            self.theta = PQ(np.pi / 2, "rad") + self.latitude
+            self.theta = (np.pi / 2) * unit.rad + self.latitude
         else:
             raise ValueError("NSsemisphere must be 'N' or 'S'")
 
@@ -56,8 +57,8 @@ class Station:
             self.phi = (-1.0) * self.longitude
         else:
             raise ValueError("EWsemisphere must be 'E' or 'W'")
-        self.theta = self.theta.to("rad")
-        self.phi = self.phi.to("rad")
+        self.theta = self.theta
+        self.phi = self.phi
         self.nvec = np.array(
             [
                 np.sin(self.theta) * np.cos(self.phi),
@@ -73,9 +74,9 @@ Mainz = Station(
     name="Mainz",
     NSsemisphere="N",  # 'N' or 'S'
     EWsemisphere="E",  # 'E' or 'W'
-    latitude=PQ(49.991247363525154, "deg"),
-    longitude=PQ(8.235360426933486, "deg"),
-    elevation=PQ(100.0, "m"),
+    latitude=49.991247363525154 * unit.deg,
+    longitude=8.235360426933486 * unit.deg,
+    elevation=100.0 * unit.m,
     verbose=False,
 )
 
@@ -83,9 +84,9 @@ Baltimore = Station(
     name="Baltimore",
     NSsemisphere="N",  # 'N' or 'S'
     EWsemisphere="W",  # 'E' or 'W'
-    latitude=PQ(39.32948159004821, "deg"),
-    longitude=PQ(76.62023874324737, "deg"),
-    elevation=PQ(35.0, "m"),
+    latitude=39.32948159004821 * unit.deg,
+    longitude=76.62023874324737 * unit.deg,
+    elevation=35.0 * unit.m,
     verbose=False,
 )
 
@@ -93,9 +94,9 @@ Sanya = Station(
     name="Sanya",
     NSsemisphere="N",  # 'N' or 'S'
     EWsemisphere="E",  # 'E' or 'W'
-    latitude=PQ(18.2546815, "deg"),
-    longitude=PQ(109.5076269, "deg"),
-    elevation=PQ(168.0, "m"),
+    latitude=18.2546815 * unit.deg,
+    longitude=109.5076269 * unit.deg,
+    elevation=168.0 * unit.m,
     verbose=False,
 )
 

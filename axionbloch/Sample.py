@@ -1,18 +1,8 @@
 import numpy as np
-from typing import Optional
-from astropy import units as u
+from astropy import units as unit
 from astropy.constants import codata2018 as const
-
-# from axionbloch.enphylope import PhysicalQuantity as u.Quantity
-from axionbloch.constants import (
-    gamma_Xe129,
-    gamma_p,
-    mu_p,
-    mu_Xe129,
-)
+from astropy.units import Quantity
 from axionbloch.utils import PhysicalObject
-
-
 class Sample(PhysicalObject):
     """
     Describe the sample used in experiments.
@@ -21,19 +11,17 @@ class Sample(PhysicalObject):
 
     def __init__(
         self,
-        name: Optional[str] = None,  # name of the sample
-        gamma: Optional[
-            u.Quantity
-        ] = None,  # gyromagnetic ratio. Remember to input it with 2 pi
-        massDensity: Optional[u.Quantity] = None,  # mass density at STP
-        molarMass: Optional[u.Quantity] = None,  # molar mass
-        numOfSpinsPerMolecule: Optional[u.Quantity] = None,  # number of spins per molecule
-        T2: Optional[u.Quantity] = None,  #
-        T1: Optional[u.Quantity] = None,  #
-        vol: Optional[u.Quantity] = None,  # volume
-        mu: Optional[u.Quantity] = None,  # magnetic dipole moment
-        temp: Optional[u.Quantity] = None,
-        pol: Optional[u.Quantity] = None,
+        name: str | None = None,  # name of the sample
+        gamma: Quantity | None = None,  # gyromagnetic ratio. Remember to input it with 2 pi
+        massDensity: Quantity | None = None,  # mass density at STP
+        molarMass: Quantity | None = None,  # molar mass
+        numOfSpinsPerMolecule: Quantity | None = None,  # number of spins per molecule
+        T2: Quantity | None = None,  #
+        T1: Quantity | None = None,  #
+        vol: Quantity | None = None,  # volume
+        mu: Quantity | None = None,  # magnetic dipole moment
+        temp: Quantity | None = None,
+        pol: Quantity | None = None,
         verbose: bool = False,
     ):
         """
@@ -67,13 +55,13 @@ class Sample(PhysicalObject):
         assert self.molarMass is not None
         self.spinNumDensity = (
             self.numOfSpinsPerMolecule * self.massDensity / self.molarMass * const.N_A
-        ).to("cm**(-3)")
+        ).to(unit.cm ** (-3))
 
         self.T2 = T2
         self.T1 = T1
         self.vol = vol
 
-        self.totalNumOfSpins = (self.spinNumDensity * self.vol).to("")
+        self.totalNumOfSpins = (self.spinNumDensity * self.vol).to(unit.one)
 
         self.mu = mu
         self.temp = temp
@@ -94,14 +82,14 @@ class Sample(PhysicalObject):
             "pol": "",
         }
         # make sure that we use common units for quantities
-        self.useCommonUnits()
+        # self.useCommonUnits()
 
     def getThermalPol(
         self,
-        B_pol: u.Quantity,
-        temp: Optional[u.Quantity] = None,
+        B_pol: Quantity,
+        temp: Quantity | None = None,
         verbose: bool = False,
-    ):
+    ) -> Quantity:
         """
         return thermal polarization
         """
@@ -111,16 +99,22 @@ class Sample(PhysicalObject):
         assert (
             temp is not None
         ), "Temperature is required to compute thermal polarization. Please provide temp or set it in the Sample object."
+        if temp.to(unit.K) < 0 * unit.K:
+            raise ValueError("Temperature must be >= 0 K.")
+            # pass  # uncomment this line to allow negative temperature. Then you should see error in pytest does not pass.
+
         pol = np.tanh(const.hbar * self.gamma * B_pol / (2 * const.k_B * temp))  # exact
-        pol = pol.to("")
+        pol = pol.to(unit.one)
         # check(pol)
         if verbose:
-            print(f"[{self.getThermalPol.__name__}] Thermal polarization at B_pol={B_pol} and temp={temp} is {pol}")
+            print(
+                f"[{self.getThermalPol.__name__}] Thermal polarization at B_pol={B_pol} and temp={temp} is {pol}"
+            )
         return pol
 
     def getM0(
         self,
-        pol: Optional[u.Quantity] = None,
+        pol: Quantity | None = None,
         verbose: bool = False,
     ):
         """
@@ -131,8 +125,8 @@ class Sample(PhysicalObject):
         assert (
             pol is not None
         ), "Polarization is required to compute M0. Please provide pol or set it in the Sample object."
-        M0 = (self.mu * pol * self.totalNumOfSpins / self.vol).to("A/m")
-        # self.M0_SPN = (self.mu * ns_SPN).to("A/m")
+        M0 = (self.mu * pol * self.totalNumOfSpins / self.vol).to(unit.A / unit.m)
+        # self.M0_SPN = (self.mu * ns_SPN).to(unit.A / unit.m)
         if verbose:
             print(
                 f"[{self.__class__.__name__}.{self.getM0.__name__}] Magnetization M0 is {M0}"
@@ -141,8 +135,8 @@ class Sample(PhysicalObject):
 
     def getM0eqb(
         self,
-        B_pol: u.Quantity,
-        temp: Optional[u.Quantity] = None,
+        B_pol: Quantity,
+        temp: Quantity | None = None,
         verbose: bool = False,
     ):
         """
@@ -151,51 +145,53 @@ class Sample(PhysicalObject):
         pol = self.getThermalPol(B_pol, temp, verbose)
         M0eqb = self.getM0(pol, verbose)
         if verbose:
-            print(f"[{self.__class__.__name__}.{self.getM0eqb.__name__}] Equilibrium magnetization M0eqb is {M0eqb}")
+            print(
+                f"[{self.__class__.__name__}.{self.getM0eqb.__name__}] Equilibrium magnetization M0eqb is {M0eqb}"
+            )
         return M0eqb
 
 
-liquid_Xe129 = Sample(
-    name="Liquid Xe-129",  # name of the sample
-    gamma=gamma_Xe129,  # [Hz/T]. Remember input it with 2 * np.pi
-    massDensity=u.Quantity(3.1, "g / cm**3 "),  # mass density at STP
-    molarMass=u.Quantity(131.29, "g / mol"),  # molar mass [g/mol]
-    numOfSpinsPerMolecule=u.Quantity(1, ""),  # number of spins per molecule
-    T2=u.Quantity(10, "minute"),  #
-    T1=u.Quantity(15, "minute"),  #
-    vol=u.Quantity(1, "cm**3"),
-    mu=mu_Xe129,  # magnetic dipole moment
-    verbose=False,
-)
+# liquid_Xe129 = Sample(
+#     name="Liquid Xe-129",  # name of the sample
+#     gamma=gamma_Xe129,  # [Hz/T]. Remember input it with 2 * np.pi
+#     massDensity=3.1 * unit.g * unit.cm ** (-3),  # mass density at STP
+#     molarMass=131.29 * unit.g / unit.mol,  # molar mass [g/mol]
+#     numOfSpinsPerMolecule=1 * unit.one,  # number of spins per molecule
+#     T2=10 * unit.minute,  #
+#     T1=15 * unit.minute,  #
+#     vol=1 * unit.cm**3,
+#     mu=mu_Xe129,  # magnetic dipole moment
+#     verbose=False,
+# )
 
-# CH3OH
-methanol = Sample(
-    name="C-12 Methanol",  # name of the sample
-    gamma=gamma_p,  # [Hz/T]. Remember input it with 2 * np.pi
-    massDensity=u.Quantity(0.792, "g / cm**3 "),
-    molarMass=u.Quantity(32.04, "g / mol"),  # molar mass
-    numOfSpinsPerMolecule=u.Quantity(4, ""),  # number of spins per molecule
-    T2=u.Quantity(1, "s"),  #
-    T1=u.Quantity(5, "s"),  #
-    vol=u.Quantity(1, "cm**3"),
-    mu=mu_p,  # magnetic dipole moment
-    # boilpt=337.8,  # [K]
-    # meltpt=175.6,  # [K]
-    verbose=False,
-)
+# # CH3OH
+# methanol = Sample(
+#     name="C-12 Methanol",  # name of the sample
+#     gamma=gamma_p,  # [Hz/T]. Remember input it with 2 * np.pi
+#     massDensity=0.792 * unit.g * unit.cm ** (-3),
+#     molarMass=32.04 * unit.g / unit.mol,  # molar mass
+#     numOfSpinsPerMolecule=4 * unit.one,  # number of spins per molecule
+#     T2=1 * unit.s,  #
+#     T1=5 * unit.s,  #
+#     vol=1 * unit.cm**3,
+#     mu=mu_p,  # magnetic dipole moment
+#     # boilpt=337.8,  # [K]
+#     # meltpt=175.6,  # [K]
+#     verbose=False,
+# )
 
-# CH3CH2OH
-ethanol = Sample(
-    name="Ethanol",  # name of the sample
-    gamma=gamma_p,  # [Hz/T]. Remember input it with 2 * np.pi
-    massDensity=u.Quantity(0.78945, "g / cm**3 "),
-    molarMass=u.Quantity(46.069, "g / mol"),  # molar mass
-    numOfSpinsPerMolecule=u.Quantity(6, ""),  # number of spins per molecule
-    T2=u.Quantity(1, "s"),  #
-    T1=u.Quantity(5, "s"),  #
-    vol=u.Quantity(1, "cm**3"),
-    mu=mu_p,  # magnetic dipole moment
-    # boilpt=351.38,  # [K]
-    # meltpt=159.01,  # [K]
-    verbose=False,
-)
+# # CH3CH2OH
+# ethanol = Sample(
+#     name="Ethanol",  # name of the sample
+#     gamma=gamma_p,  # [Hz/T]. Remember input it with 2 * np.pi
+#     massDensity=0.78945 * unit.g * unit.cm ** (-3),
+#     molarMass=46.069 * unit.g / unit.mol,  # molar mass
+#     numOfSpinsPerMolecule=6 * unit.one,  # number of spins per molecule
+#     T2=1 * unit.s,  #
+#     T1=5 * unit.s,  #
+#     vol=1 * unit.cm**3,
+#     mu=mu_p,  # magnetic dipole moment
+#     # boilpt=351.38,  # [K]
+#     # meltpt=159.01,  # [K]
+#     verbose=False,
+# )

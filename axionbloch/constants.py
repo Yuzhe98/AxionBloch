@@ -13,13 +13,13 @@ I_p = 0.5 * const.hbar
 mu_p = g_p * mu_N(const.m_p) * I_p / const.hbar
 
 # Gyromagnetic ratio of proton
-gamma_p = 2.6752218708e8 * unit.Hz / unit.T
+gamma_p = 2.6752218708e8 * unit.rad * unit.Hz / unit.T
 
 # Magnetic dipole moment of Xe nucleus
 mu_Xe129 = -0.777969 * mu_N(const.m_p)
 
 # Gyromagnetic ratio of Xe129
-gamma_Xe129 = -7.441e7 * unit.Hz / unit.T
+gamma_Xe129 = -7.441e7 * unit.rad * unit.Hz / unit.T
 
 # Earth radius: 6.371e6 (meter)
 earth_radius = 1 * unit.R_earth

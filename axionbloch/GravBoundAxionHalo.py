@@ -1,10 +1,12 @@
-from re import S
-import stat
 import time
 
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+
+from astropy import units as unit
+from astropy.constants import codata2018 as const
+from astropy.units import Quantity
 
 from scipy.sparse import diags
 
@@ -16,10 +18,8 @@ from scipy.special import sph_harm_y
 from scipy.interpolate import RegularGridInterpolator
 
 from axionbloch.Station import Station
-from axionbloch.enphylope import PhysicalQuantity as PQ
-from axionbloch.constants import hbar, c, h_Planck, Eh, AtomicUnits as AU
+from axionbloch.constants import AtomicUnits as AU
 from axionbloch.utils import high_contrast_extended as colors
-
 
 class GravBoundAxionHalo:
     """
@@ -33,41 +33,43 @@ class GravBoundAxionHalo:
     def __init__(
         self,
         name="Gravitationally Bound Axion Halo",
-        nu_a: PQ = None,  # axion Compton frequency
+        nu_a: Quantity | None = None,  # axion Compton frequency
         N: int = int(2**12),
-        extent: PQ = PQ(128.0, "earth_radius"), 
-        Phi_func=None,
-        mass_enclosed: PQ = None,
-        g_aNN: PQ = None,
+        extent: Quantity = 128.0 * unit.R_earth,
+        pot_method=None,
+        mass_enclosed: Quantity | None = None,
+        g_aNN: Quantity | None = None,
         verbose: bool = False,
     ):
+        self.name = name
         self.nu_a = nu_a
         # axion mass
-        ma = self.nu_a * h_Planck / c**2
+        ma = self.nu_a * const.h / const.c**2
         if verbose:
-            print("axion Compton frequency =", nu_a)
+            print("axion Compton frequency =", self.nu_a)
             print(
                 "axion mass =",
-                ma.to("kg"),
+                ma.to(unit.kg),
                 " =",
-                ma.to("eV/c**2"),
+                ma.to(unit.eV / const.c**2),
             )
 
         # axion mass in atomic units
-        self.ma = ma.value_in("m_e")  # 1 MHz axion mass: 7e-45 kilogram
-        
+        self.ma = ma  # 1 MHz axion mass: 7e-45 kilogram
+
         self.N = N
-        self.extent = extent.value_in("a_0")
+        self.extent = extent
         self.dr = self.extent / self.N
         # r = np.linspace(dr * 1e-12, extent, N)  # starts at dr (not zero)
         self.r = np.linspace(
             -self.extent / 2, self.extent / 2, self.N
         )  # starts at dr (not zero)
-        # Phi_func = earth_grav_potential_earth_center_au()
+        Phi_func, r_unit, Phi_unit = pot_method()
         # TODO: Try also to use the infinity as the reference point
-        # factor = 1e0
         # gravitational potential
-        self.pot = self.ma * Phi_func(self.r)
+        self.pot = (
+            self.ma * Phi_func((self.r / r_unit).to_value(unit.one)) * Phi_unit
+        )  # convert r to meter for potential function
 
         self.mass_enclosed = mass_enclosed
         self.g_aNN = g_aNN
@@ -83,17 +85,21 @@ class GravBoundAxionHalo:
         max_n_r: int = 10,  # maximum radial quantum number to plot
         verbose: bool = False,
     ):
+        # TODO: check the units and the constants. I do not think we are safe with the equations here. 
+        # I believe if we set V and T units correctly, everthing should be fine then. 
         # Parameters
-        Veff = self.pot + l * (l + 1) * AU.hbar**2 / (2 * self.ma * self.r**2)
+        Veff = self.pot + l * (l + 1) * const.hbar**2 / (2 * self.ma * self.r**2)
+
+        # ----------------- start of dimensionless computation ---------------- #
         # Kinetic energy operator
         main = -2.0 * np.ones(self.N)
         off = 1.0 * np.ones(self.N - 1)
 
         lap = diags([off, main, off], [-1, 0, 1]) / self.dr**2
-        T = -(AU.hbar**2) / (2 * self.ma) * lap
+        T = -(const.hbar**2) / (2 * self.ma) * lap
 
         # Hamiltonian
-        H = T + diags(Veff, 0)
+        H = T + diags(Veff.to_value(unit.joule / unit.kilogram), 0)
 
         H_dense = H.toarray()
 
@@ -103,11 +109,12 @@ class GravBoundAxionHalo:
         toc = time.time()
         if verbose:
             print(f"N={self.N} l={l} Eigensolver took {toc - tic:.3f} seconds")
+        # ----------------- end of dimensionless computation ---------------- #
 
         # print("Eigen-energies in eV:")
         # # print("[")
         # for i, e in enumerate(energies[0:max_n_r]):
-        #     print(f"{e/AU.eV:.6e},")
+        #     print(f"{e:.6e},")
         # # print("]")
 
         start_index = self.N // 2 + 5  # avoid r=0 singularity
@@ -153,7 +160,7 @@ class GravBoundAxionHalo:
             du2_dr2[1:-1] = (u_r[2:] - 2 * u_r[1:-1] + u_r[:-2]) / (
                 self.r[1] - self.r[0]
             ) ** 2
-            T_expect = -(AU.hbar**2 / (2 * self.ma)) * np.trapezoid(
+            T_expect = -(const.hbar**2 / (2 * self.ma)) * np.trapezoid(
                 np.conj(u_r[start_index:]) * du2_dr2[start_index:], self.r[start_index:]
             )
             R_reduced = (
@@ -173,11 +180,11 @@ class GravBoundAxionHalo:
                 "n_r_l": (i, l),
                 "n_r": (i),
                 "l": (l),
-                "eigenE_eV": energies[_n_r] / AU.eV,
-                "T_eV": T_expect / AU.eV,
-                "V_eV": V_expect / AU.eV,
-                "Veff_eV": Veff_expect / AU.eV,
-                "E_eV": (T_expect + Veff_expect) / AU.eV,
+                "eigenE_eV": energies[_n_r],
+                "T_eV": T_expect,
+                "V_eV": V_expect,
+                "Veff_eV": Veff_expect,
+                "E_eV": (T_expect + Veff_expect),
                 "u_r": u_r,
                 "R_r": R_r,
                 "R_reduced": R_reduced,
@@ -280,8 +287,8 @@ class GravBoundAxionHalo:
         grad_phi = dWF_dphi / (R_grid * np.sin(Theta_grid) + 1e-12)
 
         # project the spherical gradient onto a specific direction (from the center of the sphere to the station)
-        theta_station_rad = station.theta.value_in("rad")  # polar angle
-        phi_station_rad = station.phi.value_in("rad")  # azimuthal angle
+        theta_station_rad = station.theta.to_value(unit.rad)  # polar angle
+        phi_station_rad = station.phi.to_value(unit.rad)  # azimuthal angle
 
         # R_grid.shape = (Nr, Ntheta, Nphi)
         # grad_r.shape = same
@@ -497,7 +504,7 @@ class GravBoundAxionHalo:
 
         ax00.set_xlim(-0.3, 10.3)
         fig.suptitle(
-            f"Axion Compton frequency {self.nu_a.value_in('Hz'):.3e} Hz\nReduced radial wavefunction (n_r={n_r}, l={l})"
+            f"Axion Compton frequency {self.nu_a.to_value(unit.Hz):.3e} Hz\nReduced radial wavefunction (n_r={n_r}, l={l})"
         )
         fig.tight_layout()
         plt.show()
@@ -599,7 +606,7 @@ class GravBoundAxionHalo:
             ax.set_ylim(ylim)
 
         axes[0].set_xlabel(
-            "r (earth radius)" + f"\n$\\nu_a$={self.nu_a.value_in('Hz'):.0e} Hz"
+            "r (earth radius)" + f"\n$\\nu_a$={self.nu_a.to_value(unit.Hz):.0e} Hz"
         )
         axes[0].set_xticks([0, 1, 2, 3, 4, 5])
         axes[-1].legend(bbox_to_anchor=(1.05, 1), loc="upper left")
@@ -626,7 +633,7 @@ class GravBoundAxionHalo:
         ax = fig.add_subplot(gs[0, 0])
         ax.plot(
             self.r[start_index:] / AU.earth_radius,
-            self.pot[start_index:] / AU.eV,
+            self.pot[start_index:],
             label="Grav. Potential",
             alpha=1,
             linestyle="-",
@@ -634,7 +641,7 @@ class GravBoundAxionHalo:
 
         for key, eigenstate in self.states.items():
             cross_x_indx = np.argmin(
-                np.abs(self.pot[start_index:] / AU.eV - eigenstate["eigenE_eV"])
+                np.abs(self.pot[start_index:] - eigenstate["eigenE_eV"])
             )
             xmax = self.extent / 2 / AU.earth_radius - np.abs(
                 self.r[cross_x_indx]
@@ -652,7 +659,7 @@ class GravBoundAxionHalo:
         ax.set_ylabel("Energy (eV)")
         ax.set_xlim(-5.2, 5.2)
         ax.legend()
-        fig.suptitle(f"Eigen-energies ($\\nu_a$={self.nu_a.value_in('Hz'):.0e} Hz)")
+        fig.suptitle(f"Eigen-energies ($\\nu_a$={self.nu_a.to_value(unit.Hz):.0e} Hz)")
         # fig.suptitle(f"Eigen-energies")
         plt.show()
 
@@ -664,16 +671,16 @@ class GravBoundAxionHalo:
     def findHighProbStates(
         self,
         radius_range=[
-            PQ(0.9, "earth_radius"),
-            PQ(1.1, "earth_radius"),
+            0.9 * unit.R_earth,
+            1.1 * unit.R_earth,
         ],
         threshold=1e-2,
     ):
         # find eigen-states which has high probability around earth radius
         self.sortByEigenE()
         states = []
-        radius_start = radius_range[0].value_in("a_0")
-        radius_stop = radius_range[1].value_in("a_0")
+        radius_start = radius_range[0].to_value(unit.a0)
+        radius_stop = radius_range[1].to_value(unit.a0)
 
         if max(radius_start, radius_stop) > np.amax(self.r) or min(
             radius_start, radius_stop
@@ -697,7 +704,7 @@ class GravBoundAxionHalo:
             )
             # print("key =", key, "; n_r and l are:", n_r, l_val)
             print(f"(n_r, l) = ({n_r}, {l_val})")
-            print(f"eigen-energy = {eigenstate["eigenE_eV"]:.3e} eV")
+            print(f"eigen-energy = {eigenstate['eigenE_eV']:.3e} eV")
             print("norm =", norm)
             print("integral =", integral)
             print("")
@@ -728,5 +735,5 @@ class GravBoundAxionHalo:
             T_eV = eigenstate["T_eV"]
             v_m_s_mean = c_m_s * np.sqrt(2 * T_eV / mass_eV_c2)
             print(
-                f"{n_r:<6} {l_val:<4} {principal_n:<14} {name:<6} {eigenstate["eigenE_eV"]:1.3e} {T_eV:15.3e} {v_m_s_mean:15.3e}"
+                f"{n_r:<6} {l_val:<4} {principal_n:<14} {name:<6} {eigenstate['eigenE_eV']:1.3e} {T_eV:15.3e} {v_m_s_mean:15.3e}"
             )

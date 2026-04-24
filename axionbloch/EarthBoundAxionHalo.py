@@ -3,15 +3,16 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from scipy.signal import correlate as correlate
 
-
-# import pandas as pd
-import time
-
 from scipy.interpolate import interp1d
 
+from astropy import units as unit
+from astropy.constants import codata2018 as const
+from astropy.units import Quantity
 
 from axionbloch.enphylope import PhysicalQuantity as PQ
-from axionbloch.constants import c, h_Planck, grav_const, AtomicUnits as AU
+from axionbloch.constants import AtomicUnits as AU
+
+
 from axionbloch.utils import check
 from axionbloch.GravBoundAxionHalo import GravBoundAxionHalo
 
@@ -252,71 +253,6 @@ def earth_grav_potential_infty():
     return Phi_func
 
 
-def earth_grav_potential_earth_center():
-    """
-    Returns a function Phi(r[m]) [J/kg], valid both inside and outside Earth.
-    Uses PREM-like model for interior, point-mass approximation for exterior.
-    """
-    # Load the data (assumed to return a DataFrame with 'radius_m' and 'density_kg_m3')
-    data = loadPEMdata()
-
-    # Extract radius and density
-    r = data["radius_m"]
-    rho = data["density_kg_m3"]
-
-    # Compute shell thickness
-    dr = np.gradient(r)
-
-    # Shell volume and mass
-    dV = 4 * np.pi * r**2 * dr
-    dm = rho * dV
-
-    # Cumulative mass
-    M_r = np.cumsum(dm)
-    M_total = M_r[-1]
-
-    # Gravitational constant
-    G = 6.67430e-11  # m³/kg/s²
-
-    # Extend to radii beyond Earth's surface
-    r_max = r[-1]
-    r_outside = np.linspace(
-        r_max, 1000 * r_max, 800
-    )  # from surface to 1000 Earth radii
-    Phi_outside = -G * M_total / r_outside
-
-    # Compute gravitational potential inside Earth
-    Phi_inside = np.zeros_like(r)
-    Phi_inside[1:] = 2 * Phi_outside[0] + G * M_r[1:] / r[1:]
-    Phi_inside[0] = 2 * Phi_outside[0] + G * M_r[1] / r[1]  # avoid zero-division
-
-    # Combine inside and outside
-    r_full = np.concatenate([r, r_outside])
-    Phi_full = np.concatenate([Phi_inside, Phi_outside])
-    # Phi_full -= np.amin(Phi_full)
-
-    # Enforce symmetry: add negative r values
-    r_sym = np.concatenate([-r_full[::-1], r_full])  # mirror and append
-    Phi_sym = np.concatenate([Phi_full[::-1], Phi_full])  # symmetric values
-
-    # Optional: sort to ensure increasing r (for interp1d)
-    sorted_indices = np.argsort(r_sym)
-    r_sym_sorted = r_sym[sorted_indices]
-    Phi_sym_sorted = Phi_sym[sorted_indices]
-    Phi_sym_sorted -= np.amin(Phi_sym_sorted)
-
-    # Interpolation function: now Phi_func(-r) = Phi_func(r)
-    Phi_func = interp1d(
-        r_sym_sorted,
-        Phi_sym_sorted,
-        kind="linear",
-        fill_value="extrapolate",
-        bounds_error=False,
-    )
-
-    return Phi_func
-
-
 def earth_grav_potential_earth_center_au():
     """
     Returns a function Phi(r[a.u.]) [a.u.], valid both inside and outside Earth.
@@ -475,7 +411,7 @@ def earth_grav_potential_earth_center_():
     M_total = M_r[-1]
 
     # Gravitational constant
-    G = grav_const.value_in("m**3/kg/s**2")   # m³/kg/s²
+    G = const.G.value   # m³/kg/s²
 
     # Extend to radii beyond Earth's surface
     r_max = r[-1]
@@ -519,16 +455,84 @@ def earth_grav_potential_earth_center_():
     return Phi_func, r_unit, Phi_unit
 
 
+def earth_grav_potential_earth_center():
+    """
+    Returns a function Phi(r), valid both inside and outside Earth.
+    Uses PREM-like model for interior, point-mass approximation for exterior.
+    """
+    # Load the data (assumed to return a DataFrame with 'radius_m' and 'density_kg_m3')
+    data = loadPEMdata()
+
+    # Extract radius and density
+    r = data["radius_m"] * unit.meter
+    rho = data["density_kg_m3"] * (unit.kg / unit.meter**3)
+
+    # Compute shell thickness
+    dr = np.gradient(r)
+
+    # Shell volume and mass
+    dV = 4 * np.pi * r**2 * dr
+    dm = rho * dV
+
+    # Cumulative mass
+    M_r = np.cumsum(dm)
+    M_total = M_r[-1]
+
+    # Extend to radii beyond Earth's surface
+    r_max = r[-1]
+    r_outside = np.linspace(
+        r_max, 1000 * r_max, 100000
+    )  # from surface to 1000 Earth radii
+    Phi_outside = -const.G * M_total / r_outside  # G = 6.67430e-11 m³/kg/s²
+
+    # Compute gravitational potential inside Earth
+    Phi_inside = np.zeros_like(r) / r.unit * Phi_outside[0].unit
+    Phi_inside[1:] = 2 * Phi_outside[0] + const.G * M_r[1:] / r[1:]
+    Phi_inside[0] = 2 * Phi_outside[0] + const.G * M_r[1] / r[1]  # avoid zero-division
+
+    # Combine inside and outside
+    r_full = np.concatenate([r, r_outside])
+    Phi_full = np.concatenate([Phi_inside, Phi_outside])
+    # Phi_full -= np.amin(Phi_full)
+
+    # Enforce symmetry: add negative r values
+    r_sym = np.concatenate([-r_full[::-1], r_full])  # mirror and append
+    Phi_sym = np.concatenate([Phi_full[::-1], Phi_full])  # symmetric values
+
+    # Optional: sort to ensure increasing r (for interp1d)
+    sorted_indices = np.argsort(r_sym)
+    r_sym_sorted = r_sym[sorted_indices]
+    Phi_sym_sorted = Phi_sym[sorted_indices]
+    Phi_sym_sorted -= np.amin(Phi_sym_sorted)
+
+    # Interpolation function: now Phi_func(-r) = Phi_func(r)
+    # TODO make this more modular
+    Phi_func = interp1d(
+        r_sym_sorted.to_value(unit.meter),
+        Phi_sym_sorted.to_value(unit.joule / unit.kilogram),
+        kind="linear",
+        fill_value="extrapolate",
+        bounds_error=False,
+    )
+    r_unit = unit.meter
+    # Phi_unit = (
+    #     unit.m**3 / (unit.kg * unit.s**2) * unit.kg / unit.meter
+    # )  #  = unit.joule / unit.kilogram
+    Phi_unit = unit.joule / unit.kilogram
+    # print(Phi_unit.to("joule / kilogram"))
+    return Phi_func, r_unit, Phi_unit
+
+
 class EarthBoundAxionHalo(GravBoundAxionHalo):
     # Create the "axion stream" (axion field) object
     # you can get properties of the axion field, computed based on the input information
     def __init__(
         self,
         name="Earth-Bound Axion Halo",
-        nu_a: PQ = None,  # axion Compton frequency
+        nu_a: Quantity = None,  # axion Compton frequency
         N: int = int(2**12),
-        extent: PQ = PQ(128.0, "earth_radius"),
-        Phi_func=earth_grav_potential_earth_center_au(),
+        extent: Quantity = 128.0 * unit.R_earth,
+        Phi_func=earth_grav_potential_earth_center(),
         verbose: bool = False,
     ):
         super().__init__(
@@ -598,7 +602,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         self.timeLen:int = timeLen
         self.duration_s:float = self.timeLen / self.rate_Hz
         eigenEnergies_eV = np.asarray(eigenEnergies_eV)
-        eigenFreqs_Hz:np.ndarray = eigenEnergies_eV / h_Planck.value_in("eV * s")
+        eigenFreqs_Hz:np.ndarray = eigenEnergies_eV #/ h_Planck.value_in("eV * s")
         if verbose:
             print(eigenFreqs_Hz.mean())
         B_rms_T = 1e-15
