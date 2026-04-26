@@ -3,6 +3,8 @@ from astropy import units as unit
 from astropy.constants import codata2018 as const
 from astropy.units import Quantity
 from axionbloch.utils import PhysicalObject
+
+
 class Sample(PhysicalObject):
     """
     Describe the sample used in experiments.
@@ -12,7 +14,9 @@ class Sample(PhysicalObject):
     def __init__(
         self,
         name: str | None = None,  # name of the sample
-        gamma: Quantity | None = None,  # gyromagnetic ratio. Remember to input it with 2 pi
+        gamma: (
+            Quantity | None
+        ) = None,  # gyromagnetic ratio. Remember to input it with 2 pi
         massDensity: Quantity | None = None,  # mass density at STP
         molarMass: Quantity | None = None,  # molar mass
         numOfSpinsPerMolecule: Quantity | None = None,  # number of spins per molecule

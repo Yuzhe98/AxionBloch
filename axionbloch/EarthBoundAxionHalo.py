@@ -12,78 +12,8 @@ from astropy.units import Quantity
 from axionbloch.enphylope import PhysicalQuantity as PQ
 from axionbloch.constants import AtomicUnits as AU
 
-
 from axionbloch.utils import check
 from axionbloch.GravBoundAxionHalo import GravBoundAxionHalo
-
-
-# def loadPEMdata():
-#     # Load the data
-#     data = pd.read_csv(
-#         "data/Earth_Models/PEM_Parametric_Earth_Models_data.txt",
-#         comment="#",
-#         sep=r"\s+",
-#         header=None,
-#         names=[
-#             "radius_m",
-#             "density_kg_m3",
-#             "vpv",
-#             "vsv",
-#             "Q_kappa",
-#             "Q_miu",
-#             "vph",
-#             "vsh",
-#             "eta",
-#         ],
-#     )
-
-#     # Sort just in case
-#     data = data.sort_values(by="radius_m")
-
-#     return data
-
-
-# def loadPEMdata(filepath="axionbloch/data/Earth_Models/PEM_Parametric_Earth_Models_data.txt"):
-#     """
-#     Load PEM data file without pandas.
-#     Returns a list of dictionaries (like rows).
-#     """
-
-#     columns = [
-#         "radius_m",
-#         "density_kg_m3",
-#         "vpv",
-#         "vsv",
-#         "Q_kappa",
-#         "Q_miu",
-#         "vph",
-#         "vsh",
-#         "eta",
-#     ]
-
-#     data = []
-
-#     with open(filepath, "r") as f:
-#         for line in f:
-#             line = line.strip()
-
-#             # skip comments and empty lines
-#             if not line or line.startswith("#"):
-#                 continue
-
-#             parts = line.split()
-
-#             # convert to float
-#             values = [float(x) for x in parts]
-
-#             # map to dict
-#             row = dict(zip(columns, values))
-#             data.append(row)
-
-#     # sort by radius_m
-#     data.sort(key=lambda x: x["radius_m"])
-
-#     return data
 
 
 def loadPEMdata(
@@ -517,8 +447,8 @@ def earth_grav_potential_earth_center():
 
     # Interpolation function: now Phi_func(-r) = Phi_func(r)
     r_unit = unit.R_earth
-    Phi_unit = unit.joule / unit.kilogram
-    
+    Phi_unit = unit.megajoule / unit.kilogram
+
     Phi_func = interp1d(
         r_sym_sorted.to_value(r_unit),
         Phi_sym_sorted.to_value(Phi_unit),
@@ -528,60 +458,32 @@ def earth_grav_potential_earth_center():
     )
     return Phi_func, r_unit, Phi_unit
 
-def plot_earth_grav_potential():
 
-    # Load the data
+def plot_earth_grav_potential(showplot=True):
+
+    # load the data to obtain density profile
     data = loadPEMdata()
+    density_r = data["radius_m"] * unit.meter
+    density_rho = data["density_kg_m3"] * (unit.kg / unit.meter**3)
 
-    # Compute shell volumes and mass in each shell
-    r = data["radius_m"] * unit.meter
-    # outside earth
-    r_outside = np.linspace(r[-1], 10 * r[-1], 400)  # from surface to 10 Earth radii
-    # Combine inside and outside
-    r_full = np.concatenate([r, r_outside])
+    # cumulative mass
+    mass_r, mass_M_r = get_CumulativeMass()
 
-    rho = data["density_kg_m3"] * (unit.kg / unit.meter**3)
-
-    r, M_r = get_CumulativeMass()
+    # potential referring to earth center
     Phi_func, r_unit, Phi_unit = earth_grav_potential_earth_center()
-    r_extended = np.linspace(0, 3 * r[-1], 1000)
+    # extend to radii beyond Earth's surface
+    r_extended = np.linspace(0, 3 * mass_r[-1], 1000)
+    Phi_extended = Phi_func(r_extended.to_value(r_unit)) * Phi_unit
 
-    print("Earth radius = ", r[-1] / 1e3, "km")
-    # Compute shell thicknesses (dr)
-    dr = np.gradient(r)
+    # use units for plotting:
+    r_unit = unit.R_earth
+    Phi_unit = unit.megajoule / unit.kilogram
 
-    # Volume of each spherical shell = 4πr² dr
-    dV = 4 * np.pi * r**2 * dr
-
-    # Mass in each shell = ρ * dV
-    dm = rho * dV
-
-    # Total mass
-    M_total = np.sum(dm)  # in kg
-
-    # Cumulative mass as a function of radius
-    M_r = np.cumsum(dm)  # in kg
-
-    # Constants
-    G = 6.67430e-11  # gravitational constant [m³/kg/s²]
-
-    Phi_func = earth_grav_potential_infty()
-
-    # Gravitational potential in [J/kg]
-    Phi = np.zeros_like(r)
-    Phi[1:] = G * M_r[1:] / r[1:]
-    Phi[0] = 0  #
-    Phi += Phi_func(0)  # use this line if assuming the potential at infinity is zero
-
-    # Print result
-    print(f"Total Earth mass from PEM profile: {M_total:.3e} kg")
-
-    # Plot
+    # ------------- Plot ---------------------
 
     # plot style
     plt.rc("font", size=6)  # font size for all figures
     # plt.rcParams['font.family'] = 'serif'
-    # plt.rcParams['font.serif'] = ['Times New Roman']
     plt.rcParams["font.family"] = "Times New Roman"
     # plt.rcParams['mathtext.fontset'] = 'dejavuserif'
 
@@ -589,14 +491,11 @@ def plot_earth_grav_potential():
     plt.rcParams["mathtext.fontset"] = "cm"
     plt.rcParams["mathtext.rm"] = "Times New Roman"
 
-    # plt.style.use('seaborn-dark')  # to specify different styles
-    # print(plt.style.available)  # if you want to know available styles
-
     cm = 1 / 2.56  # convert cm to inch
 
     fig = plt.figure(figsize=(8.5 * cm, 8.5 * cm), dpi=300)  # initialize a figure
 
-    gs = gridspec.GridSpec(nrows=2, ncols=2)  # create grid for multiple figures
+    gs = gridspec.GridSpec(nrows=3, ncols=1)  # create grid for multiple figures
 
     # # fix the margins
     # left=
@@ -608,57 +507,40 @@ def plot_earth_grav_potential():
     # fig.subplots_adjust(left=left, top=top, right=right,
     #                     bottom=bottom, wspace=wspace, hspace=hspace)
 
-    ax00 = fig.add_subplot(gs[0, 0])
-    ax01 = fig.add_subplot(gs[0, 1])
-    ax10 = fig.add_subplot(gs[1, 0:])
-    # ax11 = fig.add_subplot(gs[1, 1])
+    density_ax = fig.add_subplot(gs[0, 0])
+    mass_ax = fig.add_subplot(gs[1, 0], sharex=density_ax)
+    pot_ax = fig.add_subplot(gs[2, 0], sharex=density_ax)
 
-    # earth density
-    ax00.plot(
-        r / 1000,
-        data["density_kg_m3"] / 1000,
+    # density profile
+    density_ax.plot(
+        density_r.to_value(r_unit),
+        density_rho.to_value(density_rho.unit),
         label="Density Profile",
         color="darkblue",
     )
-    ax00.set_ylim(0, 15)
-    ax00.set_xlabel("Radius (km)")
-    ax00.set_ylabel("Density (g/cm³)")
-    # ax00.set_title("Earth Density Profile (PEM Data)")
-    # ax00.grid(True)
-    # ax00.legend()
-    # ax00.gca().invert_xaxis()  # Optional: so Earth's center is on the left
+    density_ax.set_xlabel(f"Radius (earth radius)")
+    density_ax.set_ylabel(f"Density ({density_rho.unit})")
 
-    # earth mass
-    ax01.plot(r / 1000, M_r / 1e24, label="Mass Profile", color="darkgreen")
-    # ax00.set_ylim(0, 15)
-    ax01.set_xlabel("Radius (km)")
-    ax01.set_ylabel("Enclosed Mass ($10^{24}\\,$kg)")
-    # ax01.set_title("Earth Density Profile (PEM Data)")
-    # ax01.grid(True)
-    # ax01.legend()
-    # ax01.gca().invert_xaxis()  # Optional: so Earth's center is on the left
-    ax01.ticklabel_format(useOffset=False)
+    # cumulative mass
+    mass_ax.plot(
+        mass_r.to_value(r_unit),
+        mass_M_r.to_value(unit.kg) / 1e24,
+        label="Mass Profile",
+        color="darkgreen",
+    )
+    mass_ax.set_xlabel(f"Radius (earth radius)")
+    mass_ax.set_ylabel(f"Enclosed Mass ($10^{{24}}\\,$kg)")
+    mass_ax.ticklabel_format(useOffset=False)
 
-    # earth gravitational potential given by Phi_r
-    # ax10.plot(r / 1000, Phi / 1e6, label="Obtained by earth density", color="k")
-    # ax10.plot(
-    #     r / 1000,
-    #     Phi_func(r) / 1e6,
-    #     label="Grav. Pot. by Phi_func",
-    #     color="darkorange",
-    #     linestyle="dashed",
-    # )
-
-    # Obtained by earth density and calculation
-    ax10.plot(
-        r_full / 1000,
-        Phi_func(r_full) / 1e6,
+    # gravitational potential
+    pot_ax.plot(
+        r_extended.to_value(r_unit),
+        Phi_extended.to_value(Phi_unit),
         label="Earth grav. pot.",
         color="darkorange",
-        # linestyle="dashed",
     )
-    ax10.axvline(
-        x=r[-1] / 1e3,
+    pot_ax.axvline(
+        x=(1 * unit.R_earth).to_value(r_unit),
         color="k",
         linestyle="dotted",
         linewidth=1,
@@ -666,46 +548,17 @@ def plot_earth_grav_potential():
         label="Earth radius",
     )
 
-    # ax10.axhline(
-    #     y=r[-1] / 1e3,
-    #     color="k",
-    #     linestyle="dotted",
-    #     linewidth=1,
-    #     alpha=0.8,
-    #     label="Earth radius",
-    # )
-
-    ax10.axvline(
-        x=5 * r[-1] / 1e3,
-        color="green",
-        linestyle="dashed",
-        linewidth=1,
-        alpha=0.8,
-        label="$5\\times\\,$Earth radius",
-    )
-
-    # ax10.axvline(
-    #     x=384400 ,
-    #     color="tab:orange",
-    #     linestyle="dotted",
-    #     linewidth=1,
-    #     alpha=0.8,
-    #     label="Moon orbital radius",
-    # )
-
-    ax10.set_xlim(-0.1 * r[-1] / 1e3, 5.5 * r[-1] / 1e3)
-    ax10.set_ylim(-130, 5)
-    ax10.set_xlabel("Radius (km)")
-    ax10.set_ylabel("Grav. Pot. (MJ/kg) ref. to $\\infty$")
-    # ax10.set_title("Earth Density Profile (PEM Data)")
-    # ax10.grid(True)
-    ax10.legend()
-    # ax10.gca().invert_xaxis()  # Optional: so Earth's center is on the left
+    pot_ax.set_xlabel(f"Radius (earth radius)")
+    pot_ax.set_ylabel(f"Grav. Pot. (MJ/kg) ref. to $\\infty$")
+    pot_ax.legend()
 
     fig.suptitle("Earth Profiles (from PEM Data)")
     fig.tight_layout()
-    plt.savefig("figures/Earth-Profiles-(PEM-Data).png", transparent=False)
-    plt.show()
+    # plt.savefig("figures/Earth-Profiles-(PEM-Data).png", transparent=False)
+    if showplot:
+        plt.show()
+    else:
+        plt.close(fig)
 
 
 class EarthBoundAxionHalo(GravBoundAxionHalo):
@@ -717,7 +570,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         nu_a: Quantity = None,  # axion Compton frequency
         N: int = int(2**12),
         extent: Quantity = 128.0 * unit.R_earth,
-        Phi_func=earth_grav_potential_earth_center(),
+        getPot=earth_grav_potential_earth_center,
         verbose: bool = False,
     ):
         super().__init__(
@@ -725,9 +578,13 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
             nu_a=nu_a,
             N=N,
             extent=extent,
-            Phi_func=Phi_func,
+            getPot=getPot,
             verbose=verbose,
         )
+        # convert potential and kinetic energy magnitude to atto-eV for easier computation
+        self.E_unit = unit.attoelectronvolt
+        self.pot = self.pot.to(self.E_unit)
+        self.T_magnitude = self.T_magnitude.to(self.E_unit)
 
     def getBfield(
         self,

@@ -19,12 +19,14 @@ from scipy.interpolate import RegularGridInterpolator
 
 from axionbloch.Station import Station
 from axionbloch.constants import AtomicUnits as AU
-from axionbloch.utils import high_contrast_extended as colors
+from axionbloch.utils import high_contrast_extended as colors, check
+
 
 class GravBoundAxionHalo:
     """
-    A class to solve the time-independent Schrodinger equation for axions gravitationally bound to to objects like Earth or Sun. 
+    A class to solve the time-independent Schrodinger equation for axions gravitationally bound to to objects like Earth or Sun.
     """
+
     # Note: input / output units are in SI, while internal calculations are in atomic units.
 
     # Map l to labels (s, p, d, f, ...)
@@ -36,7 +38,7 @@ class GravBoundAxionHalo:
         nu_a: Quantity | None = None,  # axion Compton frequency
         N: int = int(2**12),
         extent: Quantity = 128.0 * unit.R_earth,
-        pot_method=None,
+        getPot=None,
         mass_enclosed: Quantity | None = None,
         g_aNN: Quantity | None = None,
         verbose: bool = False,
@@ -55,28 +57,43 @@ class GravBoundAxionHalo:
             )
 
         # axion mass in atomic units
-        self.ma = ma  # 1 MHz axion mass: 7e-45 kilogram
+        self.ma: Quantity = ma  # 1 MHz axion mass: 7e-45 kilogram
 
         self.N = N
-        self.extent = extent
-        self.dr = self.extent / self.N
+        self.extent: Quantity = extent
+        self.dr: Quantity = self.extent / self.N
         # r = np.linspace(dr * 1e-12, extent, N)  # starts at dr (not zero)
-        self.r = np.linspace(
+        self.r: Quantity = np.linspace(
             -self.extent / 2, self.extent / 2, self.N
         )  # starts at dr (not zero)
-        Phi_func, r_unit, Phi_unit = pot_method()
+        Phi_func, r_unit, Phi_unit = getPot()
         # TODO: Try also to use the infinity as the reference point
         # gravitational potential
-        self.pot = (
+        self.pot: Quantity = (
             self.ma * Phi_func((self.r / r_unit).to_value(unit.one)) * Phi_unit
         )  # convert r to meter for potential function
 
-        self.mass_enclosed = mass_enclosed
-        self.g_aNN = g_aNN
+        self.mass_enclosed: Quantity = mass_enclosed
+        self.g_aNN: Quantity = g_aNN
+
+        self.T_magnitude: Quantity = (const.hbar**2) / (2 * self.ma) / self.dr**2
 
         self.states: dict = {}
         self.l_vals = []
+
+        self.E_unit = unit.attoelectronvolt
         # usually we do not need all N eigenstates, so we store only the first max_n_r states for each l.
+
+    def showValueAndUnits(self):
+        """
+        Print values and units of physical quantities. Ideally, the values should be close to 1 and units should be identical for quantities that are compared or added together in the code.
+        """
+        check(self.r.mean())
+        check(self.r.std())
+        check(self.dr)
+        check(self.pot.mean())
+        check(self.pot.std())
+        check(self.T_magnitude)
 
     def solve_TISE_3D_l(
         self,
@@ -85,21 +102,22 @@ class GravBoundAxionHalo:
         max_n_r: int = 10,  # maximum radial quantum number to plot
         verbose: bool = False,
     ):
-        # TODO: check the units and the constants. I do not think we are safe with the equations here. 
-        # I believe if we set V and T units correctly, everthing should be fine then. 
+        # TODO: check the units and the constants. I do not think we are safe with the equations here.
+        # I believe if we set V and T units correctly, everthing should be fine then.
         # Parameters
-        Veff = self.pot + l * (l + 1) * const.hbar**2 / (2 * self.ma * self.r**2)
+        Veff: Quantity = self.pot + l * (l + 1) * const.hbar**2 / (2 * self.ma * self.r**2)
+        Veff = Veff.to(self.pot.unit)
 
         # ----------------- start of dimensionless computation ---------------- #
         # Kinetic energy operator
         main = -2.0 * np.ones(self.N)
         off = 1.0 * np.ones(self.N - 1)
 
-        lap = diags([off, main, off], [-1, 0, 1]) / self.dr**2
-        T = -(const.hbar**2) / (2 * self.ma) * lap
+        lap = diags([off, main, off], [-1, 0, 1])
+        T = -1 * self.T_magnitude.value * lap
 
         # Hamiltonian
-        H = T + diags(Veff.to_value(unit.joule / unit.kilogram), 0)
+        H = T + diags(Veff.value, 0)
 
         H_dense = H.toarray()
 
@@ -110,20 +128,23 @@ class GravBoundAxionHalo:
         if verbose:
             print(f"N={self.N} l={l} Eigensolver took {toc - tic:.3f} seconds")
         # ----------------- end of dimensionless computation ---------------- #
-
-        # print("Eigen-energies in eV:")
-        # # print("[")
-        # for i, e in enumerate(energies[0:max_n_r]):
-        #     print(f"{e:.6e},")
-        # # print("]")
+        if verbose:
+            print("Eigen-energies in eV:")
+            print("[")
+            for i, e in enumerate(energies[0:max_n_r]):
+                print(f"{e:.6e},")
+            print("]")
+            print(f"* {self.E_unit}")
 
         start_index = self.N // 2 + 5  # avoid r=0 singularity
         # print("Kinetic-energies in eV:")
         # print("[")
+        
         if l == 0:
             iter_range = np.arange(max_n_r)
         else:
             iter_range = np.arange(2 * max_n_r)[::2]
+        
         for i, _n_r in enumerate(iter_range):
 
             u_r = states[:, _n_r]
@@ -194,7 +215,9 @@ class GravBoundAxionHalo:
             R_reduced = (
                 1.0
                 * (states[:, :max_n_r]) ** 1
-                / np.sqrt(np.trapezoid(np.abs(states[:, :max_n_r]) ** 2, self.r, axis=0))
+                / np.sqrt(
+                    np.trapezoid(np.abs(states[:, :max_n_r]) ** 2, self.r, axis=0)
+                )
             )
             # R_reduced.shape = (N, max_n_r)
             # TODO: complete this or delete this
@@ -230,10 +253,12 @@ class GravBoundAxionHalo:
     def getStateEnergies(self):
         return [state["eigenE_eV"] for state in self.states.values()]
 
-    def findGradients(self, stateNames=[], station:Station=None):
+    def findGradients(self, stateNames=[], station: Station = None):
         # avoid r=0 singularity
         start_index = self.N // 2 + 5
-        stop_index = start_index + 2**7  # TODO: this should not be a number, but a radius range
+        stop_index = (
+            start_index + 2**7
+        )  # TODO: this should not be a number, but a radius range
         # update r and Nr
         r = self.r[start_index:stop_index]
         Nr = len(r)
@@ -410,7 +435,7 @@ class GravBoundAxionHalo:
             r_line / AU.earth_radius,
             grad_phi_line.real * (AU.earth_radius**2.5),
             label="phi gradient real",
-            color=colors[3]
+            color=colors[3],
         )
         # grad_phi_ax.plot(
         #     r_line / AU.earth_radius,
@@ -643,9 +668,10 @@ class GravBoundAxionHalo:
             cross_x_indx = np.argmin(
                 np.abs(self.pot[start_index:] - eigenstate["eigenE_eV"])
             )
-            xmax = self.extent / 2 / AU.earth_radius - np.abs(
-                self.r[cross_x_indx]
-            ) / AU.earth_radius
+            xmax = (
+                self.extent / 2 / AU.earth_radius
+                - np.abs(self.r[cross_x_indx]) / AU.earth_radius
+            )
             xmax = np.abs(self.r[cross_x_indx]) / AU.earth_radius
             ax.hlines(
                 y=eigenstate["eigenE_eV"],

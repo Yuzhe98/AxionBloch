@@ -1,30 +1,32 @@
 import time
 from axionbloch.enphylope import PhysicalQuantity as PQ
 from astropy import units as unit
-from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo, earth_grav_potential_earth_center
+from axionbloch.EarthBoundAxionHalo import (
+    EarthBoundAxionHalo,
+    earth_grav_potential_earth_center,
+    plot_earth_grav_potential,
+)
 from axionbloch.Station import Mainz, Baltimore, Sanya
-# data = loadPEMdata()
-# print(data["radius_m"])
-
-Phi, r_unit, Phi_unit = earth_grav_potential_earth_center()
-print(f"Phi(r=0) = {Phi} {Phi_unit}")
 
 halo = EarthBoundAxionHalo(
-    nu_a=PQ(1.348, "MHz"),  # axion Compton frequency in Hz
+    nu_a=1.348 * unit.MHz,  # axion Compton frequency in Hz
     N=int(2**12),  # number of grid points
-    extent=PQ(128.0, "earth_radius"),  # spatial extent of the grid in units of earth radius
+    extent=128.0 * unit.R_earth,  # spatial extent of the grid in units of earth radius
     verbose=True,
 )
 
-tic = time.time()
+halo.showValueAndUnits()
+
+# tic = time.time()
 halo.solve_TISE_3D(l_vals=[0],  # angular momentum quantum number
         max_n_r = 64,  # maximum principal quantum number to plot
+        verbose=True,
         )
-toc = time.time()
-print(f"Time taken to solve TISE: {toc - tic:.2e} seconds")
+# toc = time.time()
+# print(f"Time taken to solve TISE: {toc - tic:.2e} seconds")
 
-print(halo.getStateNames())
-print(halo.getStateEnergies())
+# print(halo.getStateNames())
+# print(halo.getStateEnergies())
 
 # halo.findGradients(stateNames=['2p'], station=Mainz)
 
