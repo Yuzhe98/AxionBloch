@@ -114,8 +114,7 @@ def loadPEMdata(
                 data[key].append(val)
 
     # sort by radius
-    order = sorted(range(len(data["radius_m"])),
-                   key=lambda i: data["radius_m"][i])
+    order = sorted(range(len(data["radius_m"])), key=lambda i: data["radius_m"][i])
 
     for key in data:
         data[key] = [data[key][i] for i in order]
@@ -411,7 +410,7 @@ def earth_grav_potential_earth_center_():
     M_total = M_r[-1]
 
     # Gravitational constant
-    G = const.G.value   # m³/kg/s²
+    G = const.G.value  # m³/kg/s²
 
     # Extend to radii beyond Earth's surface
     r_max = r[-1]
@@ -450,14 +449,16 @@ def earth_grav_potential_earth_center_():
         bounds_error=False,
     )
     r_unit = PQ(1, "meter")
-    Phi_unit = PQ(1, "m**3/kg/s**2") * PQ(1, "kg") / PQ(1, "meter")  #  = PQ(1, "joule / kilogram")
+    Phi_unit = (
+        PQ(1, "m**3/kg/s**2") * PQ(1, "kg") / PQ(1, "meter")
+    )  #  = PQ(1, "joule / kilogram")
     # print(Phi_unit.to("joule / kilogram"))
     return Phi_func, r_unit, Phi_unit
 
 
-def earth_grav_potential_earth_center():
+def get_CumulativeMass():
     """
-    Returns a function Phi(r), valid both inside and outside Earth.
+    Returns the cumulative mass as a function of radius.
     Uses PREM-like model for interior, point-mass approximation for exterior.
     """
     # Load the data (assumed to return a DataFrame with 'radius_m' and 'density_kg_m3')
@@ -476,6 +477,15 @@ def earth_grav_potential_earth_center():
 
     # Cumulative mass
     M_r = np.cumsum(dm)
+    return r, M_r
+
+
+def earth_grav_potential_earth_center():
+    """
+    Returns a function Phi(r), valid both inside and outside Earth.
+    Uses PREM-like model for interior, point-mass approximation for exterior.
+    """
+    r, M_r = get_CumulativeMass()
     M_total = M_r[-1]
 
     # Extend to radii beyond Earth's surface
@@ -483,7 +493,7 @@ def earth_grav_potential_earth_center():
     r_outside = np.linspace(
         r_max, 1000 * r_max, 100000
     )  # from surface to 1000 Earth radii
-    Phi_outside = -const.G * M_total / r_outside  # G = 6.67430e-11 m³/kg/s²
+    Phi_outside: Quantity = -const.G * M_total / r_outside  # G = 6.67430e-11 m³/kg/s²
 
     # Compute gravitational potential inside Earth
     Phi_inside = np.zeros_like(r) / r.unit * Phi_outside[0].unit
@@ -506,21 +516,196 @@ def earth_grav_potential_earth_center():
     Phi_sym_sorted -= np.amin(Phi_sym_sorted)
 
     # Interpolation function: now Phi_func(-r) = Phi_func(r)
-    # TODO make this more modular
+    r_unit = unit.R_earth
+    Phi_unit = unit.joule / unit.kilogram
+    
     Phi_func = interp1d(
-        r_sym_sorted.to_value(unit.meter),
-        Phi_sym_sorted.to_value(unit.joule / unit.kilogram),
+        r_sym_sorted.to_value(r_unit),
+        Phi_sym_sorted.to_value(Phi_unit),
         kind="linear",
         fill_value="extrapolate",
         bounds_error=False,
     )
-    r_unit = unit.meter
-    # Phi_unit = (
-    #     unit.m**3 / (unit.kg * unit.s**2) * unit.kg / unit.meter
-    # )  #  = unit.joule / unit.kilogram
-    Phi_unit = unit.joule / unit.kilogram
-    # print(Phi_unit.to("joule / kilogram"))
     return Phi_func, r_unit, Phi_unit
+
+def plot_earth_grav_potential():
+
+    # Load the data
+    data = loadPEMdata()
+
+    # Compute shell volumes and mass in each shell
+    r = data["radius_m"] * unit.meter
+    # outside earth
+    r_outside = np.linspace(r[-1], 10 * r[-1], 400)  # from surface to 10 Earth radii
+    # Combine inside and outside
+    r_full = np.concatenate([r, r_outside])
+
+    rho = data["density_kg_m3"] * (unit.kg / unit.meter**3)
+
+    r, M_r = get_CumulativeMass()
+    Phi_func, r_unit, Phi_unit = earth_grav_potential_earth_center()
+    r_extended = np.linspace(0, 3 * r[-1], 1000)
+
+    print("Earth radius = ", r[-1] / 1e3, "km")
+    # Compute shell thicknesses (dr)
+    dr = np.gradient(r)
+
+    # Volume of each spherical shell = 4πr² dr
+    dV = 4 * np.pi * r**2 * dr
+
+    # Mass in each shell = ρ * dV
+    dm = rho * dV
+
+    # Total mass
+    M_total = np.sum(dm)  # in kg
+
+    # Cumulative mass as a function of radius
+    M_r = np.cumsum(dm)  # in kg
+
+    # Constants
+    G = 6.67430e-11  # gravitational constant [m³/kg/s²]
+
+    Phi_func = earth_grav_potential_infty()
+
+    # Gravitational potential in [J/kg]
+    Phi = np.zeros_like(r)
+    Phi[1:] = G * M_r[1:] / r[1:]
+    Phi[0] = 0  #
+    Phi += Phi_func(0)  # use this line if assuming the potential at infinity is zero
+
+    # Print result
+    print(f"Total Earth mass from PEM profile: {M_total:.3e} kg")
+
+    # Plot
+
+    # plot style
+    plt.rc("font", size=6)  # font size for all figures
+    # plt.rcParams['font.family'] = 'serif'
+    # plt.rcParams['font.serif'] = ['Times New Roman']
+    plt.rcParams["font.family"] = "Times New Roman"
+    # plt.rcParams['mathtext.fontset'] = 'dejavuserif'
+
+    # Make math text match Times New Roman
+    plt.rcParams["mathtext.fontset"] = "cm"
+    plt.rcParams["mathtext.rm"] = "Times New Roman"
+
+    # plt.style.use('seaborn-dark')  # to specify different styles
+    # print(plt.style.available)  # if you want to know available styles
+
+    cm = 1 / 2.56  # convert cm to inch
+
+    fig = plt.figure(figsize=(8.5 * cm, 8.5 * cm), dpi=300)  # initialize a figure
+
+    gs = gridspec.GridSpec(nrows=2, ncols=2)  # create grid for multiple figures
+
+    # # fix the margins
+    # left=
+    # bottom=
+    # right=
+    # top=
+    # wspace=
+    # hspace=
+    # fig.subplots_adjust(left=left, top=top, right=right,
+    #                     bottom=bottom, wspace=wspace, hspace=hspace)
+
+    ax00 = fig.add_subplot(gs[0, 0])
+    ax01 = fig.add_subplot(gs[0, 1])
+    ax10 = fig.add_subplot(gs[1, 0:])
+    # ax11 = fig.add_subplot(gs[1, 1])
+
+    # earth density
+    ax00.plot(
+        r / 1000,
+        data["density_kg_m3"] / 1000,
+        label="Density Profile",
+        color="darkblue",
+    )
+    ax00.set_ylim(0, 15)
+    ax00.set_xlabel("Radius (km)")
+    ax00.set_ylabel("Density (g/cm³)")
+    # ax00.set_title("Earth Density Profile (PEM Data)")
+    # ax00.grid(True)
+    # ax00.legend()
+    # ax00.gca().invert_xaxis()  # Optional: so Earth's center is on the left
+
+    # earth mass
+    ax01.plot(r / 1000, M_r / 1e24, label="Mass Profile", color="darkgreen")
+    # ax00.set_ylim(0, 15)
+    ax01.set_xlabel("Radius (km)")
+    ax01.set_ylabel("Enclosed Mass ($10^{24}\\,$kg)")
+    # ax01.set_title("Earth Density Profile (PEM Data)")
+    # ax01.grid(True)
+    # ax01.legend()
+    # ax01.gca().invert_xaxis()  # Optional: so Earth's center is on the left
+    ax01.ticklabel_format(useOffset=False)
+
+    # earth gravitational potential given by Phi_r
+    # ax10.plot(r / 1000, Phi / 1e6, label="Obtained by earth density", color="k")
+    # ax10.plot(
+    #     r / 1000,
+    #     Phi_func(r) / 1e6,
+    #     label="Grav. Pot. by Phi_func",
+    #     color="darkorange",
+    #     linestyle="dashed",
+    # )
+
+    # Obtained by earth density and calculation
+    ax10.plot(
+        r_full / 1000,
+        Phi_func(r_full) / 1e6,
+        label="Earth grav. pot.",
+        color="darkorange",
+        # linestyle="dashed",
+    )
+    ax10.axvline(
+        x=r[-1] / 1e3,
+        color="k",
+        linestyle="dotted",
+        linewidth=1,
+        alpha=0.8,
+        label="Earth radius",
+    )
+
+    # ax10.axhline(
+    #     y=r[-1] / 1e3,
+    #     color="k",
+    #     linestyle="dotted",
+    #     linewidth=1,
+    #     alpha=0.8,
+    #     label="Earth radius",
+    # )
+
+    ax10.axvline(
+        x=5 * r[-1] / 1e3,
+        color="green",
+        linestyle="dashed",
+        linewidth=1,
+        alpha=0.8,
+        label="$5\\times\\,$Earth radius",
+    )
+
+    # ax10.axvline(
+    #     x=384400 ,
+    #     color="tab:orange",
+    #     linestyle="dotted",
+    #     linewidth=1,
+    #     alpha=0.8,
+    #     label="Moon orbital radius",
+    # )
+
+    ax10.set_xlim(-0.1 * r[-1] / 1e3, 5.5 * r[-1] / 1e3)
+    ax10.set_ylim(-130, 5)
+    ax10.set_xlabel("Radius (km)")
+    ax10.set_ylabel("Grav. Pot. (MJ/kg) ref. to $\\infty$")
+    # ax10.set_title("Earth Density Profile (PEM Data)")
+    # ax10.grid(True)
+    ax10.legend()
+    # ax10.gca().invert_xaxis()  # Optional: so Earth's center is on the left
+
+    fig.suptitle("Earth Profiles (from PEM Data)")
+    fig.tight_layout()
+    plt.savefig("figures/Earth-Profiles-(PEM-Data).png", transparent=False)
+    plt.show()
 
 
 class EarthBoundAxionHalo(GravBoundAxionHalo):
@@ -536,7 +721,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         verbose: bool = False,
     ):
         super().__init__(
-            name=name,  
+            name=name,
             nu_a=nu_a,
             N=N,
             extent=extent,
@@ -544,7 +729,14 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
             verbose=verbose,
         )
 
-    def getBfield(self, rate_Hz: float, timeLen: int, rand_seed: int, numFields:int=1, verbose:bool=False):
+    def getBfield(
+        self,
+        rate_Hz: float,
+        timeLen: int,
+        rand_seed: int,
+        numFields: int = 1,
+        verbose: bool = False,
+    ):
         # 1 MHz axion
         eigenEnergies_eV = [
             8.185620266405553e-19,
@@ -598,11 +790,11 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
             5.591403811323711e-18,
             5.591403827177387e-18,
         ]
-        self.rate_Hz:float = rate_Hz
-        self.timeLen:int = timeLen
-        self.duration_s:float = self.timeLen / self.rate_Hz
+        self.rate_Hz: float = rate_Hz
+        self.timeLen: int = timeLen
+        self.duration_s: float = self.timeLen / self.rate_Hz
         eigenEnergies_eV = np.asarray(eigenEnergies_eV)
-        eigenFreqs_Hz:np.ndarray = eigenEnergies_eV #/ h_Planck.value_in("eV * s")
+        eigenFreqs_Hz: np.ndarray = eigenEnergies_eV  # / h_Planck.value_in("eV * s")
         if verbose:
             print(eigenFreqs_Hz.mean())
         B_rms_T = 1e-15
@@ -619,12 +811,14 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
             2 * np.pi * rng.random((len(eigenFreqs_Hz), numFields))
         )  # shape: (numFreqs, numFields)
 
-        phase_time:np.ndarray = 2 * np.pi * eigenFreqs_Hz[:, None] * timeStamp[None, :]  # shape: (numFreqs, timeLen)
+        phase_time: np.ndarray = (
+            2 * np.pi * eigenFreqs_Hz[:, None] * timeStamp[None, :]
+        )  # shape: (numFreqs, timeLen)
 
         total_phase = phase_time[:, :, None] + phases[:, None, :]
         # shape: (numFreqs, timeLen, numFields)
 
-        self.Ba = np.exp(1j * total_phase).sum(axis=0) # shape: (timeLen, numFields)
+        self.Ba = np.exp(1j * total_phase).sum(axis=0)  # shape: (timeLen, numFields)
         self.Ba *= B_rms_T
         if verbose:
             print("phases.shape", phases.shape)
@@ -646,7 +840,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         N = len(E)
 
         # tic = time.time()
-        corr= correlate(E, E.conj(), mode="full")
+        corr = correlate(E, E.conj(), mode="full")
         # toc = time.time()
         # print(f"Time taken for correlation: {toc - tic:.3f} seconds")
         fig = plt.figure(figsize=(6.0, 4.0), dpi=150)  # initialize a figure
@@ -661,7 +855,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         plt.show()
 
         check(len(corr) // 2)
-        corr = corr[len(corr)//2 :]
+        corr = corr[len(corr) // 2 :]
         g1 = corr / corr[0]
 
         fig = plt.figure(figsize=(6.0, 4.0), dpi=150)  # initialize a figure

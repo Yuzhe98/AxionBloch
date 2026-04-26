@@ -1,13 +1,13 @@
 import time
 from axionbloch.enphylope import PhysicalQuantity as PQ
 from astropy import units as unit
-from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo, loadPEMdata, earth_grav_potential_earth_center_
+from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo, earth_grav_potential_earth_center
 from axionbloch.Station import Mainz, Baltimore, Sanya
 # data = loadPEMdata()
 # print(data["radius_m"])
 
-Phui, r_unit, Phi_unit = earth_grav_potential_earth_center_()
-# print(f"Phi(r=0) = {Phui} {Phi_unit}")
+Phi, r_unit, Phi_unit = earth_grav_potential_earth_center()
+print(f"Phi(r=0) = {Phi} {Phi_unit}")
 
 halo = EarthBoundAxionHalo(
     nu_a=PQ(1.348, "MHz"),  # axion Compton frequency in Hz
