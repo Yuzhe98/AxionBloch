@@ -26,8 +26,8 @@ if not on_rtd:
         Pybind11Extension(
             "axionbloch.blochsimulation",
             [
-                "blochsimulation_ext/bloch_wrapper.cpp",
-                "blochsimulation_ext/bloch.cpp",
+                "blochSimulation_ext/bloch_wrapper.cpp",
+                "blochSimulation_ext/bloch.cpp",
             ],
             include_dirs=[pybind11.get_include()],
             extra_compile_args=extra_compile_args,
