@@ -170,7 +170,7 @@ class MagField(PhysicalObject):
         timeStamp_s = timeStep_s * np.arange(timeLen - 1)
         envelope = np.zeros_like(timeStamp_s)
 
-        envelope[ startDelayLen: ] = 0.5 * B1_T
+        envelope[startDelayLen:] = 0.5 * B1_T
 
         # excitation along x-axis
         Bx_envelope = np.multiply(
@@ -227,7 +227,7 @@ class MagField(PhysicalObject):
         envelope = np.zeros_like(timeStamp_s)
         t90Len = int(np.round(t90_s / (timeStamp_s[1] - timeStamp_s[0])))
 
-        envelope[startDelayLen:startDelayLen + t90Len] = 0.5 * B90_T
+        envelope[startDelayLen : startDelayLen + t90Len] = 0.5 * B90_T
 
         # excitation along x-axis
         Bx_envelope = np.multiply(
@@ -1160,7 +1160,11 @@ class Simulations:
                 # print(
                 #     f"simulation duration = {duration.value_in('s'):e} (s).", flush=True
                 # )
-                print(verbosePrefix + f"simu.magnet.numPt =", simu.magnet.numPt, flush=True)
+                print(
+                    verbosePrefix + f"simu.magnet.numPt =",
+                    simu.magnet.numPt,
+                    flush=True,
+                )
                 # print("simuRate =", simuRate, flush=True)
                 print(f"Number of fields = {numFields}", flush=True)
 
@@ -1183,8 +1187,8 @@ class Simulations:
                 #     "min",
                 # )
                 print(
-                    verbosePrefix + 
-                    "Estimated step runtime = "
+                    verbosePrefix
+                    + "Estimated step runtime = "
                     + f"{(t_setFields_s + t_trjry_s) / 60:.2g} min",
                     flush=True,
                 )
@@ -1207,11 +1211,19 @@ class Simulations:
                 "# ---------------------------------------------------- #", flush=True
             )
             print(
-                verbosePrefix + f"Estimated setFields time = {est_setFields_s / 60.0:.3g} min",
+                verbosePrefix
+                + f"Estimated setFields time = {est_setFields_s / 60.0:.3g} min",
                 flush=True,
             )
-            print(verbosePrefix + f"Estimated trjry time = {est_trjry_s / 60.0:.3g} min", flush=True)
-            print(verbosePrefix + f"Estimated total runtime = {est_runtime / 60.0:.3g} min", flush=True)
+            print(
+                verbosePrefix + f"Estimated trjry time = {est_trjry_s / 60.0:.3g} min",
+                flush=True,
+            )
+            print(
+                verbosePrefix
+                + f"Estimated total runtime = {est_runtime / 60.0:.3g} min",
+                flush=True,
+            )
             answer = input("Continue? (y/n): ").strip().lower()
             if answer == "y" or answer == "Y":
                 print("Proceeding...", flush=True)
@@ -1258,11 +1270,13 @@ class Simulations:
                 # for key, pq in params["key_info"].items():
                 #     print(key, "=", pq, flush=True)
                 print(
-                    verbosePrefix + f"time consumption = {timeConsumption:.6f} s = {timeConsumption/60:.1g} min",
+                    verbosePrefix
+                    + f"time consumption = {timeConsumption:.6f} s = {timeConsumption/60:.1g} min",
                     flush=True,
                 )
                 print(
-                    verbosePrefix + f"individual step time consumption = {timeConsumption/(simu.numSteps+1)/simu.excField.numFields:.3e} s",
+                    verbosePrefix
+                    + f"individual step time consumption = {timeConsumption/(simu.numSteps+1)/simu.excField.numFields:.3e} s",
                     flush=True,
                 )
             # ------------------------------------
@@ -1352,7 +1366,7 @@ class Simulations:
                 fname = self.name + "_" + giveDateAndTime()
             else:
                 fname = "simulations_" + giveDateAndTime()
-        
+
         os.makedirs(dir, exist_ok=True)
         path = os.path.join(dir, f"{fname}.pkl")
 
@@ -1472,7 +1486,7 @@ class Simulation(PhysicalObject):
         """
         verbosePrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}] "
         super().__init__()
-        self.physicalQuantities = {
+        self.quantities = {
             "RCF_freq": "Hz",
             "rate": "Hz",
             "duration": "s",
@@ -1499,11 +1513,12 @@ class Simulation(PhysicalObject):
         # get the equilibrium magnetization M0
         self.M0eqb = self.sample.getM0eqb(B_pol=self.magnet.B0, verbose=verbose)
         # normalize the magnetization by the equilibrium magnetization M0, so that init_M is dimensionless and represents the initial polarization
-        
+
         if self.sample.pol is not None:
             if init_M is not None:
                 print(
-                    verbosePrefix + "WARNING: init_M is provided, but sample polarization is set. The provided init_M will be ignored and overwritten by the value determined from the sample polarization.",
+                    verbosePrefix
+                    + "WARNING: init_M is provided, but sample polarization is set. The provided init_M will be ignored and overwritten by the value determined from the sample polarization.",
                     flush=True,
                 )
             # find the M0 by polarization
@@ -1511,7 +1526,9 @@ class Simulation(PhysicalObject):
             M0_init = self.sample.getM0(verbose=verbose)
             init_M = M0_init / self.M0eqb
         elif init_M is None:
-            init_M = PQ(1.0, "")  # default to fully polarized if neither init_M nor sample polarization is provided
+            init_M = PQ(
+                1.0, ""
+            )  # default to fully polarized if neither init_M nor sample polarization is provided
 
         self.init_M = init_M
         self.init_M_theta = init_M_theta
@@ -1984,7 +2001,7 @@ class Simulation(PhysicalObject):
         # self.trjry_mean = np.mean(
         #     self.trjry, axis=0
         # )  # or
-        if numFields > 1 and len(self.trjry)>1:
+        if numFields > 1 and len(self.trjry) > 1:
             self.trjry_mean = self.trjry.mean(axis=0)
             self.Mabs_mean = np.sqrt(
                 self.trjry[:, :, 0] ** 2 + self.trjry[:, :, 1] ** 2
@@ -2220,7 +2237,6 @@ class Simulation(PhysicalObject):
         # self.excField.B_vec.shape = (numFields, numSteps, 3)
         # self.excField.B_vec_mean.shape = (numSteps, 3)
 
-
         Mxy_magnitudes: np.ndarray = np.sqrt(
             self.trjry[:, :, 0] ** 2 + self.trjry[:, :, 1] ** 2
         )
@@ -2280,7 +2296,7 @@ class Simulation(PhysicalObject):
             plotIntv = int(1.0 * self.rate_Hz / plotRate_Hz)
 
         timeStamp_s = np.linspace(
-            start=0, stop=(self.timeLen) * self.timeStep_s, num=len(self.M_mean[:,0])
+            start=0, stop=(self.timeLen) * self.timeStep_s, num=len(self.M_mean[:, 0])
         )
         fig = plt.figure(figsize=(15 * 0.8, 7 * 0.8), dpi=150)  #
         gs = gridspec.GridSpec(nrows=2, ncols=3)  #
@@ -2313,10 +2329,18 @@ class Simulation(PhysicalObject):
             ]
         )
         # Sets = [["tab:orange", "tab:blue"],["tab:red", "tab:blue"],["tab:green", "tab:blue"],["tab:black", "tab:blue"]]
-        B_mean = [self.excField.B_vec_mean[:, 0], self.excField.B_vec_mean[:, 1], self.excField.B_vec_mean[:, 2]]
-        B_std = [self.excField.B_vec_std[:, 0], self.excField.B_vec_std[:, 1], self.excField.B_vec_std[:, 2]]
-        M_mean = [self.M_mean[:,0], self.M_mean[:,1], self.M_mean[:,2], self.Mxy_mrs]
-        M_std = [self.M_std[:,0], self.M_std[:,1], self.M_std[:,2], self.Mxy_srs]
+        B_mean = [
+            self.excField.B_vec_mean[:, 0],
+            self.excField.B_vec_mean[:, 1],
+            self.excField.B_vec_mean[:, 2],
+        ]
+        B_std = [
+            self.excField.B_vec_std[:, 0],
+            self.excField.B_vec_std[:, 1],
+            self.excField.B_vec_std[:, 2],
+        ]
+        M_mean = [self.M_mean[:, 0], self.M_mean[:, 1], self.M_mean[:, 2], self.Mxy_mrs]
+        M_std = [self.M_std[:, 0], self.M_std[:, 1], self.M_std[:, 2], self.Mxy_srs]
 
         # Force scientific notation on ticks, not as offset
         formatter = ScalarFormatter(useMathText=True)
@@ -2490,7 +2514,7 @@ class Simulation(PhysicalObject):
 
         if save_simu:
             simu_group = h5f.create_group("simulation")
-            print("self.physicalQuantities = ", self.physicalQuantities)
+            print("self.quantities = ", self.quantities)
             self.saveToH5group(group=simu_group, verbose=True)
 
             if self.trjry is not None:

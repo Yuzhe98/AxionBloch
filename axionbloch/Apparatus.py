@@ -42,7 +42,7 @@ class Magnet(PhysicalObject):
         self.numPt = numPt
         self.FWHM_T = (self.B0 * self.FWHM).value_in("T")
         # Specify all physical quantities with units
-        self.physicalQuantities = {"B0": "T", "FWHM": "", "B0_nW": "T"}
+        self.quantities = {"B0": "T", "FWHM": "", "B0_nW": "T"}
         # Specify general quantities
         self.generalQuantities = {"numPt": "float", "nFWHM": "float", "FWHM_T": "float"}
         # make sure that we use common units for quantities

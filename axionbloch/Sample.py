@@ -71,7 +71,7 @@ class Sample(PhysicalObject):
         self.temp = temp
         self.pol = pol
         # Specify all physical quantities with units
-        self.physicalQuantities = {
+        self.quantities = {
             "gamma": "Hz/T",
             "massDensity": "g/cm**3",
             "molarMass": "g/mol",

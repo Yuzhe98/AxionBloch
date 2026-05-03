@@ -15,6 +15,7 @@ from mpl_toolkits.mplot3d import proj3d
 from functools import partial
 
 from axionbloch.enphylope import PhysicalQuantity, _safe_convert
+
 # Physical constants
 from astropy import units as unit
 from astropy.constants import codata2018 as const
@@ -2128,177 +2129,6 @@ def sanCheck(var, tag: str = None):
     print("")
 
 
-def axion_lineshape(v_0_ms, v_lab_ms, nu_a_Hz, nu, case="non-grad", alpha=0.0):
-    """
-    Calculate analytical lineshapes.
-    Be careful! nu should not be too far from nu_a (compared to the axion linewidth).
-    max of nu / nu_a should be smaller than 103%
-
-    Parameters
-    ----------
-
-    Return
-    ------
-    A float array of the axion lineshape
-
-    Reference
-    ---------
-    A. Gramolin: https://github.com/gramolin/lineshape
-
-    """
-    # ----------- prepare to generate the axion lineshape ----------- #
-    # return the lineshape under certain special circumstances
-    c = 299792458.0  # Speed of light (in m/s)
-    v_0_ms, v_lab_ms = np.abs(v_0_ms), np.abs(v_lab_ms)
-    Qa = 1e6
-    FWHM = 1/Qa
-
-    full_lineshape = np.zeros(len(nu))
-    RBW = np.abs(nu[1] - nu[0])
-
-    ## Find the index of the first non-zero element
-    ## the elements in the full_lineshape before nu_a are set to zeros
-    # find the index corresponding to frequency > nu_a
-    positive_indices = np.where(nu > nu_a_Hz)[0]
-    if positive_indices.size > 0:
-        nu_a_indx = positive_indices[0]
-    # if there is no element >= nu_a, return an array of zeros
-    else:
-        return full_lineshape
-    del positive_indices
-
-    # cut off the array at ~10 axion linewidths
-    # the elements in the full_lineshape after the cutoff are set to zeros
-    cutoff_indices = np.where(nu > (1 + 10 * FWHM) * nu_a_Hz)[0]
-    if cutoff_indices.size > 0:
-        cutoff_indx = cutoff_indices[0]
-    # elsewise set the cutoff index to the last index of the array
-    else:
-        cutoff_indx = len(nu) - 1
-
-    # # if the cutoff index is right
-    # if cutoff_indx == nu_a_indx:
-    #     full_lineshape[nu_a_indx] = 1.0 / RBW
-    #     check_norm(nu, full_lineshape)
-    #     return full_lineshape
-    # ------------------- end of preparations ---------------------- #
-
-    def _axion_lineshape(v_0, v_lab, nu_a, freq, case="non-grad", alpha=0.0):
-        """
-        Calculate analytical lineshapes.
-        freq[0] > nu_a
-        freq[-1] < 103% * nu_a
-
-        Parameters
-        ----------
-
-        Return
-        ------
-        A float array of the axion lineshape
-
-        Reference
-        ---------
-        A. Gramolin: https://github.com/gramolin/lineshape
-
-        """
-        assert case in [
-            "non-grad",
-            "grad_par",
-            "grad_perp",
-        ], "Case should be 'non-grad', 'grad_par', or 'grad_perp'!"
-
-        beta = 2 * c * v_lab * np.sqrt(2 * (freq - nu_a) / nu_a) / v_0**2  # Eq. (13)
-        # WARNING:
-        # Analytically, `beta` can take very large magnitudes.
-        # However, for numerical calculations using `np.sinh(beta)`,
-        # values with |beta| >> 700 will overflow in double precision.
-        # To avoid overflow, ensure |beta| is smaller than ~700.
-        if np.max(np.abs(beta)) > 700:
-            warnings.warn(
-                "Magnitude of beta is too large for np.sinh. "
-                "Values with |beta| > 700 may overflow in double precision.",
-                RuntimeWarning,
-            )
-
-        if case == "non-grad":  # Non-gradient case, Eq. (12)
-            ax_sq_lineshape = (
-                2
-                * c**2
-                * np.exp(-((0.5 * beta * v_0 / v_lab) ** 2) - (v_lab / v_0) ** 2)
-                * np.sinh(beta)
-                / (np.sqrt(np.pi) * v_0 * v_lab * nu_a)
-            )
-        elif case == "grad_par":  # Parallel gradient case, Eq. (19)
-            factor = (
-                np.cos(alpha) ** 2
-                - (1 / np.tanh(beta) - 1.0 / beta) * (2 - 3 * np.sin(alpha) ** 2) / beta
-            )
-            ax_sq_lineshape = (
-                (4 * c**2 / (v_0**2 + 2 * (v_lab * np.cos(alpha)) ** 2))
-                * (freq / nu_a - 1)
-                * factor
-                * _axion_lineshape(v_0, v_lab, nu_a, freq)
-            )
-        elif case == "grad_perp":  # Perpendicular gradient case, Eq. (20)
-            factor = (
-                np.sin(alpha) ** 2
-                + (1.0 / np.tanh(beta) - 1.0 / beta)
-                * (2.0 - 3.0 * np.sin(alpha) ** 2)
-                / beta
-            )
-            ax_sq_lineshape = (
-                (2 * c**2 / (v_0**2 + (v_lab * np.sin(alpha)) ** 2))
-                * (freq / nu_a - 1)
-                * factor
-                * _axion_lineshape(v_0, v_lab, nu_a, freq)
-            )
-        else:
-            return np.zeros(nu.shape)
-
-        return ax_sq_lineshape
-
-    # ---------------- generate axion linshape ----------------- #
-    # if RBW is smaller than axion_linewidth / 10,
-    # then the script uses input frequencies to get the lineshape
-    if RBW <= 0.1 * FWHM * nu_a_Hz:
-        full_lineshape[nu_a_indx: cutoff_indx+1] += \
-        _axion_lineshape(v_0_ms, v_lab_ms, nu_a_Hz, nu[nu_a_indx: cutoff_indx+1], case, alpha)
-    # elsewise, use finer frequencies to get the lineshape first
-    else:
-        # chose the indices corresponding to a range
-        # within [idx(nu_a) - 1, idx(nu_a + 10 Delta nu_a)]
-        start_idx = max(0, nu_a_indx - 1)
-        freq_start = nu[start_idx]
-        freq_stop = nu[cutoff_indx]
-        _factor = np.ceil(RBW /( 0.01 * FWHM * nu_a_Hz))
-        fine_RBW = RBW / _factor
-        fine_freqs = np.arange(
-            start=freq_start, stop=freq_stop + RBW, step=fine_RBW
-        )
-        fine_lineshape = np.zeros_like(fine_freqs)
-        # find the index corresponding to frequency > nu_a
-        positive_indices = np.where(fine_freqs > nu_a_Hz)[0]
-        if positive_indices.size > 0:
-            fine_nu_a_indx = positive_indices[0]
-            # Compute finely-sampled lineshape
-            fine_lineshape[fine_nu_a_indx:] += _axion_lineshape(
-                v_0_ms, v_lab_ms, nu_a_Hz, fine_freqs[fine_nu_a_indx:], case, alpha
-            )
-            # Bin fine lineshape onto coarse grid
-            for idx in range(start_idx, cutoff_indx + 1):
-                # Find fine frequencies within this coarse bin
-                fine_indices = np.where(
-                    (fine_freqs > nu[idx]) & (fine_freqs <= nu[idx] + RBW)
-                )[0]
-                # Integrate fine lineshape over the bin and add to full_lineshape
-                full_lineshape[idx] += np.sum(fine_lineshape[fine_indices]) * fine_RBW / RBW
-            # if there is no element >= nu_a, return an array of zeros
-        del positive_indices
-    # ---------------- end of generation ----------------- #
-    check_norm(nu, full_lineshape)
-    return full_lineshape
-
-
 okabe_ito_colors = [
     "#000000",  # black
     "#E69F00",  # orange
@@ -2602,6 +2432,7 @@ def record_runtime_YorN(RECORD_RUNTIME):
     """
     A decorator to record the runtime of a function when RECORD_RUNTIME is True.
     """
+
     def record_runtime(func):
         def wrapper(*args, **kwargs):
             if RECORD_RUNTIME:
@@ -2828,18 +2659,18 @@ class PhysicalObject:
     """
 
     def __init__(self):
-        self.physicalQuantities = {}
+        self.quantities = {}
         self.generalQuantities = {}
 
     def useCommonUnits(self, verbose: bool = False):
         """
         Convert all PhysicalQuantity attributes to their common units.
-        Subclasses should define a dict `physicalQuantities` mapping attribute names
+        Subclasses should define a dict `quantities` mapping attribute names
         to desired units.
         """
-        assert hasattr(self, "physicalQuantities")
+        assert hasattr(self, "quantities")
 
-        for attr_name, unit in self.physicalQuantities.items():
+        for attr_name, unit in self.quantities.items():
             attr = getattr(self, attr_name, None)
             if isinstance(attr, PhysicalQuantity):
                 setattr(self, attr_name, _safe_convert(attr, unit))
@@ -2854,7 +2685,7 @@ class PhysicalObject:
 
         if verbose:
             print(
-                f"Converted quantities to common units: {list(self.physicalQuantities.keys())}"
+                f"Converted quantities to common units: {list(self.quantities.keys())}"
             )
 
     # def saveToH5(self, pathAndName: str, h5_group_name: str, verbose: bool = False):
@@ -2872,13 +2703,13 @@ class PhysicalObject:
         verbose: bool = False,
     ):
         """Save all PhysicalQuantity attributes to the HDF5 group."""
-        assert hasattr(self, "physicalQuantities")
+        assert hasattr(self, "quantities")
         assert hasattr(self, "generalQuantities")
 
         if verbose:
             print(
-                f"[{self.__class__.__name__}.{self.saveToH5group.__name__}] self.physicalQuantities = ",
-                self.physicalQuantities,
+                f"[{self.__class__.__name__}.{self.saveToH5group.__name__}] self.quantities = ",
+                self.quantities,
             )
             print(
                 f"[{self.__class__.__name__}.{self.saveToH5group.__name__}] self.generalQuantities = ",
@@ -2894,7 +2725,7 @@ class PhysicalObject:
             )
 
         # Save all PhysicalQuantity attributes
-        for attr_name, unit in self.physicalQuantities.items():
+        for attr_name, unit in self.quantities.items():
             attr = getattr(self, attr_name, None)
             if isinstance(attr, PhysicalQuantity):
                 save_phys_quantity(
@@ -2908,7 +2739,7 @@ class PhysicalObject:
             "str": h5py.string_dtype(encoding="utf-8"),
         }
         if verbose:
-            print("self.physicalQuantities = ", self.physicalQuantities)
+            print("self.quantities = ", self.quantities)
         for attr_name, dtype_str in self.generalQuantities.items():
             value = getattr(self, attr_name, None)
             if value is not None:
@@ -2926,11 +2757,11 @@ class PhysicalObject:
 
     def loadFromH5group(self, group):
         """
-        Load all attributes listed in self.physicalQuantities and self.generalQuantities
+        Load all attributes listed in self.quantities and self.generalQuantities
         from an HDF5 group.
         """
         # load physical quantities
-        for name, unit_expected in self.physicalQuantities.items():
+        for name, unit_expected in self.quantities.items():
 
             if name not in group:
                 raise KeyError(f"Missing PhysicalQuantity '{name}' in HDF5 group")
@@ -3046,7 +2877,7 @@ def coh_time_g1(x, dt):
     check(corr[0])
     check(corr[1])
     check(corr[2])
-    check(np.sum(np.abs(x)**2))
+    check(np.sum(np.abs(x) ** 2))
     g1 = corr / np.sum(np.abs(x) ** 2)  # positive delays only
 
     fig = plt.figure(figsize=(6.0, 4.0), dpi=150)  # initialize a figure

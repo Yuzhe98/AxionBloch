@@ -65,7 +65,7 @@ class FineGrainedAxionStream(PhysicalObject):
         self.tau_a_est = self.tau_a_est.to("s")
 
         # Specify all physical quantities with units
-        self.physicalQuantities = {
+        self.quantities = {
             "v_0": "km/s",
             "v_lab": "km/s",
             "rho_E_DM": "GeV/cm**3",
