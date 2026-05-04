@@ -37,7 +37,7 @@ print("90 degree pulse duration converted to microseconds:", t90.to(unit.microse
 # 58.71648792722992 us
 
 # ------------- numpy operations ------------- #
-
+print("\n# ------------- numpy operations ------------- #")
 # sine of an array of angles
 tStamps = np.array([0, 1 / 3, 1]) * t90
 phases = gamma_p * B * tStamps
@@ -48,3 +48,55 @@ print("phases at different time stamps:", np.sin(phases))
 speed = -220.0 * unit.km / unit.s
 print("speed:", speed)
 print("absolute value of speed:", np.abs(speed))
+
+# convert to numpy array (real signal)
+signal_list = [
+    1,
+    1,
+    54,
+    6,
+    7,
+    87,
+] * unit.milliVolt
+print("signal as a list", signal_list)
+print("np.array(signal) (unit info lost)", np.array(signal_list))
+print("np.asarray(signal) (unit info lost)", np.asarray(signal_list))
+print("np.asanyarray(signal) (unit info kept!)", np.asanyarray(signal_list))
+signal_arr = np.asanyarray(signal_list)
+print("signal array mean", signal_arr.mean())
+print("signal array std", signal_arr.std())
+print("signal array var", signal_arr.var())
+
+# convert to numpy array (complex signal)
+complex_signal_list = [
+    1 + 1j,
+    1 + 1j * 11.0,
+    54,
+    6 - 1j * 121.0,
+    7,
+    87,
+] * unit.milliVolt
+complex_signal_arr = np.asanyarray(complex_signal_list)
+print("complex signal array mean", complex_signal_arr.mean())
+print("complex signal array std", complex_signal_arr.std())
+print("complex signal array var", complex_signal_arr.var())
+print("complex signal array real", complex_signal_arr.real)
+print("complex signal array imag", complex_signal_arr.imag)
+print("complex signal array reshaped", complex_signal_arr.reshape(2, 3))
+print("complex signal array numpy.ones_like", np.ones_like(complex_signal_arr))
+print("complex signal array numpy.zeros_like", np.zeros_like(complex_signal_arr))
+
+#
+duration = 5 * unit.s
+timeStamp = np.linspace(0, duration, num=5)
+print("timeStamp", timeStamp)
+#
+try: 
+    timeStamp = np.linspace(1.23, duration, num=5)
+except Exception as exc:
+    print(
+        f"np.linspace(1.23, duration, num=5) failed because the start/stop must be a quantity (unless zero/infinity/nan)"
+    )
+    print(
+        f"error message: {exc}"
+    )
