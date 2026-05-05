@@ -1113,7 +1113,7 @@ class Simulations:
         self.all_params: list[SimuParams] = all_params
 
     def setup(self, verbose: bool = False):
-        verbosePrefix = f"[{self.__class__.__name__}.{self.setup.__name__}] "
+        logPrefix = f"[{self.__class__.__name__}.{self.setup.__name__}] "
         est_runtime = 0.0
         est_setFields_s = 0.0
         est_trjry_s = 0.0
@@ -1161,7 +1161,7 @@ class Simulations:
                 #     f"simulation duration = {duration.value_in('s'):e} (s).", flush=True
                 # )
                 print(
-                    verbosePrefix + f"simu.magnet.numPt =",
+                    logPrefix + f"simu.magnet.numPt =",
                     simu.magnet.numPt,
                     flush=True,
                 )
@@ -1187,7 +1187,7 @@ class Simulations:
                 #     "min",
                 # )
                 print(
-                    verbosePrefix
+                    logPrefix
                     + "Estimated step runtime = "
                     + f"{(t_setFields_s + t_trjry_s) / 60:.2g} min",
                     flush=True,
@@ -1198,7 +1198,7 @@ class Simulations:
         # est_runtime = 0.0
         # est_setFields_s = 0.0
         # est_trjry_s = 0.0
-        verbosePrefix = f"[{self.__class__.__name__}.{self.run.__name__}] "
+        logPrefix = f"[{self.__class__.__name__}.{self.run.__name__}] "
 
         actu_runtime = 0.0
         actu_setFields_s = 0.0
@@ -1211,17 +1211,16 @@ class Simulations:
                 "# ---------------------------------------------------- #", flush=True
             )
             print(
-                verbosePrefix
+                logPrefix
                 + f"Estimated setFields time = {est_setFields_s / 60.0:.3g} min",
                 flush=True,
             )
             print(
-                verbosePrefix + f"Estimated trjry time = {est_trjry_s / 60.0:.3g} min",
+                logPrefix + f"Estimated trjry time = {est_trjry_s / 60.0:.3g} min",
                 flush=True,
             )
             print(
-                verbosePrefix
-                + f"Estimated total runtime = {est_runtime / 60.0:.3g} min",
+                logPrefix + f"Estimated total runtime = {est_runtime / 60.0:.3g} min",
                 flush=True,
             )
             answer = input("Continue? (y/n): ").strip().lower()
@@ -1270,12 +1269,12 @@ class Simulations:
                 # for key, pq in params["key_info"].items():
                 #     print(key, "=", pq, flush=True)
                 print(
-                    verbosePrefix
+                    logPrefix
                     + f"time consumption = {timeConsumption:.6f} s = {timeConsumption/60:.1g} min",
                     flush=True,
                 )
                 print(
-                    verbosePrefix
+                    logPrefix
                     + f"individual step time consumption = {timeConsumption/(simu.numSteps+1)/simu.excField.numFields:.3e} s",
                     flush=True,
                 )
@@ -1484,7 +1483,7 @@ class Simulation(PhysicalObject):
 
 
         """
-        verbosePrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}] "
+        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}] "
         super().__init__()
         self.quantities = {
             "RCF_freq": "Hz",
@@ -1517,7 +1516,7 @@ class Simulation(PhysicalObject):
         if self.sample.pol is not None:
             if init_M is not None:
                 print(
-                    verbosePrefix
+                    logPrefix
                     + "WARNING: init_M is provided, but sample polarization is set. The provided init_M will be ignored and overwritten by the value determined from the sample polarization.",
                     flush=True,
                 )
