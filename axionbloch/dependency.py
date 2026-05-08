@@ -18,16 +18,21 @@ from astropy.constants import codata2018 as const
 
 # dimensionless scale units
 # parts per million
-ppm = unit.def_unit("ppm", 1e-6 * unit.dimensionless_unscaled)
+ppm = unit.def_unit("ppm", 1e-6 * unit.one)
 # parts per billion
-ppb = unit.def_unit("ppb", 1e-9 * unit.dimensionless_unscaled)
+ppb = unit.def_unit("ppb", 1e-9 * unit.one)
 # parts per trillion
-ppt = unit.def_unit("ppt", 1e-12 * unit.dimensionless_unscaled)
+ppt = unit.def_unit("ppt", 1e-12 * unit.one)
 # parts per quadrillion
-ppq = unit.def_unit("ppq", 1e-15 * unit.dimensionless_unscaled)
+ppq = unit.def_unit("ppq", 1e-15 * unit.one)
 # parts per quintillion
-ppqu = unit.def_unit("ppqu", 1e-18 * unit.dimensionless_unscaled)
+ppqu = unit.def_unit("ppqu", 1e-18 * unit.one)
 # parts per sextillion
-ppmu = unit.def_unit("ppmu", 1e-21 * unit.dimensionless_unscaled)
+ppmu = unit.def_unit("ppmu", 1e-21 * unit.one)
 # parts per septillion
-ppbmu = unit.def_unit("ppbmu", 1e-24 * unit.dimensionless_unscaled)
+ppbmu = unit.def_unit("ppbmu", 1e-24 * unit.one)
+
+# Magnetic flux quantum
+Phi0 = magnetic_flux_quantum = unit.def_unit(
+    "magnetic_flux_quantum", 1.0 * const.h / (2 * const.e)
+)

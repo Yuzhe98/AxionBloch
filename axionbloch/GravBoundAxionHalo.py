@@ -31,6 +31,7 @@ class GravBoundAxionHalo:
 
     # Map l to labels (s, p, d, f, ...)
     orbitalLabels = ["s", "p", "d", "f", "g", "h", "i", "k", "l", "m"]
+    pot: Quantity
 
     def __init__(
         self,
@@ -69,9 +70,9 @@ class GravBoundAxionHalo:
         Phi_func, r_unit, Phi_unit = getPot()
         # TODO: Try also to use the infinity as the reference point
         # gravitational potential
-        self.pot: Quantity = (
-            self.ma * Phi_func((self.r / r_unit).to_value(unit.one)) * Phi_unit
-        )  # convert r to meter for potential function
+        self.pot: Quantity = self.ma * np.asarray(
+            Phi_func((self.r / r_unit).to_value(unit.one))
+        ) * Phi_unit  # convert r to meter for potential function
 
         self.mass_enclosed: Quantity = mass_enclosed
         self.g_aNN: Quantity = g_aNN
@@ -105,19 +106,22 @@ class GravBoundAxionHalo:
         # TODO: check the units and the constants. I do not think we are safe with the equations here.
         # I believe if we set V and T units correctly, everthing should be fine then.
         # Parameters
-        Veff: Quantity = self.pot + l * (l + 1) * const.hbar**2 / (2 * self.ma * self.r**2)
+        Veff = Quantity(self.pot + l * (l + 1) * const.hbar**2 / (
+            2 * self.ma * self.r**2
+        ))
         Veff = Veff.to(self.pot.unit)
-
+        check(self.pot.unit)
+        check(Veff[0].to("eV"))
         # ----------------- start of dimensionless computation ---------------- #
         # Kinetic energy operator
         main = -2.0 * np.ones(self.N)
         off = 1.0 * np.ones(self.N - 1)
 
         lap = diags([off, main, off], [-1, 0, 1])
-        T = -1 * self.T_magnitude.value * lap
+        T = -1 * self.T_magnitude.to_value(self.pot.unit) * lap
 
         # Hamiltonian
-        H = T + diags(Veff.value, 0)
+        H = T + diags(Veff.to_value(self.pot.unit), 0)
 
         H_dense = H.toarray()
 
@@ -128,6 +132,7 @@ class GravBoundAxionHalo:
         if verbose:
             print(f"N={self.N} l={l} Eigensolver took {toc - tic:.3f} seconds")
         # ----------------- end of dimensionless computation ---------------- #
+        
         if verbose:
             print("Eigen-energies in eV:")
             print("[")
@@ -139,12 +144,12 @@ class GravBoundAxionHalo:
         start_index = self.N // 2 + 5  # avoid r=0 singularity
         # print("Kinetic-energies in eV:")
         # print("[")
-        
+
         if l == 0:
             iter_range = np.arange(max_n_r)
         else:
             iter_range = np.arange(2 * max_n_r)[::2]
-        
+
         for i, _n_r in enumerate(iter_range):
 
             u_r = states[:, _n_r]
