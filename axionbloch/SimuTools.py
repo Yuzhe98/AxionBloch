@@ -1212,9 +1212,11 @@ class Simulations:
             )
             print(
                 logPrefix + f"Estimated trjry time = {est_trjry_s / 60.0:.3g} min",
+                logPrefix + f"Estimated trjry time = {est_trjry_s / 60.0:.3g} min",
                 flush=True,
             )
             print(
+                logPrefix + f"Estimated total runtime = {est_runtime / 60.0:.3g} min",
                 logPrefix
                 + f"Estimated total runtime = {est_runtime / 60.0:.3g} min",
                 flush=True,

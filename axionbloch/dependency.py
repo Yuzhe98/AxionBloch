@@ -29,35 +29,4 @@ ppqu = unit.def_unit("ppqu", 1e-18 * unit.one)
 # parts per sextillion
 ppmu = unit.def_unit("ppmu", 1e-21 * unit.one)
 # parts per septillion
-ppbmu = unit.def_unit("ppbmu", 1e-24 * unit.one)
-
-# Magnetic flux quantum
-Phi0 = magnetic_flux_quantum = unit.def_unit(
-    "magnetic_flux_quantum", 1.0 * const.h / (2 * const.e)
-)
-# ----------- ---------------------------- ----------- #
-
-# --------------- plotting --------------- #
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec  # for creating subplots
-import matplotlib.ticker as mticker
-from matplotlib.axes import Axes
-
-# plot style
-plt.rc("font", size=6)  # font size for all figures
-# plt.rcParams['font.family'] = 'serif'
-# plt.rcParams['font.serif'] = ['Times New Roman']
-# plt.rcParams["font.family"] = "Times New Roman"
-# plt.rcParams['mathtext.fontset'] = 'dejavuserif'
-
-# Make math text match Times New Roman
-plt.rcParams["mathtext.fontset"] = "cm"
-plt.rcParams["mathtext.rm"] = "Times New Roman"
-
-plt.rcParams["lines.linewidth"] = 1.0  # thickness of lines
-plt.rcParams["lines.markersize"] = 1.5  # size of markers
-plt.rcParams["lines.markeredgewidth"] = 1.5  # marker edge width
-
-plt.rcParams["figure.dpi"] = 300  # resolution on screen
-plt.rcParams["savefig.dpi"] = 300  # resolution when saving
-# --------------- -------- --------------- #
+ppbmu = unit.def_unit("ppbmu", 1e-24 * unit.dimensionless_unscaled)

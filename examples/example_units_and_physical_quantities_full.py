@@ -4,14 +4,14 @@ from axionbloch.utils import Lorentzian
 
 # dimensionless quantities with python scalars
 # create dimensionless Quantity objects so adding to scalars works
-a = 1.0 + 1.0 * unit.one + 1.0 * unit.dimensionless_unscaled
+a = 1.0 + 1.0 * unit.one + 1.0 * unit.one
 print("dimensionless quantities with python scalars:")
 print(a)
 # 3.0
 
 # linewidth in units of ppm / ppb / ppt
 # create dimensionless Quantity objects so adding to scalars works
-linewidth = 1.0e-6 + 1.0 * ppm + 1.0e-6 * unit.dimensionless_unscaled
+linewidth = 1.0e-6 + 1.0 * ppm + 1.0e-6 * unit.one
 print("linewidth in ppm:", linewidth.to(ppm))
 # 3.0 ppm
 
@@ -94,6 +94,8 @@ print("complex signal array numpy.zeros_like", np.zeros_like(complex_signal_arr)
 
 # numpy linspace
 print("\nnp.linspace with Quantity:")
+print("complex signal array value", complex_signal_arr.value)
+#
 duration = 5 * unit.s
 timeStamp = np.linspace(0, duration, num=5)
 print("timeStamp", timeStamp)
@@ -144,3 +146,10 @@ B_space = np.random.random(100) * unit.T
 hist, bin_edges = np.histogram(B_space)
 print("histogram counts:", hist)
 print("histogram bin edges:", bin_edges)
+mag_flux= 1 * magnetic_flux_quantum
+print("electron charge", (1 * const.e).to(unit.coulomb))
+print("magnetic_flux_quantum unit:", magnetic_flux_quantum)
+print("magnetic flux:", mag_flux)
+print("magnetic flux.to(unit.Wb):", mag_flux.to(unit.Wb))
+
+
