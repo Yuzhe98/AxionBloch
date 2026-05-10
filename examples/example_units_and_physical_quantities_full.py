@@ -36,6 +36,11 @@ B = 1.0 * unit.gauss
 print("magnetic field in SI units:", B.si)
 # 0.0001 T
 
+mag_flux = 1 * magnetic_flux_quantum
+print("electron charge", (1 * const.e).to(unit.coulomb))
+print("magnetic_flux_quantum unit:", magnetic_flux_quantum)
+print("magnetic flux:", mag_flux)
+print("magnetic flux.to(unit.Wb):", mag_flux.to(unit.Wb))
 
 # find the 90 degree pulse duration
 t90 = 0.5 * np.pi * unit.radian / (gamma_p * B)
@@ -146,10 +151,3 @@ B_space = np.random.random(100) * unit.T
 hist, bin_edges = np.histogram(B_space)
 print("histogram counts:", hist)
 print("histogram bin edges:", bin_edges)
-mag_flux= 1 * magnetic_flux_quantum
-print("electron charge", (1 * const.e).to(unit.coulomb))
-print("magnetic_flux_quantum unit:", magnetic_flux_quantum)
-print("magnetic flux:", mag_flux)
-print("magnetic flux.to(unit.Wb):", mag_flux.to(unit.Wb))
-
-
