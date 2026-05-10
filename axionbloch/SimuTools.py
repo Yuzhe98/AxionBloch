@@ -1,13 +1,9 @@
 import os
-from typing import Optional
-
-import numpy as np
 import time
 
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-from matplotlib.ticker import ScalarFormatter, FuncFormatter
+from axionbloch.dependency import *
 
+from matplotlib.ticker import ScalarFormatter
 from mpl_toolkits.mplot3d import Axes3D  # for type hinting
 
 from scipy.stats import uniform, expon
@@ -27,7 +23,6 @@ from axionbloch.utils import (
 )
 
 # from axionbloch.DataAnalysis import Signal
-from axionbloch.enphylope import PhysicalQuantity as PQ
 from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet
 from axionbloch.SimuTypes import SimuParams, SimuEntry
@@ -397,7 +392,7 @@ class MagField(PhysicalObject):
             frequencies = np.linspace(
                 -0.5 / timeStep, 0.5 / timeStep, num=timeLen, endpoint=True
             )
-            lineshape = axion_lineshape(
+            lineshape = MilkyWayAxionHalo.axion_lineshape(
                 v_0_ms=220e3,
                 v_lab_ms=233e3,
                 nu_a_Hz=nu_a_rot_Hz + RCF_freq_Hz,
@@ -1113,7 +1108,7 @@ class Simulations:
         self.all_params: list[SimuParams] = all_params
 
     def setup(self, verbose: bool = False):
-        verbosePrefix = f"[{self.__class__.__name__}.{self.setup.__name__}] "
+        logPrefix = f"[{self.__class__.__name__}.{self.setup.__name__}] "
         est_runtime = 0.0
         est_setFields_s = 0.0
         est_trjry_s = 0.0
@@ -1131,7 +1126,7 @@ class Simulations:
             rate = params["rate"]
             duration = params["duration"]
 
-            RCF_freq: PQ = axion.nu_a_eff
+            RCF_freq: Quantity = axion.nu_a_eff
 
             use_stoch = True
 
@@ -1161,7 +1156,7 @@ class Simulations:
                 #     f"simulation duration = {duration.value_in('s'):e} (s).", flush=True
                 # )
                 print(
-                    verbosePrefix + f"simu.magnet.numPt =",
+                    logPrefix + f"simu.magnet.numPt =",
                     simu.magnet.numPt,
                     flush=True,
                 )
@@ -1187,7 +1182,7 @@ class Simulations:
                 #     "min",
                 # )
                 print(
-                    verbosePrefix
+                    logPrefix
                     + "Estimated step runtime = "
                     + f"{(t_setFields_s + t_trjry_s) / 60:.2g} min",
                     flush=True,
@@ -1198,7 +1193,7 @@ class Simulations:
         # est_runtime = 0.0
         # est_setFields_s = 0.0
         # est_trjry_s = 0.0
-        verbosePrefix = f"[{self.__class__.__name__}.{self.run.__name__}] "
+        logPrefix = f"[{self.__class__.__name__}.{self.run.__name__}] "
 
         actu_runtime = 0.0
         actu_setFields_s = 0.0
@@ -1211,16 +1206,16 @@ class Simulations:
                 "# ---------------------------------------------------- #", flush=True
             )
             print(
-                verbosePrefix
+                logPrefix
                 + f"Estimated setFields time = {est_setFields_s / 60.0:.3g} min",
                 flush=True,
             )
             print(
-                verbosePrefix + f"Estimated trjry time = {est_trjry_s / 60.0:.3g} min",
+                logPrefix + f"Estimated trjry time = {est_trjry_s / 60.0:.3g} min",
                 flush=True,
             )
             print(
-                verbosePrefix
+                logPrefix
                 + f"Estimated total runtime = {est_runtime / 60.0:.3g} min",
                 flush=True,
             )
@@ -1256,9 +1251,7 @@ class Simulations:
                 RCF_freq_Hz=simu.RCF_freq_Hz,
                 numFields=params["numFields"],
                 rand_seed=params["rand_seed"],
-                B_a_rms_T=params["B_a_rms"].value_in(
-                    "T"
-                ),  # rms amplitude of the pseudo-magnetic field in [T]
+                B_a_rms_T=params["B_a_rms"].to_value(unit.T),  # rms amplitude of the pseudo-magnetic field in [T]
                 makePlot=False,
                 verbose=False,
             )
@@ -1270,12 +1263,12 @@ class Simulations:
                 # for key, pq in params["key_info"].items():
                 #     print(key, "=", pq, flush=True)
                 print(
-                    verbosePrefix
+                    logPrefix
                     + f"time consumption = {timeConsumption:.6f} s = {timeConsumption/60:.1g} min",
                     flush=True,
                 )
                 print(
-                    verbosePrefix
+                    logPrefix
                     + f"individual step time consumption = {timeConsumption/(simu.numSteps+1)/simu.excField.numFields:.3e} s",
                     flush=True,
                 )
@@ -1443,18 +1436,18 @@ class Simulation(PhysicalObject):
     # NMR simulation in the rotating frame
     def __init__(
         self,
-        name: Optional[str] = "NMR simulation",
-        axion: Optional[MilkyWayAxionHalo] = None,
-        sample: Optional[Sample] = None,
-        magnet: Optional[Magnet] = None,
-        excField: Optional[MagField] = None,
-        station: Optional[Station] = None,
-        init_M: Optional[PQ] = None,  # initial magnetization vector amplitude
-        init_M_theta: Optional[PQ] = PQ(0, "rad"),
-        init_M_phi: Optional[PQ] = PQ(0, "rad"),
-        RCF_freq: Optional[PQ] = None,
-        rate: Optional[PQ] = None,  # simulation rate
-        duration: Optional[PQ] = None,  # simulation duration
+        name: str | None = "NMR simulation",
+        axion: MilkyWayAxionHalo | None = None,
+        sample: Sample | None = None,
+        magnet: Magnet | None = None,
+        excField: MagField | None = None,
+        station: Station | None = None,
+        init_M: Quantity | None = None,  # initial magnetization vector amplitude
+        init_M_theta: Quantity | None = 0 * unit.rad,
+        init_M_phi: Quantity | None = 0 * unit.rad,
+        RCF_freq: Quantity | None = None,
+        rate: Quantity | None = None,  # simulation rate
+        duration: Quantity | None = None,  # simulation duration
         verbose: bool = False,
     ):
         """
@@ -1484,7 +1477,7 @@ class Simulation(PhysicalObject):
 
 
         """
-        verbosePrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}] "
+        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}] "
         super().__init__()
         self.quantities = {
             "RCF_freq": "Hz",
@@ -1508,7 +1501,7 @@ class Simulation(PhysicalObject):
         self.excField = excField
 
         #
-        self.gamma_HzToT = self.sample.gamma.value_in("Hz/T")
+        self.gamma_HzToT = self.sample.gamma.to_value(unit.Hz / unit.T)
 
         # get the equilibrium magnetization M0
         self.M0eqb = self.sample.getM0eqb(B_pol=self.magnet.B0, verbose=verbose)
@@ -1517,7 +1510,7 @@ class Simulation(PhysicalObject):
         if self.sample.pol is not None:
             if init_M is not None:
                 print(
-                    verbosePrefix
+                    logPrefix
                     + "WARNING: init_M is provided, but sample polarization is set. The provided init_M will be ignored and overwritten by the value determined from the sample polarization.",
                     flush=True,
                 )
@@ -1526,19 +1519,17 @@ class Simulation(PhysicalObject):
             M0_init = self.sample.getM0(verbose=verbose)
             init_M = M0_init / self.M0eqb
         elif init_M is None:
-            init_M = PQ(
-                1.0, ""
-            )  # default to fully polarized if neither init_M nor sample polarization is provided
+            init_M = 1.0 * unit.dimensionless_unscaled  # default to fully polarized if neither init_M nor sample polarization is provided
 
         self.init_M = init_M
         self.init_M_theta = init_M_theta
         self.init_M_phi = init_M_phi
 
-        self.init_M_amp = init_M.value_in("")
-        self.init_M_theta_rad = init_M_theta.value_in("rad")
-        self.init_M_phi_rad = init_M_phi.value_in("rad")
+        self.init_M_amp = init_M.to_value(unit.dimensionless_unscaled)
+        self.init_M_theta_rad = init_M_theta.to_value(unit.rad)
+        self.init_M_phi_rad = init_M_phi.to_value(unit.rad)
 
-        self.B0z_T = magnet.B0.value_in("T")
+        self.B0z_T = magnet.B0.to_value(unit.T)
 
         # TODO：be more smart in setting rate and duration
         # set rotating frame frequency
@@ -1546,39 +1537,41 @@ class Simulation(PhysicalObject):
             self.RCF_freq = self.sample.gamma / (2 * np.pi) * self.magnet.B0
         else:
             self.RCF_freq = RCF_freq
-        self.RCF_freq_Hz = self.RCF_freq.value_in("Hz")
+        self.RCF_freq_Hz = self.RCF_freq.to_value(unit.Hz)
 
         self.nuL_Hz = (
             abs(self.gamma_HzToT * self.B0z_T / (2 * np.pi)) - self.RCF_freq_Hz
         )  # nuL_Hz is the Larmor frequency of the magnetization in the rotating frame
 
-        self.T2_s = sample.T2.value_in("s")
-        self.T1_s = sample.T1.value_in("s")
+        self.T2_s = sample.T2.to_value(unit.s)
+        self.T1_s = sample.T1.to_value(unit.s)
 
         self.trjry = None
 
         # ---------------------------- set duration ----------------------------#
-        FWHM_Hz = self.magnet.FWHM_T * sample.gamma.value_in("Hz/T") / (2 * np.pi)
+        FWHM_Hz = self.magnet.FWHM_B0 * sample.gamma.to_value(unit.Hz / unit.T) / (2 * np.pi)
         # find Tdelta
         self.Tdelta_s = 1 / (np.pi * FWHM_Hz)
-        self.T2star_s = 1 / (1 / self.Tdelta_s + 1 / sample.T2.value_in("s"))
+        self.T2star_s = 1 / (1 / self.Tdelta_s + 1 / sample.T2.to_value(unit.s))
 
         if duration is None:
             if self.axion is not None:
                 self.duration_s = np.amin(
-                    [3.2e3 * self.axion.tau_a_est.value_in("s"), 1.5e2 * self.T2star_s]
+                    [3.2e3 * self.axion.tau_a_est.to_value(unit.s), 1.5e2 * self.T2star_s]
                 )
             else:
                 self.duration_s = 2e2 * self.T2star_s
-            self.duration = PQ(self.duration_s, "s")
+            self.duration = self.duration_s * unit.s
         else:
             self.duration = duration
-            self.duration_s = self.duration.value_in("s")
+            self.duration_s = self.duration.to_value(unit.s)
         # ---------------------------------------------------------------------------- #
 
         # -----------------------------set magnet--------------------------------------- #
         # estimate the necessary data points for sampling the inhomogeneity
-        numPt: float = (self.duration * 2 * magnet.B0_nW * sample.gamma).value_in("")
+        numPt: float = (
+            self.duration * 2 * magnet.B0_nW_T * sample.gamma.to_value(unit.Hz / unit.T)
+        ).to_value(unit.dimensionless_unscaled)
         if numPt <= 1:
             numPt = 1
         else:
@@ -1595,11 +1588,11 @@ class Simulation(PhysicalObject):
         # ---------------------------- simulation rate ----------------------------#
         T2star_relaxation_rate_Hz = 1 / self.T2star_s
         if self.axion is not None:
-            axion_decoherence_rate_Hz = 1 / self.axion.tau_a_est.value_in("s")
+            axion_decoherence_rate_Hz = 1 / self.axion.tau_a_est.to_value(unit.s)
         else:
             axion_decoherence_rate_Hz = 0.0
         nuL_vals_Hz = (
-            sample.gamma.value_in("Hz/T") / (2 * np.pi) * magnet.B_vals_T
+            sample.gamma.to_value(unit.Hz / unit.T) / (2 * np.pi) * magnet.B_vals_T
             - self.RCF_freq_Hz
         )
         nuL_Hz_abs_max = np.amax(np.abs(nuL_vals_Hz))
@@ -1614,7 +1607,7 @@ class Simulation(PhysicalObject):
                     100.0 * axion_decoherence_rate_Hz,
                 ]
             )
-            rate = PQ(rate_Hz, "Hz")
+            rate = rate_Hz * unit.Hz
         self.setRate(rate=rate)
         # -------------------------------------------------------------------------#
 
@@ -1625,7 +1618,7 @@ class Simulation(PhysicalObject):
             self.magnet.numPt
             < 2
             * self.magnet.nFWHM
-            * self.magnet.FWHM_T
+            * self.magnet.FWHM_B0
             * self.gamma_HzToT
             * self.duration_s
         ):
@@ -1653,10 +1646,10 @@ class Simulation(PhysicalObject):
             )
         # ----- ----------------------------------------------------- -----#
 
-    def setRate(self, rate: PQ):
+    def setRate(self, rate: Quantity):
         assert rate is not None, f"[{self.setRate.__name__}] rate is None"
         self.rate = rate
-        self.rate_Hz = rate.value_in("Hz")
+        self.rate_Hz = rate.to_value(unit.Hz)
         self.timeStep_s = (
             1.0 / self.rate_Hz
         )  # the key parameter in setting simulation timing
@@ -1672,11 +1665,11 @@ class Simulation(PhysicalObject):
 
         # compute the maximum of (absolute) Larmor frequencies
         nuL_Hz_max = (
-            self.gamma_HzToT / (2 * np.pi) * self.magnet.B_vals_T.max()
+            self.gamma_HzToT / (2 * np.pi) * self.magnet.B_spread.max()
             - self.RCF_freq_Hz
         )
         nuL_Hz_min = (
-            self.gamma_HzToT / (2 * np.pi) * self.magnet.B_vals_T.min()
+            self.gamma_HzToT / (2 * np.pi) * self.magnet.B_spread.min()
             - self.RCF_freq_Hz
         )
         nuL_Hz_abs_max = max(abs(nuL_Hz_max), abs(nuL_Hz_min))
@@ -1702,7 +1695,7 @@ class Simulation(PhysicalObject):
             print(f"{self.suggestRate.__name__}: resolution bandwidth (RBW) = {RBW} Hz")
         # from experience, simulation rate should be 20 times greater than the max. of signal frequency in the rotating frame
         rate_Hz = np.amax([21 * nuL_Hz_abs_max, 10 * T2Rate, 10 * RBW])
-        return PQ(rate_Hz, "Hz")
+        return rate_Hz * unit.Hz
 
     def getTimeStamp(self):
         return np.arange(
@@ -1766,7 +1759,7 @@ class Simulation(PhysicalObject):
             self.excField.dBdt_vec,
             self.magnet.B_vals_T,
             self.magnet.ratios,
-            self.sample.gamma.value_in("Hz/T"),
+            self.sample.gamma.to_value(unit.Hz / unit.T),
             self.timeStep_s,
             self.T1_s,
             self.T2_s,

@@ -6,6 +6,7 @@
 # pytest tests/test_MilkyWayAxionHalo.py -k "initialization or RabiFreq" -q -s
 import os
 import time
+import warnings
 
 import pytest
 
@@ -24,11 +25,12 @@ import pytest
 # from astropy.constants import codata2018 as const
 
 from axionbloch.dependency import *
-from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo, axion_lineshape
+from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
+from axionbloch.utils import check_norm, check
 
-PRINT_RESULTS = os.getenv("NUMPY_PERF_PRINT_RESULTS", "0") == "1"
-SEED = int(os.getenv("NUMPY_PERF_SEED", "42"))
-
+PRINT_RESULTS = os.getenv("PRINT_RESULTS", "0") == "1"
+SEED = int(os.getenv("SEED", "42"))
+NUM_FIELD = int(os.getenv("NUM_FIELD", "1000"))
 
 def test_MilkyWayAxionHalo_initialization():
     # TODO: test illegal units for parameters
@@ -92,20 +94,6 @@ def test_MilkyWayAxionHalo_initialization():
     assert len(errors) == 1, f"Expected 1 error due to missing nu_a and m_a, but got {len(errors)} errors: {errors}"
 
 
-# def test_MilkyWayAxionHalo_initialization_minimum_info():
-#     axion = MilkyWayAxionHalo(
-#         name="Milky Way Axion Halo",
-#         nu_a=PhysicalQuantity(1.0e6, "Hz"),
-#         g_aNN=PhysicalQuantity(1.0e-9, "GeV**(-1)"),
-#         Qa=None,
-#         v_0=PhysicalQuantity(220.0, "km/s"),
-#         v_lab=PhysicalQuantity(233.0, "km/s"),
-#         windAngle=None,
-#         rho_E_DM=PhysicalQuantity(0.3, "GeV/cm**3"),
-#         verbose=PRINT_RESULTS,
-#     )
-
-
 # def test_MilkyWayAxionHalo_initialization():
 #     # parameters_all = []
 #     # param_minimum_infor =
@@ -137,9 +125,180 @@ def test_MilkyWayAxionHalo_initialization():
 #     spec = axion.getAmpSpectra(frequencies=frequencies, verbose=True)
 #     print(spec.shape)
 
+def test_getRabiFreq():
+    rabi_freq = MilkyWayAxionHalo.getRabiFreq(gaNN=1e-9 * unit.GeV**(-1), verbose=PRINT_RESULTS)
+    assert rabi_freq.unit.is_equivalent(unit.Hz), f"Expected Rabi frequency to have units of Hz, but got {rabi_freq.unit}"
+    assert np.isfinite(rabi_freq.value), f"Expected Rabi frequency to be finite, but got {rabi_freq.value}"
+
+
+def test_check_norm_with_quantities():
+    x = np.array([0.0, 1.0, 2.0]) * unit.Hz
+    y = np.array([0.0, 1.0, 0.0]) / unit.Hz
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        check_norm(x, y)
+
+    assert caught == []
+
+    with pytest.warns(UserWarning):
+        check_norm(x, 2.0 * y)
+
+
+def test_check_norm_with_values():
+    x = np.array([0.0, 1.0, 2.0]) 
+    y = np.array([0.0, 1.0, 0.0])
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        check_norm(x, y)
+
+    assert caught == []
+
+    with pytest.warns(UserWarning):
+        check_norm(x, 2.0 * y)
+
+
 def test_axion_lineshape():
     """
     For testing axion_lineshape(). 
     """
-    
-    pass
+    nu_a = 1 * unit.MHz
+    v_0 = 220.0 * unit.km / unit.s
+    v_lab = 233.0 * unit.km / unit.s
+
+    frequency_arrays = [
+        # case 0: frequencies < nu_a
+        np.linspace(0.9e6, 0.99e6, 300) * unit.Hz,
+        # case 1: fine RBW = 0.05 Hz
+        np.linspace(1.0e6 - 10.0, 1.0e6 + 10.0, 1000) * unit.Hz,
+        # case 2: coarse RBW = 0.5 Hz
+        np.linspace(1.0e6 - 10.0, 1.0e6 + 10.0, 40) * unit.Hz,
+        # case 3: max frequencies >> 10 axion linewidths
+        np.linspace(1.0e6 - 10.0, 1.0e6 + 1.0e3, 500) * unit.Hz,
+    ]
+
+    spectra = [
+        MilkyWayAxionHalo.axion_lineshape(
+            v_0=v_0,
+            v_lab=v_lab,
+            nu_a=nu_a,
+            nu=frequencies,
+            case="grad_perp",
+            alpha=0.0 * unit.rad,
+            verbose=PRINT_RESULTS,
+        )
+        for frequencies in frequency_arrays
+    ]
+
+    for frequencies, spectrum in zip(frequency_arrays, spectra):
+        assert spectrum.shape == frequencies.shape
+        assert spectrum.unit.is_equivalent(unit.Hz**-1)
+        assert np.all(np.isfinite(spectrum.value))
+        # the spectrum should be zero for frequencies < nu_a
+        # (allow the boundary frequency closest to nu_a to be non-zero)
+        mask = frequencies <= nu_a
+        if np.any(mask):
+            # Set the last True (boundary frequency) to False
+            mask[np.where(mask)[0][-1]] = False
+        # Assert spectrum is zero where mask is True (all frequencies < nu_a except boundary)
+        assert np.all(spectrum[mask] == 0 / unit.Hz)
+
+    assert np.all(spectra[0] == 0)
+
+def test_getAmpSpectra_stochastic():
+    """Test that without stochasticity, |ampSpectra|^2 integrates to 1."""
+
+    nu_a = 1 * unit.MHz
+    v_0 = 220.0 * unit.km / unit.s
+    v_lab = 233.0 * unit.km / unit.s
+    frequencies = np.linspace(-10, 100, 2000) * unit.Hz + 1 * unit.MHz
+
+    axion = MilkyWayAxionHalo(
+        name="Milky Way Axion Halo",
+        nu_a=nu_a,
+        g_aNN=1.0e-9 * unit.GeV ** (-1),
+        Qa=None,
+        v_0=v_0,
+        v_lab=v_lab,
+        windAngle=None,
+        rho_E_DM=0.3 * unit.GeV / unit.cm**3,
+        verbose=False,
+    )
+
+    # Get amplitude spectra without stochasticity
+    ampSpectra = axion.getAmpSpectra(
+        frequencies=frequencies,
+        numSpectra=NUM_FIELD,
+        use_stoch=True,
+        rand_seed=SEED,
+        verbose=PRINT_RESULTS,
+    )
+
+    # ampSpectra has shape (numSpectra, len(frequencies)); 
+    # each row is one spectrum.
+
+    assert ampSpectra.shape == (NUM_FIELD, frequencies.shape[0])
+    assert ampSpectra.unit.is_equivalent(unit.Hz ** (-0.5))
+    assert np.all(np.isfinite(ampSpectra.value))
+
+    # Compute intensity |ampSpectra|^2
+    PSD = np.abs(ampSpectra) ** 2
+
+    # Integrate each spectrum over frequency, then average the results.
+    integral = np.trapezoid(PSD, frequencies, axis=1)
+    integral_mean = np.mean(integral)
+    if PRINT_RESULTS:
+        print(f"mean integral of |ampSpectra|^2: {integral_mean:.6f}")
+
+    # Assert integral is close to 1 with reasonable tolerance
+    assert np.isclose(integral_mean.to_value(unit.one), 1.0, rtol=1e-2)
+
+
+def test_getAmpSpectra_deterministic():
+    """Test that without stochasticity, |ampSpectra|^2 integrates to 1."""
+    nu_a = 1 * unit.MHz
+    v_0 = 220.0 * unit.km / unit.s
+    v_lab = 233.0 * unit.km / unit.s
+    frequencies = np.linspace(-10, 100, 2000) * unit.Hz + 1 * unit.MHz
+
+    axion = MilkyWayAxionHalo(
+        name="Milky Way Axion Halo",
+        nu_a=nu_a,
+        g_aNN=1.0e-9 * unit.GeV ** (-1),
+        Qa=None,
+        v_0=v_0,
+        v_lab=v_lab,
+        windAngle=None,
+        rho_E_DM=0.3 * unit.GeV / unit.cm**3,
+        verbose=False,
+    )
+
+    # Get amplitude spectra without stochasticity
+    ampSpectra = axion.getAmpSpectra(
+        frequencies=frequencies,
+        numSpectra=1,
+        use_stoch=False,
+        rand_seed=SEED,
+        verbose=PRINT_RESULTS,
+    )
+
+    # Note: ampSpectra has shape (numSpectra, len(frequencies)) = (1, len(frequencies))
+    # Extract the first spectrum to get shape (len(frequencies),)
+    ampSpectra = ampSpectra[0]
+
+    assert ampSpectra.shape == frequencies.shape
+    assert ampSpectra.unit.is_equivalent(unit.Hz ** (-0.5))
+    assert np.all(np.isfinite(ampSpectra.value))
+
+    # Compute intensity |ampSpectra|^2
+    PSD = np.abs(ampSpectra) ** 2
+
+    # Integrate intensity over frequency (should equal 1 since PSD integrates to 1)
+    integral = np.trapezoid(PSD, frequencies)
+
+    if PRINT_RESULTS:
+        print(f"Integral of |ampSpectra|^2: {integral:.6f}")
+
+    # Assert integral is close to 1 with reasonable tolerance
+    assert np.isclose(integral.to_value(unit.one), 1.0, rtol=1e-3)

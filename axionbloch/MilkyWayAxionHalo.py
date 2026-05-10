@@ -1,7 +1,7 @@
 import warnings
 
 from axionbloch.dependency import *
-from axionbloch.utils import PhysicalObject
+from axionbloch.utils import PhysicalObject, check, check_norm
 
 
 class MilkyWayAxionHalo(PhysicalObject):
@@ -14,7 +14,7 @@ class MilkyWayAxionHalo(PhysicalObject):
     # axion mass
     m_a: Quantity[unit.kg]
     # axion-nucleon coupling strength
-    g_aNN: Quantity[unit.GeV**(-1)]
+    g_aNN: Quantity[unit.GeV ** (-1)]
     # axion quality factor
     Qa: Quantity[unit.one]
     # Local (@ solar radius) galaxy circular rotation speed
@@ -28,6 +28,7 @@ class MilkyWayAxionHalo(PhysicalObject):
     rho_E_DM: Quantity[unit.GeV / unit.cm**3] = 0.3 * unit.GeV / unit.cm**3
     nu_a_eff: Quantity[unit.Hz]
     tau_a_est: Quantity[unit.s]
+
     # ----------- ----------- ----------- #
     def __init__(
         self,
@@ -52,19 +53,23 @@ class MilkyWayAxionHalo(PhysicalObject):
 
         self.rho_E_DM = rho_E_DM
 
-        assert nu_a is not None or m_a is not None, "Either nu_a (axion Compton frequency) or m_a (axion mass) needs to be specified"
+        assert (
+            nu_a is not None or m_a is not None
+        ), "Either nu_a (axion Compton frequency) or m_a (axion mass) needs to be specified"
 
         if nu_a is not None and m_a is not None:
             # check consistency
-            nu_a_from_m_a = (m_a * const.c**2 / const.hbar)
+            nu_a_from_m_a = m_a * const.c**2 / const.hbar
             if not np.isclose(nu_a.value, nu_a_from_m_a.value, rtol=1e-6):
-                raise ValueError(f"Inconsistent nu_a and m_a: nu_a from m_a = {nu_a_from_m_a}, provided nu_a = {nu_a}")
+                raise ValueError(
+                    f"Inconsistent nu_a and m_a: nu_a from m_a = {nu_a_from_m_a}, provided nu_a = {nu_a}"
+                )
         elif nu_a is not None and m_a is None:
             self.nu_a = nu_a
-            self.m_a = (nu_a * const.hbar / const.c**2)
+            self.m_a = nu_a * const.hbar / const.c**2
         elif nu_a is None and m_a is not None:
             self.m_a = m_a
-            self.nu_a = (m_a * const.c**2 / const.hbar)
+            self.nu_a = m_a * const.c**2 / const.hbar
 
         self.gaNN = g_aNN
 
@@ -97,23 +102,38 @@ class MilkyWayAxionHalo(PhysicalObject):
         # # self.Omega_a_rms = 0.5 * self.gaNN * (2 * const.hbar * const.c * self.rho_E_DM)**(1/2) * self.v_lab * np.cos(windAngle) * PhysicalQuantity(1e-15, "T")
         # self.useCommonUnits()
 
-    def getRabiFreq(self, case="grad_perp", verbose=False) -> Quantity:
+    @classmethod
+    def getRabiFreq(
+        cls,
+        gaNN: Quantity[unit.GeV ** (-1)] | None = None,
+        case="grad_perp",
+        verbose=False,
+    ) -> Quantity:
         """
         get the Rabi frequency of the pseudomagnetic field amplitude in [Hz] for the specified case
         case: "non-grad", "grad_par" or "grad_perp", determines the lineshape function to use
         """
+        logPrefix = f"[{cls.__name__}.{cls.getRabiFreq.__name__}]"
+        if gaNN is None:
+            if cls.gaNN is None:
+                raise ValueError("gaNN cannot be None")
+            else:
+                gaNN = cls.gaNN
         # if case == "non-grad":
-        #     Omega_rms = 0.5 * self.gaNN * (2 * const.c * self.rho_E_DM) ** (
+        #     Omega_rms = 0.5 * cls.gaNN * (2 * const.c * cls.rho_E_DM) ** (
         #         1 / 2
-        #     ) * self.v_lab * np.cos(self.windAngle)
+        #     ) * cls.v_lab * np.cos(cls.windAngle)
         # elif case == "grad_par":
-        #     Omega_rms = 0.5 * self.gaNN * (2 * const.c * self.rho_E_DM) ** (
+        #     Omega_rms = 0.5 * cls.gaNN * (2 * const.c * cls.rho_E_DM) ** (
         #         1 / 2
-        #     ) * self.v_lab * np.cos(self.windAngle) * self.FWHM**(1 / 2)
+        #     ) * cls.v_lab * np.cos(cls.windAngle) * cls.FWHM**(1 / 2)
         # el
         if case == "grad_perp":
             Omega_rms = (
-                0.5 * self.gaNN * (2 * const.hbar * const.c * self.rho_E_DM) ** (1 / 2) * self.v_lab
+                0.5
+                * gaNN
+                * (2 * const.hbar * const.c * cls.rho_E_DM) ** (1 / 2)
+                * cls.v_lab
             )
             Omega_rms = Omega_rms
         else:
@@ -121,10 +141,227 @@ class MilkyWayAxionHalo(PhysicalObject):
                 f"case {case} not recognized, should be 'grad_perp'"
             )  #  'non-grad', 'grad_par' or
         if verbose:
-            print(
-                f"[{self.__class__.__name__}.{self.getRabiFreq.__name__}] axion wind Rabi frequency (case={case}): {Omega_rms}"
-            )
+            print(logPrefix, f"axion wind Rabi frequency (case={case}): {Omega_rms}")
         return Omega_rms
+
+    @staticmethod
+    def axion_lineshape(
+        v_0: Quantity[unit.m / unit.s],
+        v_lab: Quantity[unit.m / unit.s],
+        nu_a:Quantity[unit.Hz],
+        nu:Quantity,
+        case:str="non-grad",
+        alpha:Quantity=0.0*unit.rad,
+        verbose:bool=False,
+    ):
+        """
+        Calculate analytical lineshapes.
+        Be careful! nu should not be too far from nu_a (compared to the axion linewidth).
+        max of nu / nu_a should be smaller than 103%
+
+        Parameters
+        ----------
+
+        Return
+        ------
+        A float array of the axion lineshape
+
+        Reference
+        ---------
+        A. Gramolin: https://github.com/gramolin/lineshape
+
+        """
+        logPrefix = f"[{MilkyWayAxionHalo.__name__}.{MilkyWayAxionHalo.axion_lineshape.__name__}]"
+        # ----------- prepare to generate the axion lineshape ----------- #
+        # return the lineshape under certain special circumstances
+        # c = 299792458.0  # Speed of light (in m/s)
+        v_0, v_lab = np.abs(v_0), np.abs(v_lab)
+        # Q_a = 1e6
+        Q_a = (const.c / v_0) ** 2.0
+        Q_a = Q_a.to(unit.one)
+        FWHM = 1 / Q_a
+
+        full_lineshape = np.zeros_like(nu) * nu.unit**-2
+        RBW = np.abs(nu[1] - nu[0])
+
+        ## Find the index of the first non-zero element
+        ## the elements in the full_lineshape before nu_a are set to zeros
+        # find the index corresponding to frequency > nu_a
+        positive_indices = np.where(nu > nu_a)[0]
+        if positive_indices.size > 0:
+            nu_a_indx = positive_indices[0]
+            if verbose:
+                print(logPrefix,
+                    f"nu_a = {nu_a}, first frequency element > nu_a is nu[{nu_a_indx}] = {nu[nu_a_indx]}")
+        # if there is no element >= nu_a, return an array of zeros
+        else:
+            if verbose:
+                print(
+                    logPrefix,
+                    f"all input frequencies are < nu_a = {nu_a}, returning an array of zeros",
+                )
+            return full_lineshape
+        del positive_indices
+
+        # cut off the array at ~10 axion linewidths
+        # the elements in the full_lineshape after the cutoff are set to zeros
+        cutoff_indices = np.where(nu > (1 + 10 * FWHM) * nu_a)[0]
+        if cutoff_indices.size > 0:
+            if verbose:
+                print(logPrefix,
+                    f"cutoff frequency is {(1 + 10 * FWHM) * nu_a}, first frequency element > cutoff frequency is nu[{cutoff_indices[0]}] = {nu[cutoff_indices[0]]}")
+            cutoff_idx = cutoff_indices[0]
+        # elsewise set the cutoff index to the last index of the array
+        else:
+            if verbose:
+                print(
+                    logPrefix,
+                    f"all input frequencies are < cutoff frequency {(1 + 10 * FWHM) * nu_a}, setting cutoff index to the last index of the array",
+                )
+            cutoff_idx = len(nu) - 1
+
+        # if cutoff_indx == nu_a_indx:
+        #     full_lineshape[nu_a_indx] = 1.0 / RBW
+        #     check_norm(nu, full_lineshape)
+        #     return full_lineshape
+        # ------------------- end of preparations ---------------------- #
+
+        def _axion_lineshape(v_0, v_lab, nu_a, freq, case="non-grad", alpha=0.0):
+            """
+            Calculate analytical lineshapes.
+            freq[0] > nu_a
+            freq[-1] < 103% * nu_a
+
+            Parameters
+            ----------
+
+            Return
+            ------
+            A float array of the axion lineshape
+
+            Reference
+            ---------
+            A. Gramolin: https://github.com/gramolin/lineshape
+
+            """
+            assert case in [
+                "non-grad",
+                "grad_par",
+                "grad_perp",
+            ], "Case should be 'non-grad', 'grad_par', or 'grad_perp'!"
+
+            beta = 2 * const.c * v_lab * np.sqrt(2 * (freq - nu_a) / nu_a) / v_0**2  # Eq. (13) in Gramolin lineshape paper
+            beta = beta.to_value(unit.one)
+            # WARNING:
+            # Analytically, `beta` can take very large magnitudes.
+            # However, for numerical calculations using `np.sinh(beta)`,
+            # values with |beta| >> 700 will overflow in double precision.
+            # To avoid overflow, ensure |beta| is smaller than ~700.
+            if np.max(np.abs(beta)) > 700:
+                warnings.warn(
+                    "Magnitude of beta is too large for np.sinh. "
+                    "Values with |beta| > 700 may overflow in double precision.",
+                    RuntimeWarning,
+                )
+
+            if case == "non-grad":  # Non-gradient case, Eq. (12)
+                ax_PSD_lineshape = (
+                    2
+                    * const.c**2
+                    * np.exp(-((0.5 * beta * v_0 / v_lab) ** 2) - (v_lab / v_0) ** 2)
+                    * np.sinh(beta)
+                    / (np.sqrt(np.pi) * v_0 * v_lab * nu_a)
+                )
+            elif case == "grad_par":  # Parallel gradient case, Eq. (19)
+                factor = (
+                    np.cos(alpha) ** 2
+                    - (1 / np.tanh(beta) - 1.0 / beta) * (2 - 3 * np.sin(alpha) ** 2) / beta
+                )
+                ax_PSD_lineshape = (
+                    (4 * const.c**2 / (v_0**2 + 2 * (v_lab * np.cos(alpha)) ** 2))
+                    * (freq / nu_a - 1)
+                    * factor
+                    * _axion_lineshape(v_0, v_lab, nu_a, freq)
+                )
+            elif case == "grad_perp":  # Perpendicular gradient case, Eq. (20)
+                factor = (
+                    np.sin(alpha) ** 2
+                    + (1.0 / np.tanh(beta) - 1.0 / beta)
+                    * (2.0 - 3.0 * np.sin(alpha) ** 2)
+                    / beta
+                )
+                ax_PSD_lineshape = (
+                    (2 * const.c**2 / (v_0**2 + (v_lab * np.sin(alpha)) ** 2))
+                    * (freq / nu_a - 1)
+                    * factor
+                    * _axion_lineshape(v_0, v_lab, nu_a, freq)
+                )
+            else:
+                return np.zeros_like(nu) * nu.unit**-2
+
+            return ax_PSD_lineshape
+
+        # ---------------- generate axion linshape ----------------- #
+        # if RBW is smaller than 0.1 * axion_linewidth (usual case),
+        # then the script uses input frequencies to get the lineshape
+        if RBW <= 0.1 * FWHM * nu_a:
+            if verbose:
+                print(
+                    logPrefix,
+                    f"RBW = {RBW:.3e} is <= 0.1 * FWHM * nu_a = {0.1 * FWHM * nu_a:.3e}, using input frequencies to get the lineshape",
+                )
+            full_lineshape[nu_a_indx : cutoff_idx + 1] += _axion_lineshape(
+                v_0, v_lab, nu_a, nu[nu_a_indx : cutoff_idx + 1], case, alpha
+            )
+        # elsewise, use finer frequencies to get the lineshape first
+        else:
+            # chose the indices corresponding to a range
+            # within [idx(nu_a) - 1, idx(nu_a + 10 Delta nu_a)]
+            if verbose:
+                print(
+                    logPrefix,
+                    f"RBW = {RBW:.3e} is > 0.1 * FWHM * nu_a = {(0.1 * FWHM * nu_a).to(RBW.unit):.3e}, using finer frequencies to get the lineshape",
+                )
+            start_idx = max(0, nu_a_indx - 1)
+            freq_start = nu[start_idx]
+            freq_stop = nu[cutoff_idx]
+            _factor = np.ceil(RBW / (0.01 * FWHM * nu_a))
+            fine_RBW = RBW / _factor
+            fine_freqs = (
+                np.arange(
+                    start=freq_start.to_value(nu.unit),
+                    stop=(freq_stop + RBW).to_value(nu.unit),
+                    step=fine_RBW.to_value(nu.unit),
+                )
+                * nu.unit
+            )
+            fine_lineshape = np.zeros_like(fine_freqs) * fine_freqs.unit**-2
+            # find the index corresponding to frequency > nu_a
+            positive_indices = np.where(fine_freqs > nu_a)[0]
+            if positive_indices.size > 0:
+                fine_nu_a_idx = positive_indices[0]
+                # Compute finely-sampled lineshape
+                fine_lineshape[fine_nu_a_idx:] += _axion_lineshape(
+                    v_0, v_lab, nu_a, fine_freqs[fine_nu_a_idx:], case, alpha
+                )
+                # Bin fine lineshape onto coarse grid
+                # Only bin into bins at or above nu_a_indx to avoid non-zero values below nu_a
+                for idx in range(start_idx, cutoff_idx + 1):
+                    # Find fine frequencies within this coarse bin
+                    fine_indices = np.where(
+                        (fine_freqs > nu[idx]) & (fine_freqs <= nu[idx] + RBW)
+                    )[0]
+                    # Integrate fine lineshape over the bin and add to full_lineshape
+                    full_lineshape[idx] += (
+                        np.sum(fine_lineshape[fine_indices]) * fine_RBW / RBW
+                    )
+            # if there is no element >= nu_a, return an array of zeros
+            else:
+                return full_lineshape
+            del positive_indices
+        # ---------------- end of generation ----------------- #
+        check_norm(nu, full_lineshape)
+        return full_lineshape
 
     def getAmpSpectra(
         self,
@@ -142,28 +379,18 @@ class MilkyWayAxionHalo(PhysicalObject):
         frequencies: absolute frequencies at which to evaluate the axion wind spectrum, in [Hz]
         case:  "non-grad", "grad_par" or "grad_perp", determines the lineshape function to use
         """
-        # frequencies = np.linspace(
-        #     -0.5 / timeStep_s, 0.5 / timeStep_s, num=numSteps, endpoint=True
-        # )
-        # if verbose:
-        #     check(timeStep_s)
-        #     check(numSteps)
 
-        # tic = time.perf_counter()
-        avgPSD = axion_lineshape(
-            v_0_ms=self.v_0.to_value(unit.m / unit.s),
-            v_lab_ms=self.v_lab.to_value(unit.m / unit.s),
-            nu_a_Hz=self.nu_a.value,
+        PSD_lineshape = MilkyWayAxionHalo.axion_lineshape(
+            v_0=self.v_0,
+            v_lab=self.v_lab,
+            nu_a=self.nu_a,
             nu=frequencies,
             case=case,
-            alpha=0.0,
+            alpha=0.0*unit.rad,
         )
-        # toc = time.perf_counter()
-        # timeConsumption = toc - tic
-        # if verbose:
-        #     print(f"axion_lineshape time consumption = {timeConsumption:.3e} s")
+
         shape = (numSpectra, len(frequencies))
-        # tic = time.perf_counter()
+
         rng = (
             np.random.default_rng(seed=rand_seed)
             if rand_seed is not None
@@ -177,20 +404,10 @@ class MilkyWayAxionHalo(PhysicalObject):
         if use_stoch:
             stochastic = rng.exponential(scale=1.0, size=shape)
             ampSpectra = (
-                np.sqrt(stochastic * avgPSD) * phases
+                np.sqrt(stochastic * PSD_lineshape) * phases
             )  # shape = (numFields, numSteps)
         else:
-            ampSpectra = np.sqrt(avgPSD) * phases  # shape = (numFields, numSteps)
-
-        # toc = time.perf_counter()
-        # timeConsumption = toc - tic
-        # if verbose:
-        #     print(f"rng time consumption = {timeConsumption:.3e} s")
-
-        # check(amp_freq.shape)  # shape = (numFields, numSteps)
-        # check(phase_freq.shape)  # shape = (numFields, numSteps)
-
-        # TODO optimize when only a small fraction of lineshapes is non-zero by using less lengths for amp and phase
+            ampSpectra = np.sqrt(PSD_lineshape) * phases  # shape = (numFields, numSteps)
 
         return ampSpectra
 
@@ -393,175 +610,3 @@ class MilkyWayAxionHalo(PhysicalObject):
     #         p = signal[i * conv_step_len:i * conv_step_len + conv_line_len] * conv_line
     #         conv_signal.append(np.sum(p)/np.sum(conv_line)**2)
     #     return conv_xstamp, conv_signal
-
-
-def axion_lineshape(v_0_ms, v_lab_ms, nu_a_Hz, nu, case="non-grad", alpha=0.0):
-    """
-    Calculate analytical lineshapes.
-    Be careful! nu should not be too far from nu_a (compared to the axion linewidth).
-    max of nu / nu_a should be smaller than 103%
-
-    Parameters
-    ----------
-
-    Return
-    ------
-    A float array of the axion lineshape
-
-    Reference
-    ---------
-    A. Gramolin: https://github.com/gramolin/lineshape
-
-    """
-    # ----------- prepare to generate the axion lineshape ----------- #
-    # return the lineshape under certain special circumstances
-    c = 299792458.0  # Speed of light (in m/s)
-    v_0_ms, v_lab_ms = np.abs(v_0_ms), np.abs(v_lab_ms)
-    Q_a = 1e6
-    FWHM = 1 / Q_a
-
-    full_lineshape = np.zeros(len(nu))
-    RBW = np.abs(nu[1] - nu[0])
-
-    ## Find the index of the first non-zero element
-    ## the elements in the full_lineshape before nu_a are set to zeros
-    # find the index corresponding to frequency > nu_a
-    positive_indices = np.where(nu > nu_a_Hz)[0]
-    if positive_indices.size > 0:
-        nu_a_indx = positive_indices[0]
-    # if there is no element >= nu_a, return an array of zeros
-    else:
-        return full_lineshape
-    del positive_indices
-
-    # cut off the array at ~10 axion linewidths
-    # the elements in the full_lineshape after the cutoff are set to zeros
-    cutoff_indices = np.where(nu > (1 + 10 * FWHM) * nu_a_Hz)[0]
-    if cutoff_indices.size > 0:
-        cutoff_indx = cutoff_indices[0]
-    # elsewise set the cutoff index to the last index of the array
-    else:
-        cutoff_indx = len(nu) - 1
-
-    # # if the cutoff index is right
-    # if cutoff_indx == nu_a_indx:
-    #     full_lineshape[nu_a_indx] = 1.0 / RBW
-    #     check_norm(nu, full_lineshape)
-    #     return full_lineshape
-    # ------------------- end of preparations ---------------------- #
-
-    def _axion_lineshape(v_0, v_lab, nu_a, freq, case="non-grad", alpha=0.0):
-        """
-        Calculate analytical lineshapes.
-        freq[0] > nu_a
-        freq[-1] < 103% * nu_a
-
-        Parameters
-        ----------
-
-        Return
-        ------
-        A float array of the axion lineshape
-
-        Reference
-        ---------
-        A. Gramolin: https://github.com/gramolin/lineshape
-
-        """
-        assert case in [
-            "non-grad",
-            "grad_par",
-            "grad_perp",
-        ], "Case should be 'non-grad', 'grad_par', or 'grad_perp'!"
-
-        beta = 2 * c * v_lab * np.sqrt(2 * (freq - nu_a) / nu_a) / v_0**2  # Eq. (13)
-        # WARNING:
-        # Analytically, `beta` can take very large magnitudes.
-        # However, for numerical calculations using `np.sinh(beta)`,
-        # values with |beta| >> 700 will overflow in double precision.
-        # To avoid overflow, ensure |beta| is smaller than ~700.
-        if np.max(np.abs(beta)) > 700:
-            warnings.warn(
-                "Magnitude of beta is too large for np.sinh. "
-                "Values with |beta| > 700 may overflow in double precision.",
-                RuntimeWarning,
-            )
-
-        if case == "non-grad":  # Non-gradient case, Eq. (12)
-            ax_sq_lineshape = (
-                2
-                * c**2
-                * np.exp(-((0.5 * beta * v_0 / v_lab) ** 2) - (v_lab / v_0) ** 2)
-                * np.sinh(beta)
-                / (np.sqrt(np.pi) * v_0 * v_lab * nu_a)
-            )
-        elif case == "grad_par":  # Parallel gradient case, Eq. (19)
-            factor = (
-                np.cos(alpha) ** 2
-                - (1 / np.tanh(beta) - 1.0 / beta) * (2 - 3 * np.sin(alpha) ** 2) / beta
-            )
-            ax_sq_lineshape = (
-                (4 * c**2 / (v_0**2 + 2 * (v_lab * np.cos(alpha)) ** 2))
-                * (freq / nu_a - 1)
-                * factor
-                * _axion_lineshape(v_0, v_lab, nu_a, freq)
-            )
-        elif case == "grad_perp":  # Perpendicular gradient case, Eq. (20)
-            factor = (
-                np.sin(alpha) ** 2
-                + (1.0 / np.tanh(beta) - 1.0 / beta)
-                * (2.0 - 3.0 * np.sin(alpha) ** 2)
-                / beta
-            )
-            ax_sq_lineshape = (
-                (2 * c**2 / (v_0**2 + (v_lab * np.sin(alpha)) ** 2))
-                * (freq / nu_a - 1)
-                * factor
-                * _axion_lineshape(v_0, v_lab, nu_a, freq)
-            )
-        else:
-            return np.zeros(nu.shape)
-
-        return ax_sq_lineshape
-
-    # ---------------- generate axion linshape ----------------- #
-    # if RBW is smaller than axion_linewidth / 10,
-    # then the script uses input frequencies to get the lineshape
-    if RBW <= 0.1 * FWHM * nu_a_Hz:
-        full_lineshape[nu_a_indx : cutoff_indx + 1] += _axion_lineshape(
-            v_0_ms, v_lab_ms, nu_a_Hz, nu[nu_a_indx : cutoff_indx + 1], case, alpha
-        )
-    # elsewise, use finer frequencies to get the lineshape first
-    else:
-        # chose the indices corresponding to a range
-        # within [idx(nu_a) - 1, idx(nu_a + 10 Delta nu_a)]
-        start_idx = max(0, nu_a_indx - 1)
-        freq_start = nu[start_idx]
-        freq_stop = nu[cutoff_indx]
-        _factor = np.ceil(RBW / (0.01 * FWHM * nu_a_Hz))
-        fine_RBW = RBW / _factor
-        fine_freqs = np.arange(start=freq_start, stop=freq_stop + RBW, step=fine_RBW)
-        fine_lineshape = np.zeros_like(fine_freqs)
-        # find the index corresponding to frequency > nu_a
-        positive_indices = np.where(fine_freqs > nu_a_Hz)[0]
-        if positive_indices.size > 0:
-            fine_nu_a_indx = positive_indices[0]
-            # Compute finely-sampled lineshape
-            fine_lineshape[fine_nu_a_indx:] += _axion_lineshape(
-                v_0_ms, v_lab_ms, nu_a_Hz, fine_freqs[fine_nu_a_indx:], case, alpha
-            )
-            # Bin fine lineshape onto coarse grid
-            for idx in range(start_idx, cutoff_indx + 1):
-                # Find fine frequencies within this coarse bin
-                fine_indices = np.where(
-                    (fine_freqs > nu[idx]) & (fine_freqs <= nu[idx] + RBW)
-                )[0]
-                # Integrate fine lineshape over the bin and add to full_lineshape
-                full_lineshape[idx] += (
-                    np.sum(fine_lineshape[fine_indices]) * fine_RBW / RBW
-                )
-            # if there is no element >= nu_a, return an array of zeros
-        del positive_indices
-    # ---------------- end of generation ----------------- #
-    check_norm(nu, full_lineshape)
-    return full_lineshape

@@ -148,7 +148,7 @@ def Lorentzian(x, center, FWHM, area: float = 1.0, offset: float = 0.0):
     Null
 
     """
-    return offset + 0.5 * abs(FWHM) * area / (
+    return offset + 0.5 * np.abs(FWHM) * area / (
         np.pi * ((x - center) ** 2 + (0.5 * FWHM) ** 2)
     )
 
@@ -2848,11 +2848,14 @@ def check_norm(x: np.ndarray, y: np.ndarray):
     Warning
         If the integral of y over x is not close to 1.
     """
-    RBW = np.abs(x[1] - x[0])  # resolution bandwidth
-    integral = np.sum(y) * RBW
-    if not np.allclose(integral, 1.0, rtol=1e-3):
+    integral = np.trapezoid(y, x)
+    if hasattr(integral, "unit"):
+        integral_value = integral.to_value(unit.one)
+    else:
+        integral_value = integral
+    if not np.allclose(integral_value, 1.0, rtol=1e-3):
         warnings.warn(
-            f"Array is not normalized! Integral = {integral:.5f}", category=UserWarning
+            f"Array is not normalized! Integral = {integral}", category=UserWarning
         )
 
 

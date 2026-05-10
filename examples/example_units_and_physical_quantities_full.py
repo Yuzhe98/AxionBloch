@@ -1,6 +1,6 @@
 from axionbloch.dependency import *
-
 from axionbloch.constants import gamma_p
+from axionbloch.utils import Lorentzian
 
 # dimensionless quantities with python scalars
 # create dimensionless Quantity objects so adding to scalars works
@@ -14,6 +14,12 @@ print(a)
 linewidth = 1.0e-6 + 1.0 * ppm + 1.0e-6 * unit.dimensionless_unscaled
 print("linewidth in ppm:", linewidth.to(ppm))
 # 3.0 ppm
+
+# Lorentzian
+print("\nLorentzian")
+frequencies = np.linspace(-10, 10, 21) * unit.kHz
+PSD = Lorentzian(x=frequencies, center=0, FWHM=1.0e3 * unit.Hz, area=1, offset=0)
+print("Lorentzian PSD:", PSD.to(unit.kHz ** (-1)))
 
 # define a physical quantity with Quantity
 speed = Quantity(1.0, unit.km / unit.s)
@@ -86,7 +92,8 @@ print("complex signal array reshaped", complex_signal_arr.reshape(2, 3))
 print("complex signal array numpy.ones_like", np.ones_like(complex_signal_arr))
 print("complex signal array numpy.zeros_like", np.zeros_like(complex_signal_arr))
 
-#
+# numpy linspace
+print("\nnp.linspace with Quantity:")
 duration = 5 * unit.s
 timeStamp = np.linspace(0, duration, num=5)
 print("timeStamp", timeStamp)
@@ -100,3 +107,40 @@ except Exception as exc:
     print(
         f"error message: {exc}"
     )
+
+print("\nnp.arange with Quantity:")
+try:
+    timeStamp = np.arange(0, duration + 1e-9 * unit.s, step=1 * unit.s)
+except Exception as exc:
+    print(f"np.arange does not work with Quantity")
+    print(f"error message: {exc}")
+
+# np.where
+print("\nnp.where:")
+nu_a = 1.0e6 * unit.Hz
+nu = np.linspace(0.9, 1.1, 10) * unit.MHz
+positive_indices = np.where(nu > nu_a)[0]
+print("\npositive_indices:", positive_indices)
+
+# np.tanh with Quantity
+print("\n numpy sinh cosh tanh with Quantity:")
+beta = 0.5 * np.pi * unit.one * unit.radian
+beta_float = 0.5 * np.pi
+# print("np.tanh(beta)", np.tanh(beta))
+# print("np.tanh(beta_float)", np.tanh(beta_float))
+assert np.isclose(
+    np.sinh(beta).value, np.sinh(beta_float)
+), "np.sinh with Quantity should give the same result as np.sinh with float"
+assert np.isclose(
+    np.cosh(beta).value, np.cosh(beta_float)
+), "np.cosh with Quantity should give the same result as np.cosh with float"
+
+assert np.isclose(np.tanh(beta).value, np.tanh(beta_float)), "np.tanh with Quantity should give the same result as np.tanh with float"
+print("np.sinh / cosh / tanh accepts Quantity[unit.radian]")
+
+# histogram
+print("\nnp.histogram:")
+B_space = np.random.random(100) * unit.T
+hist, bin_edges = np.histogram(B_space)
+print("histogram counts:", hist)
+print("histogram bin edges:", bin_edges)
