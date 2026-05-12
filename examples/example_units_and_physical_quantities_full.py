@@ -6,8 +6,9 @@ from axionbloch.utils import Lorentzian
 # create dimensionless Quantity objects so adding to scalars works
 a = 1.0 + 1.0 * unit.one + 1.0 * unit.one
 print("dimensionless quantities with python scalars:")
-print(a)
+print("1.0 + 1.0 * unit.one + 1.0 * unit.one =", a)
 # 3.0
+
 
 # linewidth in units of ppm / ppb / ppt
 # create dimensionless Quantity objects so adding to scalars works
@@ -105,15 +106,13 @@ duration = 5 * unit.s
 timeStamp = np.linspace(0, duration, num=5)
 print("timeStamp", timeStamp)
 #
-try: 
+try:
     timeStamp = np.linspace(1.23, duration, num=5)
 except Exception as exc:
     print(
         f"np.linspace(1.23, duration, num=5) failed because the start/stop must be a quantity (unless zero/infinity/nan)"
     )
-    print(
-        f"error message: {exc}"
-    )
+    print(f"error message: {exc}")
 
 print("\nnp.arange with Quantity:")
 try:
@@ -129,6 +128,25 @@ nu = np.linspace(0.9, 1.1, 10) * unit.MHz
 positive_indices = np.where(nu > nu_a)[0]
 print("\npositive_indices:", positive_indices)
 
+# np.isclose works with Quantity
+# if a Quantity is close to a scalar, it will be treated as close if the value is close and the unit is dimensionless (or has the same dimension as the scalar)
+print("\nnp.isclose:")
+a = 1.0 * ppm
+b = 1.0e-6 * unit.one
+c = 1.0e-6
+print("a:", a)
+print("b:", b)
+print("c:", c)
+print("np.isclose(a, b):", np.isclose(a, b))
+print("np.isclose(a, c):", np.isclose(a, c))
+print("np.isclose(b, c):", np.isclose(b, c))
+
+dur_0 = 1.0 * unit.microsecond
+dur_1 = 1.0e-6 * unit.s
+print("\nduration 0:", dur_0)
+print("duration 1:", dur_1)
+print("np.isclose(dur_0, dur_1):", np.isclose(dur_0, dur_1))
+
 # np.tanh with Quantity
 print("\n numpy sinh cosh tanh with Quantity:")
 beta = 0.5 * np.pi * unit.one * unit.radian
@@ -142,7 +160,9 @@ assert np.isclose(
     np.cosh(beta).value, np.cosh(beta_float)
 ), "np.cosh with Quantity should give the same result as np.cosh with float"
 
-assert np.isclose(np.tanh(beta).value, np.tanh(beta_float)), "np.tanh with Quantity should give the same result as np.tanh with float"
+assert np.isclose(
+    np.tanh(beta).value, np.tanh(beta_float)
+), "np.tanh with Quantity should give the same result as np.tanh with float"
 print("np.sinh / cosh / tanh accepts Quantity[unit.radian]")
 
 # histogram
