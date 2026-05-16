@@ -78,10 +78,10 @@ magnet.setHomogeneity(
 )
 
 simu.excField.setCPMGPulseTrain(
-    timeStep_s=simu.timeStep_s,
+    timeStep_s=simu.timeStep,
     timeLen=simu.timeLen,
     gamma_HzToT=simu.gamma_HzToT,
-    t90_s=10 * simu.timeStep_s,
+    t90_s=10 * simu.timeStep,
     tau_s=4 * Tdelta_s,
     numEcho=2,
     nu_rot_Hz=signalFreqRot_Hz,

@@ -7,7 +7,7 @@ from matplotlib.ticker import ScalarFormatter
 from mpl_toolkits.mplot3d import Axes3D  # for type hinting
 
 from scipy.stats import uniform, expon
-from scipy.fft import ifft
+from scipy.fft import ifft as sp_ifft
 
 # for saving data
 import pickle
@@ -15,7 +15,6 @@ import h5py
 
 from axionbloch.utils import (
     PhysicalObject,
-    axion_lineshape,
     check,
     save_phys_quantity,
     giveDateAndTime,
@@ -560,7 +559,7 @@ class MagField(PhysicalObject):
 
             if verbose:
                 tic = time.perf_counter()
-            lineshape = axion_lineshape(
+            lineshape = MilkyWayAxionHalo.axion_lineshape(
                 v_0_ms=220e3,
                 v_lab_ms=233e3,
                 nu_a_Hz=nu_a_rot_Hz + RCF_freq_Hz,
@@ -605,7 +604,6 @@ class MagField(PhysicalObject):
             if verbose:
                 tic = time.perf_counter()
 
-            # ttic = time.perf_counter()
             ax_FFT = (
                 ax_lineshape
                 * phase_freq
@@ -613,30 +611,20 @@ class MagField(PhysicalObject):
                 * simuRate_Hz
                 * np.sqrt(duration_s)
             )
-            # ttoc = time.perf_counter()
-            # ifft_runtimes.append(ttoc - ttic)
 
-            # ttic = time.perf_counter()
             ax_FFT_0_pos_neg = np.fft.fftshift(ax_FFT)
-            # ttoc = time.perf_counter()
-            # ifft_runtimes.append(ttoc - ttic)
 
-            # ttic = time.perf_counter()
             # Ba_t = np.fft.ifft(ax_FFT_0_pos_neg)
-            Ba_t = ifft(ax_FFT_0_pos_neg)  # , axis=1 batch IFFT along time axis
-            # ttoc = time.perf_counter()
-            # ifft_runtimes.append(ttoc - ttic)
+            Ba_t = sp_ifft(ax_FFT_0_pos_neg)  # , axis=1 batch IFFT along time axis
 
-            # ttic = time.perf_counter()
-            dBadt_FFT = 1j * 2 * np.pi * freq * ax_FFT_0_pos_neg
-            # ttoc = time.perf_counter()
-            # ifft_runtimes.append(ttoc - ttic)
+            # sp_ifft_runtimes.append(ttoc - ttic)
 
-            # ttic = time.perf_counter()
-            # dBadt = np.fft.ifft(dBadt_FFT)
-            dBadt = ifft(dBadt_FFT)
-            # ttoc = time.perf_counter()
-            # ifft_runtimes.append(ttoc - ttic)
+            dBadt_FD = 1j * 2 * np.pi * freq * ax_FFT_0_pos_neg
+
+            # sp_ifft_runtimes.append(ttoc - ttic)
+
+            # dBadt = np.fft.sp_ifft(dBadt_FFT)
+            dBadt = sp_ifft(dBadt_FD)
 
             if verbose:
                 toc = time.perf_counter()
@@ -764,7 +752,7 @@ class MagField(PhysicalObject):
                 check(numSteps)
 
             tic = time.perf_counter()
-            avg_lineshape = axion_lineshape(
+            avg_lineshape = MilkyWayAxionHalo.axion_lineshape(
                 v_0_ms=220e3,
                 v_lab_ms=233e3,
                 nu_a_Hz=nu_a_rot_Hz + RCF_freq_Hz,
@@ -849,37 +837,22 @@ class MagField(PhysicalObject):
             if verbose:
                 tic = time.perf_counter()
 
-            # ttic = time.perf_counter()
             ax_FFT: np.ndarray = (
                 B_a_rms_T * simuRate_Hz * np.sqrt(duration_s) * rand_sqrt_lineshapes
             )
-            # ttoc = time.perf_counter()
-            # ifft_runtimes.append(ttoc - ttic)
 
-            # ttic = time.perf_counter()
             ax_FFT_0_pos_neg: np.ndarray = np.fft.fftshift(ax_FFT, axes=1)
-            # ttoc = time.perf_counter()
-            # ifft_runtimes.append(ttoc - ttic)
 
-            # ttic = time.perf_counter()
             # Ba_t = np.fft.ifft(ax_FFT_0_pos_neg, axis=1)
             # reveal_type(ifft(ax_FFT_0_pos_neg, axis=1))
             Ba_t = np.asarray(
-                ifft(ax_FFT_0_pos_neg, axis=1)
+                sp_ifft(ax_FFT_0_pos_neg, axis=1)
             )  # batch IFFT along time axis
-            # ttoc = time.perf_counter()
-            # ifft_runtimes.append(ttoc - ttic)
 
-            # ttic = time.perf_counter()
             dBadt_FFT: np.ndarray = 1j * 2 * np.pi * freq * ax_FFT_0_pos_neg
-            # ttoc = time.perf_counter()
-            # ifft_runtimes.append(ttoc - ttic)
 
-            # ttic = time.perf_counter()
             # dBadt = np.fft.ifft(dBadt_FFT, axis=1)
-            dBadt = np.asarray(ifft(dBadt_FFT, axis=1))
-            # ttoc = time.perf_counter()
-            # ifft_runtimes.append(ttoc - ttic)
+            dBadt = np.asarray(sp_ifft(dBadt_FFT, axis=1))
 
             if verbose:
                 toc = time.perf_counter()
@@ -933,8 +906,8 @@ class MagField(PhysicalObject):
         axion: MilkyWayAxionHalo | FineGrainedAxionStream,
         timeStep_s: float,
         timeLen: int,
-        simuRate_Hz: float,
-        duration_s: float,
+        simuRate: Quantity,
+        duration: Quantity,
         # nu_a_rot_Hz: float,  # axion effective frequency in RCF
         use_stoch: bool,
         RCF_freq_Hz: float,
@@ -959,20 +932,22 @@ class MagField(PhysicalObject):
             )
 
             ampSpectra = axion.getAmpSpectra(
-                frequencies=frequencies + RCF_freq_Hz,
+                frequencies=frequencies + RCF_freq_Hz*unit.Hz,
                 case="grad_perp",
                 numSpectra=numFields,
                 use_stoch=use_stoch,
                 rand_seed=rand_seed,
                 verbose=verbose,
             )
-
             # amplitue spectra of axion fieds
             ax_AS: np.ndarray = (
-                B_a_rms_T * simuRate_Hz * np.sqrt(duration_s) * ampSpectra
+                B_a_rms_T * unit.T * simuRate * np.sqrt(duration) * ampSpectra
             )
 
             freq = np.fft.fftfreq(numSteps, timeStep_s)  # shape = (numSteps)
+            check(ampSpectra.unit)
+            check(ax_AS.unit)
+            check(freq.unit)
 
             if makePlot:
                 fig = plt.figure(figsize=(6.0, 4.0), dpi=150)  # initialize a figure
@@ -1015,40 +990,26 @@ class MagField(PhysicalObject):
             if verbose:
                 tic = time.perf_counter()
 
-            # ttic = time.perf_counter()
             ax_AS_pos_neg: np.ndarray = np.fft.fftshift(ax_AS, axes=1)
-            # ttoc = time.perf_counter()
-            # ifft_runtimes.append(ttoc - ttic)
 
-            # ttic = time.perf_counter()
-            # Ba_t = np.fft.ifft(ax_AS_pos_neg, axis=1)
-            B_t = np.asarray(ifft(ax_AS_pos_neg, axis=1))  # batch IFFT along time axis
-            # ttoc = time.perf_counter()
-            # ifft_runtimes.append(ttoc - ttic)
+            B_t = np.asarray(sp_ifft(ax_AS_pos_neg.value, axis=1)) * ax_AS_pos_neg.unit  # batch IFFT along time axis
 
-            # ttic = time.perf_counter()
-            dBdt_FFT: np.ndarray = 1j * 2 * np.pi * freq * ax_AS_pos_neg
-            # ttoc = time.perf_counter()
-            # ifft_runtimes.append(ttoc - ttic)
+            dBdt_FD: np.ndarray = 1j * 2 * np.pi * freq * ax_AS_pos_neg
 
-            # ttic = time.perf_counter()
-            # dBadt = np.fft.ifft(dBadt_FFT, axis=1)
-            dBdt: np.ndarray = np.asarray(ifft(dBdt_FFT, axis=1))
-            # ttoc = time.perf_counter()
-            # ifft_runtimes.append(ttoc - ttic)
-
+            dBdt: np.ndarray = np.asarray(sp_ifft(dBdt_FD.value, axis=1)) * dBdt_FD.unit
+            check(ax_AS_pos_neg.unit)
+            check(B_t.unit)
+            check(dBdt.unit)
             if verbose:
                 toc = time.perf_counter()
                 timeConsumption = toc - tic
                 print(f"ifft total time consumption = {timeConsumption:.3e} s")
-                # for i, runtime in enumerate(ifft_runtimes):
-                # print("individual runtimes =", ifft_runtimes)
 
             if verbose:
                 tic = time.perf_counter()
 
-            self.B_vec = np.zeros((numFields, numSteps, 3))
-            self.dBdt_vec = np.zeros((numFields, numSteps, 3))
+            self.B_vec = np.zeros((numFields, numSteps, 3)) * B_t.unit
+            self.dBdt_vec = np.zeros((numFields, numSteps, 3)) * dBdt.unit
 
             self.B_vec[:, :, 0] = B_t.real
             self.B_vec[:, :, 1] = B_t.imag
@@ -1156,7 +1117,7 @@ class Simulations:
                 #     f"simulation duration = {duration.value_in('s'):e} (s).", flush=True
                 # )
                 print(
-                    logPrefix + f"simu.magnet.numPt =",
+                    logPrefix, f"simu.magnet.numPt =",
                     simu.magnet.numPt,
                     flush=True,
                 )
@@ -1190,10 +1151,7 @@ class Simulations:
         return est_runtime, est_setFields_s, est_trjry_s
 
     def run(self, autoStart: bool = True, verbose: bool = False):
-        # est_runtime = 0.0
-        # est_setFields_s = 0.0
-        # est_trjry_s = 0.0
-        logPrefix = f"[{self.__class__.__name__}.{self.run.__name__}] "
+        logPrefix = f"[{self.__class__.__name__}.{self.run.__name__}]"
 
         actu_runtime = 0.0
         actu_setFields_s = 0.0
@@ -1206,19 +1164,17 @@ class Simulations:
                 "# ---------------------------------------------------- #", flush=True
             )
             print(
-                logPrefix
-                + f"Estimated setFields time = {est_setFields_s / 60.0:.3g} min",
+                logPrefix, f"Estimated setFields time = {est_setFields_s / 60.0:.3g} min",
                 flush=True,
             )
             print(
-                logPrefix + f"Estimated trjry time = {est_trjry_s / 60.0:.3g} min",
-                logPrefix + f"Estimated trjry time = {est_trjry_s / 60.0:.3g} min",
+                logPrefix, f"Estimated trjry time = {est_trjry_s / 60.0:.3g} min",
+                logPrefix, f"Estimated trjry time = {est_trjry_s / 60.0:.3g} min",
                 flush=True,
             )
             print(
-                logPrefix + f"Estimated total runtime = {est_runtime / 60.0:.3g} min",
-                logPrefix
-                + f"Estimated total runtime = {est_runtime / 60.0:.3g} min",
+                logPrefix, f"Estimated total runtime = {est_runtime / 60.0:.3g} min",
+                logPrefix, f"Estimated total runtime = {est_runtime / 60.0:.3g} min",
                 flush=True,
             )
             answer = input("Continue? (y/n): ").strip().lower()
@@ -1243,17 +1199,19 @@ class Simulations:
             tic = time.perf_counter()
             simu.excField.setAxionFields(
                 axion=params["axion"],
-                timeStep_s=simu.timeStep_s,
+                timeStep_s=simu.timeStep,
                 timeLen=simu.timeLen,
-                simuRate_Hz=simu.rate_Hz,
-                duration_s=simu.duration_s,
+                simuRate=simu.rate,
+                duration=simu.duration,
                 # nu_a_rot_Hz=params["axion"].nu_a.value_in("Hz")
                 # - simu.RCF_freq_Hz,  # frequency in the rotating frame
                 use_stoch=True,
                 RCF_freq_Hz=simu.RCF_freq_Hz,
                 numFields=params["numFields"],
                 rand_seed=params["rand_seed"],
-                B_a_rms_T=params["B_a_rms"].to_value(unit.T),  # rms amplitude of the pseudo-magnetic field in [T]
+                B_a_rms_T=params["B_a_rms"].to_value(
+                    unit.T
+                ),  # rms amplitude of the pseudo-magnetic field in [T]
                 makePlot=False,
                 verbose=False,
             )
@@ -1502,8 +1460,9 @@ class Simulation(PhysicalObject):
         self.station = station
         self.excField = excField
 
-        #
-        self.gamma_HzToT = self.sample.gamma.to_value(unit.Hz / unit.T)
+        # angular gamma (rad·Hz/T) → strip rad via dimensionless_angles so value is in Hz/T
+        # gamma_p = 2.6752218708e8 * unit.rad * unit.Hz / unit.T
+        self.gamma_HzToT = self.sample.gamma.to_value(unit.rad * unit.Hz / unit.T)
 
         # get the equilibrium magnetization M0
         self.M0eqb = self.sample.getM0eqb(B_pol=self.magnet.B0, verbose=verbose)
@@ -1521,7 +1480,9 @@ class Simulation(PhysicalObject):
             M0_init = self.sample.getM0(verbose=verbose)
             init_M = M0_init / self.M0eqb
         elif init_M is None:
-            init_M = 1.0 * unit.dimensionless_unscaled  # default to fully polarized if neither init_M nor sample polarization is provided
+            init_M = (
+                1.0 * unit.dimensionless_unscaled
+            )  # default to fully polarized if neither init_M nor sample polarization is provided
 
         self.init_M = init_M
         self.init_M_theta = init_M_theta
@@ -1536,9 +1497,12 @@ class Simulation(PhysicalObject):
         # TODO：be more smart in setting rate and duration
         # set rotating frame frequency
         if RCF_freq is None:
-            self.RCF_freq = self.sample.gamma / (2 * np.pi) * self.magnet.B0
+            # gamma is rad·Hz/T; strip rad via dimensionless_angles to get Hz
+            self.RCF_freq = (self.sample.gamma / (2 * np.pi) * self.magnet.B0).to(
+                unit.Hz, equivalencies=unit.dimensionless_angles()
+            )
         else:
-            self.RCF_freq = RCF_freq
+            self.RCF_freq = RCF_freq.to(unit.Hz)
         self.RCF_freq_Hz = self.RCF_freq.to_value(unit.Hz)
 
         self.nuL_Hz = (
@@ -1551,7 +1515,9 @@ class Simulation(PhysicalObject):
         self.trjry = None
 
         # ---------------------------- set duration ----------------------------#
-        FWHM_Hz = self.magnet.FWHM_B0 * sample.gamma.to_value(unit.Hz / unit.T) / (2 * np.pi)
+        FWHM_Hz = (
+            self.magnet.FWHM_B0 * sample.gamma / (2 * np.pi * unit.rad)
+        ).to_value(unit.Hz)
         # find Tdelta
         self.Tdelta_s = 1 / (np.pi * FWHM_Hz)
         self.T2star_s = 1 / (1 / self.Tdelta_s + 1 / sample.T2.to_value(unit.s))
@@ -1559,7 +1525,10 @@ class Simulation(PhysicalObject):
         if duration is None:
             if self.axion is not None:
                 self.duration_s = np.amin(
-                    [3.2e3 * self.axion.tau_a_est.to_value(unit.s), 1.5e2 * self.T2star_s]
+                    [
+                        3.2e3 * self.axion.tau_a_est.to_value(unit.s),
+                        1.5e2 * self.T2star_s,
+                    ]
                 )
             else:
                 self.duration_s = 2e2 * self.T2star_s
@@ -1571,9 +1540,11 @@ class Simulation(PhysicalObject):
 
         # -----------------------------set magnet--------------------------------------- #
         # estimate the necessary data points for sampling the inhomogeneity
-        numPt: float = (
-            self.duration * 2 * magnet.B0_nW_T * sample.gamma.to_value(unit.Hz / unit.T)
-        ).to_value(unit.dimensionless_unscaled)
+        numPt = abs(
+            (self.duration * 2 * magnet.B0_nW * sample.gamma / (2 * np.pi)).to_value(
+                unit.dimensionless_unscaled, equivalencies=unit.dimensionless_angles()
+            )
+        )
         if numPt <= 1:
             numPt = 1
         else:
@@ -1594,7 +1565,7 @@ class Simulation(PhysicalObject):
         else:
             axion_decoherence_rate_Hz = 0.0
         nuL_vals_Hz = (
-            sample.gamma.to_value(unit.Hz / unit.T) / (2 * np.pi) * magnet.B_vals_T
+            self.gamma_HzToT / (2 * np.pi) * magnet.B_spread.to_value(unit.T)
             - self.RCF_freq_Hz
         )
         nuL_Hz_abs_max = np.amax(np.abs(nuL_vals_Hz))
@@ -1616,13 +1587,11 @@ class Simulation(PhysicalObject):
         # ----- check if parameter values are within reasonable range -----#
         assert self.numSteps >= 5, "number of steps < 5"
         # numPt >= 2 pi * Delta_nu * duration
+        variation = self.magnet.nFWHM * self.magnet.FWHM_B0 * self.sample.gamma / (2 * np.pi * unit.rad) * self.duration
         if (
             self.magnet.numPt
             < 2
-            * self.magnet.nFWHM
-            * self.magnet.FWHM_B0
-            * self.gamma_HzToT
-            * self.duration_s
+            * variation.to_value(unit.one)
         ):
             print(
                 f"{self.__init__.__name__} WARNING: magnet_det.numPt may be too few. "
@@ -1652,8 +1621,8 @@ class Simulation(PhysicalObject):
         assert rate is not None, f"[{self.setRate.__name__}] rate is None"
         self.rate = rate
         self.rate_Hz = rate.to_value(unit.Hz)
-        self.timeStep_s = (
-            1.0 / self.rate_Hz
+        self.timeStep = (
+            1.0 / self.rate
         )  # the key parameter in setting simulation timing
         self.timeLen: int = int(np.ceil(self.duration_s * self.rate_Hz))
         self.numSteps: int = self.timeLen - 1
@@ -1701,7 +1670,7 @@ class Simulation(PhysicalObject):
 
     def getTimeStamp(self):
         return np.arange(
-            start=0, stop=(self.timeLen) * self.timeStep_s, step=self.timeStep_s
+            start=0, stop=(self.timeLen) * self.timeStep, step=self.timeStep
         )
 
     def generateTrajectories(
@@ -1757,14 +1726,14 @@ class Simulation(PhysicalObject):
 
         # Use the kinetic simulation function from blochsimulation to generate trajectories
         self.trjry, self.dMdt, self.d2Mdt2 = bs.generateTrajectories(
-            self.excField.B_vec,
-            self.excField.dBdt_vec,
-            self.magnet.B_vals_T,
+            self.excField.B_vec.to_value(unit.T),
+            self.excField.dBdt_vec.to_value(unit.T / unit.s),
+            self.magnet.B_spread.to_value(unit.T),
             self.magnet.ratios,
-            self.sample.gamma.to_value(unit.Hz / unit.T),
-            self.timeStep_s,
-            self.T1_s,
-            self.T2_s,
+            self.sample.gamma.to_value(unit.rad * unit.Hz / unit.T),
+            self.timeStep.to_value(unit.s),
+            self.sample.T1.to_value(unit.s),
+            self.sample.T2.to_value(unit.s),
             self.RCF_freq_Hz,
             Mx0,
             My0,
@@ -1799,7 +1768,7 @@ class Simulation(PhysicalObject):
             (self.excField.B_vec, [self.excField.B_vec[-1]]), axis=0
         )
         timestamp_step = np.arange(
-            start=0, stop=(self.timeLen) * self.timeStep_s, step=self.timeStep_s
+            start=0, stop=(self.timeLen) * self.timeStep, step=self.timeStep
         )
         fig = plt.figure(figsize=(15 * 0.8, 7 * 0.8), dpi=150)  #
         gs = gridspec.GridSpec(nrows=2, ncols=4)  #
@@ -2021,8 +1990,8 @@ class Simulation(PhysicalObject):
                 (self.excField.B_vec[0], [self.excField.B_vec[0][-1]]),
                 axis=0,
             )
-        BfieldTimeStamp_s = self.timeStep_s * np.arange(magfield.shape[0])
-        timeStamp_s = self.timeStep_s * np.arange(self.Mabs_mean.shape[0])
+        BfieldTimeStamp_s = self.timeStep * np.arange(magfield.shape[0])
+        timeStamp_s = self.timeStep * np.arange(self.Mabs_mean.shape[0])
 
         fig = plt.figure(figsize=(15 * 0.8, 7 * 0.8), dpi=150)  #
         gs = gridspec.GridSpec(nrows=2, ncols=4)  #
@@ -2291,7 +2260,7 @@ class Simulation(PhysicalObject):
             plotIntv = int(1.0 * self.rate_Hz / plotRate_Hz)
 
         timeStamp_s = np.linspace(
-            start=0, stop=(self.timeLen) * self.timeStep_s, num=len(self.M_mean[:, 0])
+            start=0, stop=(self.timeLen) * self.timeStep, num=len(self.M_mean[:, 0])
         )
         fig = plt.figure(figsize=(15 * 0.8, 7 * 0.8), dpi=150)  #
         gs = gridspec.GridSpec(nrows=2, ncols=3)  #

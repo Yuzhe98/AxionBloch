@@ -59,10 +59,10 @@ simu = Simulation(
     verbose=True,
 )
 simu.excField.setCPMGPulseTrain(
-    timeStep_s=simu.timeStep_s,
+    timeStep_s=simu.timeStep,
     timeLen=simu.timeLen,
     gamma_HzToT=simu.gamma_HzToT,
-    t90_s=3 * simu.timeStep_s,
+    t90_s=3 * simu.timeStep,
     tau_s=10 * Tdelta_s,
     numEcho=10,
     nu_rot_Hz=0,

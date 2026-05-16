@@ -1,7 +1,6 @@
 import numpy as np
 
 from axionbloch.enphylope import PhysicalQuantity
-from axionbloch.constants import c as c_SI
 from axionbloch.utils import PhysicalObject
 
 
@@ -52,12 +51,12 @@ class FineGrainedAxionStream(PhysicalObject):
         self.gaNN = gaNN
 
         if Qa is None:
-            self.Qa = (c_SI / self.v_lab) ** 2.0
+            self.Q_a = (const.c / self.v_lab) ** 2.0
 
-        self.FWHM = 1.0 / self.Qa
+        self.FWHM = 1.0 / self.Q_a
 
         #
-        self.nu_a_eff = self.nu_a * (PhysicalQuantity(1, "") + self.v_lab**2 / c_SI**2)
+        self.nu_a_eff = self.nu_a * (PhysicalQuantity(1, "") + self.v_lab**2 / const.c**2)
         self.nu_a_eff = self.nu_a_eff.to("Hz")
 
         # coherence time (estimated)

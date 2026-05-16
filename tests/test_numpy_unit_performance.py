@@ -1,17 +1,15 @@
 # COMMAND TO RUN THIS TEST:
-# $env:NUMPY_PERF_PRINT_RESULTS="1"; pytest tests/test_numpy_unit_performance.py -q -s
+# $env:PRINT_RESULTS="1"; pytest tests/test_numpy_unit_performance.py -q -s
 import os
 import time
-
-import numpy as np
 import pytest
-from astropy import units as u
+import scipy.fft as sp_fft
+from axionbloch.dependency import *
 
-
-ARRAY_SIZE = int(os.getenv("NUMPY_PERF_ARRAY_SIZE", "1000000"))
-REPEAT = int(os.getenv("NUMPY_PERF_REPEAT", "10"))
-PRINT_RESULTS = os.getenv("NUMPY_PERF_PRINT_RESULTS", "0") == "1"
-SEED = int(os.getenv("NUMPY_PERF_SEED", "42"))
+ARRAY_SIZE = int(os.getenv("ARRAY_SIZE", "1000000"))
+REPEAT = int(os.getenv("REPEAT", "10"))
+PRINT_RESULTS = os.getenv("PRINT_RESULTS", "0") == "1"
+SEED = int(os.getenv("SEED", "42"))
 
 
 def _timed_average(callable_obj, repeat=REPEAT):
@@ -42,7 +40,7 @@ def _run_numpy_operation(array_like, operation):
     if operation == "unit_conversion":
         if not hasattr(array_like, "to"):
             pytest.skip("Unit conversion requires an Astropy Quantity array.")
-        return array_like.to(u.cm * u.microsecond * u.g)
+        return array_like.to(unit.cm * unit.microsecond * unit.g)
     raise ValueError(f"Unsupported operation: {operation}")
 
 
@@ -54,7 +52,7 @@ def _assert_result_valid(result, operation, use_units):
         return
     if operation == "unit_conversion":
         assert use_units
-        assert result.unit == u.cm * u.microsecond * u.g
+        assert result.unit == unit.cm * unit.microsecond * unit.g
         return
     assert result is not None
 
@@ -65,7 +63,7 @@ def compare_numpy_operation_efficiency(
     """Compare timing for plain NumPy arrays vs Astropy Quantity arrays."""
     rng = np.random.default_rng(seed)
     arr = rng.random(array_size)
-    arr_with_unit = arr * u.m * u.s * u.kg  # attach a composite unit for more realistic conversion
+    arr_with_unit = arr * unit.m * unit.s * unit.kg  # attach a composite unit for more realistic conversion
     operations = (
         "addition",
         "multiplication",
@@ -140,3 +138,74 @@ def test_numpy_operation_efficiency_comparison():
     assert results["std"]["with_units_ms"] > 0
     assert results["unit_conversion"]["plain_ms"] is None
     assert results["unit_conversion"]["with_units_ms"] > 0
+
+
+def compare_fft_efficiency(
+    array_size=ARRAY_SIZE, repeat=REPEAT, print_results=False, seed=SEED
+):
+    """Compare FFT + invFFT timing: numpy plain, numpy Quantity, scipy plain, scipy Quantity.
+
+    scipy does not support Quantity arrays directly, so the Quantity path strips
+    .value before the call and re-attaches the unit afterward.
+    """
+    rng = np.random.default_rng(seed)
+    arr = rng.random(array_size)
+    arr_V = arr * unit.V
+
+    # --- forward FFT ---
+    np_fft_plain = _timed_average(lambda: np.fft.fft(arr) * unit.V, repeat)
+    np_fft_units  = _timed_average(lambda: np.fft.fft(arr_V),            repeat)
+    sp_fft_plain = _timed_average(lambda: sp_fft.fft(arr) * unit.V, repeat)
+    sp_fft_units  = _timed_average(lambda: sp_fft.fft(arr_V.value) * unit.V, repeat)
+
+    # --- inverse FFT (run on pre-computed forward result to time only ifft) ---
+    np_spec = np.fft.fft(arr)
+    np_spec_V = np.fft.fft(arr_V)
+    sp_spec = sp_fft.fft(arr)
+    sp_spec_V = sp_fft.fft(arr_V.value) * unit.V
+
+    np_ifft_plain = _timed_average(lambda: np.fft.ifft(np_spec) * unit.V, repeat)
+    np_ifft_units = _timed_average(lambda: np.fft.ifft(np_spec_V),                 repeat)
+    sp_ifft_plain = _timed_average(lambda: sp_fft.ifft(sp_spec) * unit.V, repeat)
+    sp_ifft_units = _timed_average(lambda: sp_fft.ifft(sp_spec_V.value) * unit.V,     repeat)
+
+    results = {
+        "np_fft": {
+            "plain_ms": np_fft_plain,
+            "with_units_ms": np_fft_units,
+            "ratio": np_fft_units / np_fft_plain,
+        },
+        "sp_fft": {
+            "plain_ms": sp_fft_plain,
+            "with_units_ms": sp_fft_units,
+            "ratio": sp_fft_units / sp_fft_plain,
+        },
+        "np_ifft": {
+            "plain_ms": np_ifft_plain,
+            "with_units_ms": np_ifft_units,
+            "ratio": np_ifft_units / np_ifft_plain,
+        },
+        "sp_ifft": {
+            "plain_ms": sp_ifft_plain,
+            "with_units_ms": sp_ifft_units,
+            "ratio": sp_ifft_units / sp_ifft_plain,
+        },
+    }
+
+    if print_results:
+        print(f"\nFFT / invFFT timing comparison (ms)")
+        print(f"array_size={array_size:,}, repeat={repeat}, seed={seed}")
+        print(f"{'op':<10}  {'plain (ms)':>10}  {'with_units (ms)':>15}  {'ratio':>8}")
+        for op, v in results.items():
+            print(f"{op:<10}  {v['plain_ms']:>10.3f}  {v['with_units_ms']:>15.3f}  {v['ratio']:>7.2f}x")
+
+    return results
+
+
+def test_fft_efficiency_comparison():
+    results = compare_fft_efficiency(print_results=PRINT_RESULTS)
+
+    for op in ("np_fft", "sp_fft", "np_ifft", "sp_ifft"):
+        assert results[op]["plain_ms"] > 0
+        assert results[op]["with_units_ms"] > 0
+        assert results[op]["ratio"] > 0

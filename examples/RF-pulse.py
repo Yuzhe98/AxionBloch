@@ -95,10 +95,10 @@ simu = Simulation(
 # set excitation pulse: 90 degree hard pulse
 # t90_s = 10 * simu.timeStep_s
 simu.excField.set90DegPulse(
-    timeStep_s=simu.timeStep_s,
+    timeStep_s=simu.timeStep,
     timeLen=simu.timeLen,
     gamma_HzToT=simu.gamma_HzToT,
-    t90_s=10 * simu.timeStep_s,
+    t90_s=10 * simu.timeStep,
     nu_rot_Hz=signalFreqRot_Hz,
 )
 

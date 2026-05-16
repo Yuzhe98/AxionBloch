@@ -5,32 +5,80 @@
 # pytest tests/test_MilkyWayAxionHalo.py::test_MilkyWayAxionHalo_initialization -q -s
 # pytest tests/test_MilkyWayAxionHalo.py -k "initialization or RabiFreq" -q -s
 import os
-import time
 import warnings
-
 import pytest
 
-# # numerical computing
-# import numpy as np
-
-# # plotting
-# import matplotlib.pyplot as plt
-# import matplotlib.gridspec as gridspec  # for creating subplots
-# import matplotlib.ticker as mticker
-# from matplotlib.axes import Axes
-
-# # physical units and constants
-# from astropy import units as unit
-# from astropy.units import Quantity, CompositeUnit
-# from astropy.constants import codata2018 as const
-
 from axionbloch.dependency import *
-from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
 from axionbloch.utils import check_norm, check
+
+# Gyromagnetic ratio and magnetic dipole moment of Xe-129
+from axionbloch.constants import gamma_Xe129, mu_Xe129, gamma_p, mu_p
+
+# classes for simulations
+from axionbloch.SimuTools import MagField, Simulations
+from axionbloch.SimuTypes import SimuParams
+from axionbloch.Sample import Sample
+from axionbloch.Apparatus import Magnet
+from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
 
 PRINT_RESULTS = os.getenv("PRINT_RESULTS", "0") == "1"
 SEED = int(os.getenv("SEED", "42"))
 NUM_FIELD = int(os.getenv("NUM_FIELD", "1000"))
+
+
+LXe = Sample(
+    name="Liquid Xe-129",
+    gamma=gamma_Xe129,
+    massDensity=3.1 * unit.g * unit.cm ** (-3),
+    molarMass=131.29 * unit.g / unit.mol,
+    numOfSpinsPerMolecule=1 * unit.one,
+    T2=10 * unit.minute,
+    T1=15 * unit.minute,
+    vol=1 * unit.cm**3,
+    mu=mu_Xe129,
+    temp=163 * unit.K,
+    verbose=False,
+)
+
+# CH3OH
+methanol = Sample(
+    name="C-12 Methanol",
+    gamma=gamma_p,
+    massDensity=0.792 * unit.g * unit.cm ** (-3),
+    molarMass=32.04 * unit.g / unit.mol,
+    numOfSpinsPerMolecule=4 * unit.one,
+    T2=1 * unit.s,
+    T1=5 * unit.s,
+    vol=1 * unit.cm**3,
+    mu=mu_p,
+    temp=300 * unit.K,
+    verbose=False,
+)
+
+# CH3CH2OH
+ethanol = Sample(
+    name="Ethanol",
+    gamma=gamma_p,
+    massDensity=0.78945 * unit.g * unit.cm ** (-3),
+    molarMass=46.069 * unit.g / unit.mol,
+    numOfSpinsPerMolecule=6 * unit.one,
+    T2=1 * unit.s,
+    T1=5 * unit.s,
+    vol=1 * unit.cm**3,
+    mu=mu_p,
+    temp=300 * unit.K,
+    verbose=False,
+)
+
+samples = []
+
+magnet_2ppm = Magnet(B0=1.5 * unit.T, FWHM=2.0 * ppm, nFWHM=100, verbose=PRINT_RESULTS)
+magnet_2ppb = Magnet(
+    B0=2.0 * unit.T, FWHM=5.0 * ppb, nFWHM=10, numPt=100, verbose=PRINT_RESULTS
+)
+
+magnets = []
+
 
 def test_MilkyWayAxionHalo_initialization():
     # TODO: test illegal units for parameters
@@ -91,44 +139,21 @@ def test_MilkyWayAxionHalo_initialization():
             print(msg)
         errors.append(msg)
 
-    assert len(errors) == 1, f"Expected 1 error due to missing nu_a and m_a, but got {len(errors)} errors: {errors}"
+    assert (
+        len(errors) == 1
+    ), f"Expected 1 error due to missing nu_a and m_a, but got {len(errors)} errors: {errors}"
 
-
-# def test_MilkyWayAxionHalo_initialization():
-#     # parameters_all = []
-#     # param_minimum_infor =
-#     # parameters_all.append(
-#     #     {
-#     #         "nu_a": 1.0e6 * unit.Hz,
-#     #         "g_aNN": 1.0e-9 * unit.GeV**(-1),
-#     #         "Qa": None,
-#     #         "v_0": 220.0 * unit.km / unit.s,
-#     #         "v_lab": 233.0 * unit.km / unit.s,
-#     #         "windAngle": None,
-#     #         "rho_E_DM": 0.3 * unit.GeV / unit.cm**3,
-#     #     }
-#     # )
-#     axion = MilkyWayAxionHalo(
-#         name="Milky Way Axion Halo",
-#         nu_a=PhysicalQuantity(1.0e6, "Hz"),
-#         g_aNN=PhysicalQuantity(1.0e-9, "GeV**(-1)"),
-#         Qa=None,
-#         v_0=PhysicalQuantity(220.0, "km/s"),
-#         v_lab=PhysicalQuantity(233.0, "km/s"),
-#         windAngle=None,
-#         rho_E_DM=PhysicalQuantity(0.3, "GeV/cm**3"),
-#         verbose=PRINT_RESULTS,
-#     )
-
-#     axion.getRabiFreq(verbose=True)
-#     frequencies = np.linspace(0.9e6, 1.1e6, 1000)  # in Hz
-#     spec = axion.getAmpSpectra(frequencies=frequencies, verbose=True)
-#     print(spec.shape)
 
 def test_getRabiFreq():
-    rabi_freq = MilkyWayAxionHalo.getRabiFreq(gaNN=1e-9 * unit.GeV**(-1), verbose=PRINT_RESULTS)
-    assert rabi_freq.unit.is_equivalent(unit.Hz), f"Expected Rabi frequency to have units of Hz, but got {rabi_freq.unit}"
-    assert np.isfinite(rabi_freq.value), f"Expected Rabi frequency to be finite, but got {rabi_freq.value}"
+    rabi_freq = MilkyWayAxionHalo.getRabiFreq(
+        gaNN=1e-9 * unit.GeV ** (-1), verbose=PRINT_RESULTS
+    )
+    assert rabi_freq.unit.is_equivalent(
+        unit.Hz
+    ), f"Expected Rabi frequency to have units of Hz, but got {rabi_freq.unit}"
+    assert np.isfinite(
+        rabi_freq.value
+    ), f"Expected Rabi frequency to be finite, but got {rabi_freq.value}"
 
 
 def test_check_norm_with_quantities():
@@ -146,7 +171,7 @@ def test_check_norm_with_quantities():
 
 
 def test_check_norm_with_values():
-    x = np.array([0.0, 1.0, 2.0]) 
+    x = np.array([0.0, 1.0, 2.0])
     y = np.array([0.0, 1.0, 0.0])
 
     with warnings.catch_warnings(record=True) as caught:
@@ -161,7 +186,7 @@ def test_check_norm_with_values():
 
 def test_axion_lineshape():
     """
-    For testing axion_lineshape(). 
+    For testing axion_lineshape().
     """
     nu_a = 1 * unit.MHz
     v_0 = 220.0 * unit.km / unit.s
@@ -206,6 +231,7 @@ def test_axion_lineshape():
 
     assert np.all(spectra[0] == 0)
 
+
 def test_getAmpSpectra_stochastic():
     """Test that without stochasticity, |ampSpectra|^2 integrates to 1."""
 
@@ -235,7 +261,7 @@ def test_getAmpSpectra_stochastic():
         verbose=PRINT_RESULTS,
     )
 
-    # ampSpectra has shape (numSpectra, len(frequencies)); 
+    # ampSpectra has shape (numSpectra, len(frequencies));
     # each row is one spectrum.
 
     assert ampSpectra.shape == (NUM_FIELD, frequencies.shape[0])
@@ -302,3 +328,74 @@ def test_getAmpSpectra_deterministic():
 
     # Assert integral is close to 1 with reasonable tolerance
     assert np.isclose(integral.to_value(unit.one), 1.0, rtol=1e-3)
+
+
+@pytest.mark.parametrize(
+    "sample", [LXe, methanol, ethanol], ids=["LXe", "methanol", "ethanol"]
+)
+@pytest.mark.parametrize(
+    "magnet_kwargs",
+    [
+        {"FWHM": 1 * ppb, "numPt": 1},
+        {"FWHM": 2 * ppm, "numPt": 100},
+        {"FWHM": 10 * ppm, "numPt": 5000},
+    ],
+    ids=["1ppb", "2ppm", "10ppm"],
+)
+def test_Simulation(sample: Sample, magnet_kwargs: dict):
+    g_aNN = 1.0e-9 * unit.GeV ** (-1)
+
+    axion = MilkyWayAxionHalo(
+        name="Milky Way Axion Halo",
+        nu_a=1 * unit.kHz,
+        g_aNN=g_aNN,
+        verbose=False,
+    )
+
+    # B0 is always determined by the sample's gamma and the axion frequency
+    B0 = (axion.nu_a_eff / (sample.gamma / (2 * np.pi))).to(
+        unit.T, equivalencies=unit.dimensionless_angles()
+    )
+    magnet = Magnet(
+        B0=B0,
+        direction=[0, 0, 1],
+        **magnet_kwargs,
+    )
+
+    B_a_rms = (axion.getRabiFreq(gaNN=g_aNN) / (sample.gamma / (2 * np.pi))).to(
+        unit.T, equivalencies=unit.dimensionless_angles()
+    )
+
+    params: SimuParams = {
+        "key_info": {"nu_a": axion.nu_a},
+        "axion": axion,
+        "sample": sample,
+        "magnet": magnet,
+        "excField": MagField(),
+        "B_a_rms": B_a_rms,
+        # Number of random field realizations.
+        "numFields": NUM_FIELD,
+        "rand_seed": SEED,  # random seed
+        # amplitude, polar and azimuthal angle
+        # of the initial magnetization
+        "init_M": 1 * unit.one,
+        "init_M_theta": 0 * unit.rad,
+        "init_M_phi": 0 * unit.rad,
+        # sampling rate and duration of the time series
+        "rate": 1 * unit.Hz,
+        "duration": 4000 * unit.s,
+    }
+
+    # Create and execute the simulation job collection
+    simulations = Simulations(all_params=[params])
+
+    # run the simulation
+    simulations.run(verbose=PRINT_RESULTS)
+
+    assert len(simulations.pool) == 1
+
+    # Post-process results with summary stats and plotting
+    if PRINT_RESULTS:
+        for i, item in enumerate(simulations.pool):
+            item.simu.keepMeanStd()
+            item.simu.displayTrjries()
