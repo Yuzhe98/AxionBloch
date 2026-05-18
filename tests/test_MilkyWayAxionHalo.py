@@ -362,7 +362,7 @@ def test_Simulation(sample: Sample, magnet_kwargs: dict):
         **magnet_kwargs,
     )
 
-    B_a_rms = (axion.getRabiFreq(gaNN=g_aNN) / (sample.gamma / (2 * np.pi))).to(
+    B_a_rms = (axion.getRabiFreq() / (sample.gamma / (2 * np.pi))).to(
         unit.T, equivalencies=unit.dimensionless_angles()
     )
 

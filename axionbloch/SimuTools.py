@@ -1,5 +1,6 @@
 import os
 import time
+import warnings
 
 from axionbloch.dependency import *
 
@@ -79,6 +80,11 @@ class MagField(PhysicalObject):
         """
         generate a pulse in the rotating frame
         """
+        warnings.warn(
+            "setXYPulse_old is deprecated and will be removed in a future version. Use setXYPulse instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         # direction_norm = direction / np.dot(direction, direction)
 
         # excitation along x-axis
@@ -1065,7 +1071,7 @@ class Simulation(PhysicalObject):
     def setRate(self, rate: Quantity):
         assert rate is not None, f"[{self.setRate.__name__}] rate is None"
         self.rate = rate
-        self.rate_Hz = rate.to_value(unit.Hz)
+        self.rate_Hz = float(rate.to_value(unit.Hz))
         self.timeStep = (
             1.0 / self.rate
         )  # the key parameter in setting simulation timing
@@ -1200,6 +1206,11 @@ class Simulation(PhysicalObject):
         plotRate: float = None,  #
         verbose: bool = False,
     ):
+        warnings.warn(
+            "monitorTrajectories is deprecated and will be removed in a future version.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         if plotRate is None:
             plotRate = self.rate_Hz
 
@@ -1630,7 +1641,6 @@ class Simulation(PhysicalObject):
             print(
                 "WARNING: plotrate > self.simurate. plotrate will be decreased to simurate"
             )
-            # warnings.warn('plotrate > self.simurate. plotrate will be decreased to simurate', DeprecationWarning)
             plotrate = self.rate_Hz
             plotintv = 1
         else:

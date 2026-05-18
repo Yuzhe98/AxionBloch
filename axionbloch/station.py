@@ -20,7 +20,7 @@ class Station:
         """
         A station on Earth. 
         The station's position is specified by its latitude, longitude, and elevation.
-        The latitude and longitude are specified by PhysicalQuantity objects, with the N/S and E/W semispheres indicated. 
+        The latitude and longitude are specified by astropy.unit.Quantity objects, with the N/S and E/W semispheres indicated. 
         The loaction is converted to spherical coordinates (theta, phi). phi=0 is the prime meridian, and phi increases towards the east. theta=0 is the north pole, and theta increases towards the south pole.
         """
 

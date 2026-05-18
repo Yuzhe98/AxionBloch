@@ -99,7 +99,7 @@ class MilkyWayAxionHalo(PhysicalObject):
             "tau_a_est": "s",
         }
         # # self.generalQuantities = {"RCF_freq": "Hz", "rate": "Hz", "duration": "s"}
-        # # self.Omega_a_rms = 0.5 * self.gaNN * (2 * const.hbar * const.c * self.rho_E_DM)**(1/2) * self.v_lab * np.cos(windAngle) * PhysicalQuantity(1e-15, "T")
+        # # self.Omega_a_rms = 0.5 * self.gaNN * (2 * const.hbar * const.c * self.rho_E_DM)**(1/2) * self.v_lab * np.cos(windAngle) * Quantity(1e-15, "T")
         # self.useCommonUnits()
 
     @classmethod
@@ -174,8 +174,8 @@ class MilkyWayAxionHalo(PhysicalObject):
         logPrefix = f"[{MilkyWayAxionHalo.__name__}.{MilkyWayAxionHalo.axion_lineshape.__name__}]"
         # ----------- prepare to generate the axion lineshape ----------- #
         # return the lineshape under certain special circumstances
-        # c = 299792458.0  # Speed of light (in m/s)
-        v_0, v_lab = np.abs(v_0), np.abs(v_lab)
+        v_0, v_lab = Quantity(np.abs(v_0)), Quantity(np.abs(v_lab))
+        
         # Q_a = 1e6
         Q_a = (const.c / v_0) ** 2.0
         Q_a = Q_a.to(unit.one)

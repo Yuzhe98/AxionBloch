@@ -16,16 +16,7 @@
 # 2      2    5              5d     5.072e-18       3.448e-19       3.871e+03
 # 1      3    5              5f     5.015e-18       2.420e-19       3.243e+03
 # 0      4    5              5g     nan             nan             nan
-
-import signal
-import time
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-
-
-from axionbloch.enphylope import PhysicalQuantity
-from axionbloch.constants import c as c_SI, h_Planck
+from axionbloch.dependency import *
 from axionbloch.utils import Lorentzian, coh_time_g1
 
 max_n_r = 20  # maximum principal quantum number to plot
@@ -33,11 +24,11 @@ quantum_l = 0  # angular momentum quantum number
 
 # axion Compton frequency
 # 1 MHz
-nu_a = PhysicalQuantity(1, "MHz")
+nu_a = 1 * unit.MHz
 # axion mass
-m_a = nu_a * h_Planck / c_SI**2
+m_a = nu_a * const.h / const.c**2
 print("axion Compton frequency =", nu_a)
-print("axion mass =", m_a.to("kg"), " =", m_a.to("eV/c**2"))
+print("axion mass =", m_a.to(unit.kg), " =", m_a.to(unit.eV/const.c))
 
 
 duration_s = 1e2  # in seconds

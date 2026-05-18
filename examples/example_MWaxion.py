@@ -1,9 +1,7 @@
 # Example script to run axion NMR simulations
 
+# numpy, matplotlib, astropy dependency
 from axionbloch.dependency import *
-
-# For handling quantities with units.
-from axionbloch.enphylope import PhysicalQuantity as PQ
 
 # Gyromagnetic ratio and magnetic dipole moment of Xe-129
 from axionbloch.constants import gamma_Xe129, mu_Xe129
@@ -81,26 +79,29 @@ magnet = Magnet(
     FWHM=2 * ppm,
 )
 
+B_a_rms = (axion.getRabiFreq() / (sample.gamma / (2 * np.pi))).to(
+    unit.T, equivalencies=unit.dimensionless_angles()
+)
+
 # Bundle all inputs into one dictionary
 params: SimuParams = {
     "key_info": {"nu_a": axion.nu_a},
     "axion": axion,
     "sample": sample,
     "magnet": magnet,
-    "excField": MagField(),  # excitation field
-    # rms of the pseudomagnetic field
-    "B_a_rms": axion.getRabiFreq() / (sample.gamma),
+    "excField": MagField(),
+    "B_a_rms": B_a_rms,
     # Number of random field realizations.
     "numFields": 1000,
     "rand_seed": 10,  # random seed
     # amplitude, polar and azimuthal angle
     # of the initial magnetization
-    "init_M": PQ(1.0, ""),
-    "init_M_theta": PQ(0, "rad"),
-    "init_M_phi": PQ(0, "rad"),
+    "init_M": 1 * unit.one,
+    "init_M_theta": 0 * unit.rad,
+    "init_M_phi": 0 * unit.rad,
     # sampling rate and duration of the time series
-    "rate": PQ(1, "Hz"),
-    "duration": PQ(4000, "s"),
+    "rate": 1 * unit.Hz,
+    "duration": 4000 * unit.s,
 }
 
 # Create and execute the simulation job collection

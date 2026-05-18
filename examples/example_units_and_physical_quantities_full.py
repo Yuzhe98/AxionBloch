@@ -9,7 +9,6 @@ print("dimensionless quantities with python scalars:")
 print("1.0 + 1.0 * unit.one + 1.0 * unit.one =", a)
 # 3.0
 
-
 # linewidth in units of ppm / ppb / ppt
 # create dimensionless Quantity objects so adding to scalars works
 linewidth = 1.0e-6 + 1.0 * ppm + 1.0e-6 * unit.one
@@ -28,8 +27,10 @@ print("speed in SI units:", speed.si)
 # 1000.0 m / s
 
 speed = Quantity(1.0, "km / s")
-print("speed in CGS units:", speed.cgs)
+print("speed (defined by unit string) in CGS units:", speed.cgs)
 # 100000.0 cm / s
+print("speed in unit of light speed:", speed.to(const.c))
+# 3.3356409519815205e-06 2.99792e+08 m / s
 
 # Define a quantity from scalars and units:
 # a magnetic field of 1 Gauss
@@ -57,8 +58,9 @@ print("phases at different time stamps:", np.sin(phases))
 # [0.  0.5 1. ]
 
 # absolute value
-speed = -220.0 * unit.km / unit.s
+speed: Quantity[unit.km / unit.s] = -220.0 * unit.km / unit.s
 print("speed:", speed)
+speed = np.abs(speed)
 print("absolute value of speed:", np.abs(speed))
 
 # convert to numpy array (real signal)

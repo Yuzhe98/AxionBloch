@@ -119,13 +119,13 @@ simu_all = Simulations(name="Axion-Xe_NMR-simulations", all_params=all_params)
 # print("simu_all.run started", flush=True)
 simu_all.run(autoStart=False, verbose=True)
 
-# simu_all.pool[0].simunit.monitorTrajectories()
+# simu_all.pool[0].simu.monitorTrajectories()
 for i in range(len(simu_all.pool)):
-    simu_all.pool[i].simunit.keepMeanStd()
-    simu_all.pool[i].simunit.displayTrjries()
-    # check(simu_all.pool[i].simunit.T2star_s)
-    # check(simu_all.pool[i].simunit.Tdelta_s)
-    # check(simu_all.pool[i].simunit.T2_s)
+    simu_all.pool[i].simu.keepMeanStd()
+    simu_all.pool[i].simu.displayTrjries()
+    # check(simu_all.pool[i].simu.T2star_s)
+    # check(simu_all.pool[i].simu.Tdelta_s)
+    # check(simu_all.pool[i].simu.T2_s)
 simu_all.saveToPkl(
     dir=os.path.dirname(os.path.abspath(__file__))  # , fname="new_simulation"
 )
@@ -133,22 +133,22 @@ save_data = True
 if save_data:
     i = 0
     simu: Simulation = simu_all.pool[i].simu
-    timeStamp_s = simunit.getTimeStamp()
-    # check(simunit.excField.B_vec.shape)
-    # check(simunit.trjry.shape)
+    timeStamp_s = simu.getTimeStamp()
+    # check(simu.excField.B_vec.shape)
+    # check(simu.trjry.shape)
     np.savez(
         "C:\\Users\\zhenf\\D\\Yu0702\\CASPEr-Collaboration\\AxionBloch-paper/figures/Axion-Xe_NMR-simulations-1.npz",
         timeStamp_s=timeStamp_s,
-        B_vec_mean=simunit.excField.B_vec_mean,
-        B_vec_std=simunit.excField.B_vec_std,
-        M_mean=simunit.M_mean,
-        M_std=simunit.M_std,
-        Mxy_mrs=simunit.Mxy_mrs,
-        Mxy_srs=simunit.Mxy_srs,
-        # trjry=simunit.trjry,
+        B_vec_mean=simu.excField.B_vec_mean,
+        B_vec_std=simu.excField.B_vec_std,
+        M_mean=simu.M_mean,
+        M_std=simu.M_std,
+        Mxy_mrs=simu.Mxy_mrs,
+        Mxy_srs=simu.Mxy_srs,
+        # trjry=simu.trjry,
         T2_s=sample.T2.to(unit.s).value,
-        Tdelta_s=simu_all.pool[i].simunit.Tdelta_s,
+        Tdelta_s=simu_all.pool[i].simu.Tdelta_s,
         T_1_s=sample.T1.value_in("s"),
         pol=sample.pol,
-        # init_M=simunit.init_M.value_in(""),
+        # init_M=simu.init_M.value_in(""),
     )
