@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     )  # Simulation engine and magnetic field type
 
 # Import physical quantities and modules used in simulation
-from axionbloch.enphylope import PhysicalQuantity  # physical quantity with units
+from axionbloch.dependency import *  # physical quantity with units
 from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo  # axion field information
 from axionbloch.Sample import Sample  # NMR sample
 from axionbloch.Apparatus import Magnet  # magnet
@@ -32,14 +32,14 @@ class SimuParams(TypedDict):
     sample: Sample  # NMR sample
     magnet: Magnet  # magnetic field apparatus
     excField: MagField  # excitation (magnetic) field
-    B_a_rms: PhysicalQuantity | None  # RMS axion-induced magnetic field
+    B_a_rms: Quantity | None  # RMS axion-induced magnetic field
     numFields: int  # number of magnetic fields
     rand_seed: int  # random seed for reproducibility
-    init_M: PhysicalQuantity | None  # initial magnetization magnitude
-    init_M_theta: PhysicalQuantity  # initial polar angle of magnetization
-    init_M_phi: PhysicalQuantity  # initial azimuthal angle of magnetization
-    rate: PhysicalQuantity | None  # simulation rate
-    duration: PhysicalQuantity | None  # simulation duration
+    init_M: Quantity | None  # initial magnetization magnitude
+    init_M_theta: Quantity  # initial polar angle of magnetization
+    init_M_phi: Quantity  # initial azimuthal angle of magnetization
+    rate: Quantity | None  # simulation rate
+    duration: Quantity | None  # simulation duration
 
 
 # -------------------------------------------------------------------
