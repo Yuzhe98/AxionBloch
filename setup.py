@@ -38,7 +38,7 @@ if not on_rtd:
 
 setup(
     name="axionbloch",
-    version="0.1.1",
+    version="0.1.2",
     packages=find_packages(),
     ext_modules=ext_modules,
     cmdclass={"build_ext": build_ext},
