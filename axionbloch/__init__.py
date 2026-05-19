@@ -27,8 +27,6 @@ DataAnalysis
     NMR signal processing (:class:`~axionbloch.DataAnalysis.Signal`).
 utils
     General-purpose helpers (curve fitting, debugging, base classes).
-enphylope
-    Unit-aware quantity class (:class:`~axionbloch.enphylope.PhysicalQuantity`).
 """
 try:
     from .blochsimulation import *

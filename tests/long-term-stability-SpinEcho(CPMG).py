@@ -3,11 +3,12 @@
 import numpy as np
 import time
 
+from astropy import units as unit
+
 from axionbloch.SimuTools import MagField, Simulation
 from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet
 from axionbloch.utils import check
-from axionbloch.enphylope import PhysicalQuantity
 from axionbloch.constants import gamma_p, mu_p
 
 
@@ -23,20 +24,20 @@ T2_s = 5.0
 sample = Sample(
     name="Ethanol",  # name of the sample
     gamma=gamma_p,  # [Hz/T]. Remember input it with 2 * np.pi
-    massDensity=PhysicalQuantity(0.78945, "g / cm**3 "),
-    molarMass=PhysicalQuantity(46.069, "g / mol"),  # molar mass
-    numOfSpinsPerMolecule=PhysicalQuantity(6, ""),  # number of spins per molecule
-    T2=PhysicalQuantity(T2_s, "s"),  #
-    T1=PhysicalQuantity(T1_s, "s"),  #
-    vol=PhysicalQuantity(1, "cm**3"),
+    massDensity=0.78945 * unit.g / unit.cm**3,
+    molarMass=46.069 * unit.g / unit.mol,
+    numOfSpinsPerMolecule=6 * unit.one,
+    T2=T2_s * unit.s,
+    T1=T1_s * unit.s,
+    vol=1 * unit.cm**3,
     mu=mu_p,  # magnetic dipole moment
     verbose=False,
 )
 
 magnet = Magnet(
     name="detection magnet",
-    B0=PhysicalQuantity(RCF_Freq_Hz, "Hz") / (sample.gamma / (2 * np.pi)),
-    FWHM=PhysicalQuantity(1 / (np.pi * Tdelta_s) / RCF_Freq_Hz, ""),
+    B0=RCF_Freq_Hz * unit.Hz / (sample.gamma / (2 * np.pi)),
+    FWHM=(1 / (np.pi * Tdelta_s) / RCF_Freq_Hz) * unit.one,
     nFWHM=10.0,
 )
 magnet.setHomogeneity(
@@ -54,15 +55,15 @@ simu = Simulation(
     sample=sample,
     magnet=magnet,
     excField=excField,
-    rate=PhysicalQuantity(1000, "Hz"),  #
-    duration=PhysicalQuantity(20, "s"),
+    rate=1000 * unit.Hz,
+    duration=20 * unit.s,
     verbose=True,
 )
 simu.excField.setCPMGPulseTrain(
-    timeStep_s=simu.timeStep,
+    timeStep_s=simu.timeStep.to_value(unit.s),
     timeLen=simu.timeLen,
     gamma_HzToT=simu.gamma_HzToT,
-    t90_s=3 * simu.timeStep,
+    t90_s=3 * simu.timeStep.to_value(unit.s),
     tau_s=10 * Tdelta_s,
     numEcho=10,
     nu_rot_Hz=0,

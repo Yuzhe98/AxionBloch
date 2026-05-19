@@ -9,7 +9,6 @@ from astropy import units as unit
 from astropy.constants import codata2018 as const
 from astropy.units import Quantity
 
-from axionbloch.enphylope import PhysicalQuantity as PQ
 from axionbloch.constants import AtomicUnits as AU
 
 from axionbloch.utils import check
@@ -378,11 +377,8 @@ def earth_grav_potential_earth_center_():
         fill_value="extrapolate",
         bounds_error=False,
     )
-    r_unit = PQ(1, "meter")
-    Phi_unit = (
-        PQ(1, "m**3/kg/s**2") * PQ(1, "kg") / PQ(1, "meter")
-    )  #  = PQ(1, "joule / kilogram")
-    # print(Phi_unit.to("joule / kilogram"))
+    r_unit = unit.meter
+    Phi_unit = unit.joule / unit.kilogram
     return Phi_func, r_unit, Phi_unit
 
 
