@@ -5,9 +5,7 @@ exposes the corresponding unit vector and distance from the Earth's centre.
 Three pre-built instances are provided: :data:`Mainz`, :data:`Baltimore`, and
 :data:`Sanya`.
 """
-import numpy as np
-from astropy import units as unit
-from astropy.units import Quantity
+from axionbloch.dependency import np, unit, Quantity
 from axionbloch.constants import earth_radius
 
 
