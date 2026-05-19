@@ -1,7 +1,7 @@
 # To preview the docs locally
 # cd docs
 # sphinx-build -b html . _build/html
-# or 
+# or
 # sphinx-build -b html -a . _build/html
 
 import os
@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.abspath(".."))
 
 project = "axionbloch"
 author = "Yuzhe Zhang"
-release = "0.1.1"
+release = "0.1.2"
 
 
 extensions = [
@@ -26,7 +26,7 @@ source_suffix = {
     ".md": "markdown",
 }
 
-master_doc = 'index'
+master_doc = "index"
 
 # # Enable MyST extensions
 # myst_enable_extensions = [

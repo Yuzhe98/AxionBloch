@@ -24,13 +24,13 @@ sample = Sample(
     gamma=gamma_Xe129,  # [Hz/T]. Remember input it with 2 * np.pi
     massDensity=3.1 * unit.g / unit.cm**3,  # mass density at STP
     molarMass=131.29 * unit.g / unit.mol,  # molar mass [g/mol]
-    numOfSpinsPerMolecule=1,  # number of spins per molecule
+    numOfSpinsPerMolecule=1 * unit.one,  # number of spins per molecule
     T2=355 * unit.s,  #
     T1=1800 * unit.s,  #
     vol=1 * unit.cm**3,
     mu=mu_Xe129,  # magnetic dipole moment
     temp=300 * unit.K,  # room temperature
-    pol=0.5,  # polarization
+    pol=0.5 * unit.one,  # polarization
     verbose=False,
 )
 
@@ -60,7 +60,7 @@ all_params = []
 
 for nu_a in nu_a_array:
     for mag_FWHM in mag_FWHMs:
-        nu_a_Hz = nu_a.value_in("Hz")
+        nu_a_Hz = nu_a.to_value(unit.Hz)
         print("Axion Compton frequency =", nu_a, flush=True)
         time.sleep(0.1)
         axion = MilkyWayAxionHalo(
@@ -71,7 +71,7 @@ for nu_a in nu_a_array:
 
         # set RCF frequency to it RCF_Freq_Hz = nu_a*(1+v_a^2/c^2)
         RCF_freq = axion.nu_a_eff
-        RCF_freq_Hz = RCF_freq.to(unit.Hz).value
+        RCF_freq_Hz = RCF_freq.to_value(unit.Hz)
 
         # set the detection magnet (bias field) accordingly
         # also set detection magnet (bias field) homogeneity
@@ -146,9 +146,9 @@ if save_data:
         Mxy_mrs=simu.Mxy_mrs,
         Mxy_srs=simu.Mxy_srs,
         # trjry=simu.trjry,
-        T2_s=sample.T2.to(unit.s).value,
+        T2_s=sample.T2.to_value(unit.s),
         Tdelta_s=simu_all.pool[i].simu.Tdelta_s,
-        T_1_s=sample.T1.value_in("s"),
+        T_1_s=sample.T1.to_value(unit.s),
         pol=sample.pol,
         # init_M=simu.init_M.value_in(""),
     )

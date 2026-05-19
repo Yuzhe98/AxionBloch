@@ -5,8 +5,19 @@ from axionbloch.utils import PhysicalObject, check, check_norm
 
 
 class MilkyWayAxionHalo(PhysicalObject):
-    # Create the "axion wind" (axion field) object
-    # you can get propeties of the axion field, computed based on the input information
+    """Axion dark-matter field (axion wind) from the Milky Way halo.
+
+    Models the pseudomagnetic field experienced by nuclear spins due to the
+    coherent oscillation of axion dark matter.  Uses the Standard Halo Model
+    (SHM) velocity distribution.
+
+    The class provides:
+
+    - Axion field properties (Compton frequency, quality factor, coherence time).
+    - Analytical lineshapes for gradient and non-gradient coupling cases
+      (Gramolin et al.).
+    - Stochastic amplitude spectra for time-domain simulations.
+    """
 
     # ----------- parameters ----------- #
     # Compton frequency
@@ -43,8 +54,35 @@ class MilkyWayAxionHalo(PhysicalObject):
         rho_E_DM: Quantity = 0.3 * unit.GeV / unit.cm**3,
         verbose: bool = False,
     ):
-        """
-        initialize NMR simulation
+        """Initialise the Milky Way axion halo model.
+
+        Provide either ``nu_a`` or ``m_a`` (or both, in which case they are
+        checked for consistency).  If ``Qa`` is omitted it is estimated from the
+        Standard Halo Model as ``(c / v_lab)^2``.
+
+        Parameters
+        ----------
+        name : str
+            Human-readable label.
+        nu_a : Quantity, optional
+            Axion Compton frequency (Hz).
+        m_a : Quantity, optional
+            Axion mass (kg or equivalent).
+        g_aNN : Quantity, optional
+            Axion-nucleon coupling constant (GeV⁻¹).
+        Qa : Quantity, optional
+            Axion quality factor (dimensionless).  Defaults to ``(c/v_lab)^2``.
+        v_0 : Quantity
+            Local circular-rotation speed of the galaxy (km/s).
+        v_lab : Quantity
+            Speed of the laboratory relative to the galactic rest frame (km/s).
+        windAngle : Quantity, optional
+            Angle between the sensitive axis and the axion wind direction (rad).
+        rho_E_DM : Quantity
+            Local dark-matter energy density (GeV/cm³).
+            SHM: 0.3, commonly-used: 0.4, SHM++ / PDG 2024: 0.55.
+        verbose : bool
+            Print derived quantities after construction.
         """
         super().__init__()
         self.name = name
@@ -154,22 +192,45 @@ class MilkyWayAxionHalo(PhysicalObject):
         alpha:Quantity=0.0*unit.rad,
         verbose:bool=False,
     ):
-        """
-        Calculate analytical lineshapes.
-        Be careful! nu should not be too far from nu_a (compared to the axion linewidth).
-        max of nu / nu_a should be smaller than 103%
+        """Calculate the analytical axion power-spectral-density lineshape.
+
+        Implements Eqs. (12), (19), (20) of the Gramolin lineshape paper for
+        the non-gradient, parallel-gradient, and perpendicular-gradient coupling
+        cases respectively.
+
+        .. warning::
+            ``nu`` should not be too far above ``nu_a``.  The ratio
+            ``nu / nu_a`` must remain below ~1.03 to avoid numerical overflow in
+            the ``sinh(beta)`` term.
 
         Parameters
         ----------
+        v_0 : Quantity [m/s]
+            Local circular-rotation speed of the Milky Way.
+        v_lab : Quantity [m/s]
+            Speed of the laboratory in the galactic rest frame.
+        nu_a : Quantity [Hz]
+            Axion Compton frequency.
+        nu : Quantity array [Hz]
+            Frequency array at which to evaluate the lineshape.  Must be
+            uniformly spaced.
+        case : str
+            Coupling geometry: ``'non-grad'``, ``'grad_par'``, or
+            ``'grad_perp'``.
+        alpha : Quantity [rad]
+            Angle between the sensitive axis and the axion wind velocity.
+        verbose : bool
+            Print diagnostic information.
 
-        Return
-        ------
-        A float array of the axion lineshape
+        Returns
+        -------
+        Quantity array, shape ``(len(nu),)`` [Hz⁻²]
+            Power spectral density lineshape, normalised so that
+            ``integral(lineshape * dnu) = 1``.
 
-        Reference
-        ---------
-        A. Gramolin: https://github.com/gramolin/lineshape
-
+        References
+        ----------
+        A. Gramolin et al., https://github.com/gramolin/lineshape
         """
         logPrefix = f"[{MilkyWayAxionHalo.__name__}.{MilkyWayAxionHalo.axion_lineshape.__name__}]"
         # ----------- prepare to generate the axion lineshape ----------- #
@@ -372,12 +433,36 @@ class MilkyWayAxionHalo(PhysicalObject):
         use_stoch: bool = True,
         verbose: bool = False,
     ) -> np.ndarray:
-        """
-        get the normalized axion wind spectrum / spectra at the specified frequencies
+        """Return complex amplitude spectra for the axion pseudo-magnetic field.
+
+        Draws ``numSpectra`` realisations of the stochastic axion field in the
+        frequency domain using the SHM lineshape as the power spectral density.
+        Each realisation has random phases uniformly distributed in ``[0, 2π)``.
+        When ``use_stoch=True``, amplitudes are additionally drawn from an
+        exponential distribution, matching the expected statistics of a
+        narrowband stochastic signal.
+
         Parameters
         ----------
-        frequencies: absolute frequencies at which to evaluate the axion wind spectrum, in [Hz]
-        case:  "non-grad", "grad_par" or "grad_perp", determines the lineshape function to use
+        frequencies : Quantity array [Hz]
+            Absolute frequencies at which to evaluate the spectrum.
+        case : str
+            Lineshape coupling case: ``'non-grad'``, ``'grad_par'``, or
+            ``'grad_perp'``.
+        numSpectra : int
+            Number of independent field realisations to generate.
+        rand_seed : int, optional
+            Seed for the random-number generator (for reproducibility).
+        use_stoch : bool
+            If ``True``, draw stochastic amplitudes; if ``False``, use the
+            deterministic ``sqrt(PSD)`` amplitude.
+        verbose : bool
+            Unused; reserved for future diagnostic output.
+
+        Returns
+        -------
+        ndarray, shape ``(numSpectra, len(frequencies))``
+            Complex amplitude spectra.
         """
 
         PSD_lineshape = MilkyWayAxionHalo.axion_lineshape(

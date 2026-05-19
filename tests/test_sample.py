@@ -1,3 +1,26 @@
+"""Tests for axionbloch.Sample.Sample.
+
+Covers three representative samples via a parametrised fixture:
+
+- ``methanol``    – proton-bearing liquid (¹H NMR)
+- ``liquid Xe-129`` – spin-½ noble-gas NMR
+- ``negative temperature Xe-129`` – verifies the ValueError guard in
+  :meth:`~axionbloch.Sample.Sample.getThermalPol` for unphysical temperatures
+
+Test functions
+--------------
+test_sample_initialization_runs
+    Checks that spin number density and total spin count are finite and have
+    the correct units after construction.
+test_getThermalPol_runs
+    Checks that thermal polarisation is finite and dimensionless.
+test_getThermalPol_raises_below_absolute_zero
+    Verifies that a negative temperature raises ``ValueError``.
+test_getM0_runs
+    Checks that magnetisation M₀ is finite and has units of A/m.
+test_getM0eqb_runs
+    Checks the equilibrium magnetisation end-to-end pipeline.
+"""
 import numpy as np
 import pytest
 from astropy import units as unit
@@ -55,6 +78,7 @@ SAMPLE_CASES = [
 
 @pytest.fixture(params=SAMPLE_CASES, ids=lambda case: case["name"])
 def sample(request) -> Sample:
+    """Parametrised fixture that yields one Sample per entry in SAMPLE_CASES."""
     case = request.param
     return Sample(
         name=case["name"],
@@ -73,6 +97,7 @@ def sample(request) -> Sample:
 
 
 def test_sample_initialization_runs(sample: Sample):
+    """Sample construction derives spinNumDensity and totalNumOfSpins correctly."""
     assert sample.spinNumDensity.unit.is_equivalent(unit.cm ** (-3))
     assert np.isfinite(sample.spinNumDensity.value)
 
@@ -81,6 +106,7 @@ def test_sample_initialization_runs(sample: Sample):
 
 
 def test_getThermalPol_runs(sample: Sample):
+    """getThermalPol returns a finite dimensionless polarisation for T > 0."""
     pol = sample.getThermalPol(B_pol=1.0 * unit.T, temp=300.0 * unit.K)
 
     assert pol.unit == unit.one
@@ -88,11 +114,13 @@ def test_getThermalPol_runs(sample: Sample):
 
 
 def test_getThermalPol_raises_below_absolute_zero(sample: Sample):
+    """getThermalPol raises ValueError for temperatures below absolute zero."""
     with pytest.raises(ValueError, match=r">= 0 K"):
         sample.getThermalPol(B_pol=1.0 * unit.T, temp=-1.0 * unit.K)
 
 
 def test_getM0_runs(sample: Sample):
+    """getM0 returns a finite magnetisation with units of A/m."""
     M0 = sample.getM0(pol=1e-6 * unit.one)
 
     assert M0.unit.is_equivalent(unit.A / unit.m)
@@ -100,6 +128,7 @@ def test_getM0_runs(sample: Sample):
 
 
 def test_getM0eqb_runs(sample: Sample):
+    """getM0eqb chains getThermalPol → getM0 and returns a finite A/m value."""
     M0eqb = sample.getM0eqb(B_pol=1.0 * unit.T, temp=300.0 * unit.K)
 
     assert M0eqb.unit.is_equivalent(unit.A / unit.m)

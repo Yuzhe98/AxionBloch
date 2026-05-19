@@ -1,6 +1,14 @@
-##############################################
-# for illustrating atomic and SI unit system
-##############################################
+"""Interactive script illustrating the Hartree atomic unit system via Pint.
+
+Run directly (``python tests/atomic_unit.py``) to print:
+
+- Fundamental constants in SI (hbar, m_e, e, ε₀, a₀, Eh).
+- The atomic-unit time ``tau = hbar/Eh``.
+- Conversion factors from SI base units to atomic units:
+  mass → m_e, length → a₀, time → tau, current → e/tau, temperature → Eh/k_B.
+
+This file is not a pytest test suite; it is a standalone educational reference.
+"""
 from pint import UnitRegistry
 
 # Create a Unit Registry for managing units

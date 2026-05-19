@@ -6,6 +6,28 @@ from axionbloch.utils import Lorentzian
 
 
 class Magnet:
+    """DC magnetic field apparatus.
+
+    Models a static polarising magnet whose field may be spatially inhomogeneous.
+    Inhomogeneity is characterised by a Lorentzian lineshape with a given FWHM,
+    and the field distribution is discretised into ``numPt`` spin packets for
+    simulation.
+
+    Attributes
+    ----------
+    name : str
+    B0 : astropy Quantity
+        Nominal field strength.
+    direction : list or None
+        Unit vector along B0 (laboratory frame).
+    FWHM : astropy Quantity
+        Fractional field inhomogeneity (dimensionless, e.g. ppm).
+    B_spread : ndarray
+        Sampled B0 values for each spin packet.
+    ratios : ndarray
+        Fractional weight of each spin packet (sums to 1).
+    """
+
     name:str
     B0: Quantity | None = None
     direction: list | None = None
@@ -23,8 +45,24 @@ class Magnet:
         verbose: bool = False,
     ):
         """
+        Parameters
+        ----------
         name : str
-            name of the SQUID. default to 'PhiC6L1W'. 'PhiC73L1' is the other option
+            Human-readable label for this magnet.
+        B0 : Quantity
+            Nominal DC field strength (e.g. ``0.1 * unit.T``).
+        direction : list, optional
+            Unit vector specifying the field orientation in the lab frame.
+        FWHM : Quantity
+            Fractional full-width at half-maximum of the field inhomogeneity
+            (dimensionless, e.g. ``1e-6 * unit.one`` for 1 ppm).
+        numPt : int
+            Number of discrete spin packets used to model field inhomogeneity.
+            ``numPt=1`` treats the field as perfectly homogeneous.
+        nFWHM : float
+            Half-range of the field spread expressed in units of FWHM.
+        verbose : bool
+            Print diagnostic information.
         """
         self.name = name
         assert nFWHM >= 0
@@ -51,8 +89,26 @@ class Magnet:
         showPlot: bool = False,
         verbose: bool = False,
     ):
-        """
-        set the homogeneity sampling using ...some complicated methods
+        """Set the spin-packet sampling of the field inhomogeneity.
+
+        Discretises a Lorentzian field distribution into ``numPt`` spin packets
+        using a non-uniform sampling scheme (density proportional to
+        ``|x|^(1/2)`` in normalised coordinates) to oversample the peak region.
+        Each packet is assigned a weight ``ratio`` equal to its fraction of the
+        total Lorentzian area so that weighted averages reproduce the continuous
+        lineshape.
+
+        For ``numPt == 1`` or zero FWHM the field is treated as homogeneous and
+        a single packet at ``B0`` with weight 1 is used.
+
+        Parameters
+        ----------
+        numPt : int or float, optional
+            Override the stored ``self.numPt``.
+        showPlot : bool
+            Display diagnostic histograms of the sampled B values and weights.
+        verbose : bool
+            Print diagnostic information.
         """
         # update self.numPt if
         if numPt is not None:

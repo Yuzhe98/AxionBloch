@@ -1,3 +1,10 @@
+"""Type definitions shared across the simulation layer.
+
+:class:`SimuParams` (TypedDict) describes the full set of parameters passed to
+a Bloch-equation simulation run. :class:`SimuEntry` (dataclass) pairs a live
+:class:`~axionbloch.SimuTools.Simulation` object with its :class:`SimuParams`
+for bookkeeping across multiple runs.
+"""
 # Enable forward references for type hints (Python 3.7+)
 
 # This allows us to reference classes that are defined later or imported only during type checking.

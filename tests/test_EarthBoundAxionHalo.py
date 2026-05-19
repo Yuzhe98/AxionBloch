@@ -1,18 +1,35 @@
+"""Tests for axionbloch.EarthBoundAxionHalo utility functions.
+
+Covers the Preliminary Reference Earth Model (PREM) data loader and the
+Earth gravitational-potential helper used by the bound-axion Schrödinger
+solver.
+
+Run with::
+
+    pytest tests/test_EarthBoundAxionHalo.py -q
+"""
 import numpy as np
 
 from astropy import units as unit
 from astropy.constants import codata2018 as const
 from astropy.units import Quantity
 
-from axionbloch.EarthBoundAxionHalo import loadPEMdata, earth_grav_potential_earth_center, plot_earth_grav_potential
+from axionbloch.EarthBoundAxionHalo import (
+    loadPEMdata,
+    earth_grav_potential_earth_center,
+    plot_earth_grav_potential,
+)
+
 
 def test_loadPEMdata():
+    """loadPEMdata returns a dict with matching-length radius and density arrays."""
     data = loadPEMdata()
     assert "radius_m" in data
     assert "density_kg_m3" in data
     assert len(data["radius_m"]) == len(data["density_kg_m3"])
 
 def test_earth_grav_potential_earth_center_returns_valid_objects():
+    """earth_grav_potential_earth_center returns a callable and compatible unit objects."""
     phi_func, r_unit, phi_unit = earth_grav_potential_earth_center()
 
     assert callable(phi_func)
@@ -21,6 +38,7 @@ def test_earth_grav_potential_earth_center_returns_valid_objects():
 
 
 def test_earth_grav_potential_earth_center_is_symmetric_and_finite():
+    """The gravitational potential is finite and symmetric about r = 0 (even function)."""
     phi_func, _, _ = earth_grav_potential_earth_center()
     
     test_radius = 1e3 * unit.R_earth
@@ -33,6 +51,7 @@ def test_earth_grav_potential_earth_center_is_symmetric_and_finite():
     assert np.allclose(phi_pos, phi_neg, rtol=1e-10, atol=1e-10)
 
 def test_plot_earth_grav_potential_runs_without_error():
+    """plot_earth_grav_potential completes without raising when showplot=False."""
     try:
         plot_earth_grav_potential(showplot=False)
     except Exception as e:

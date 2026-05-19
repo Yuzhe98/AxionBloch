@@ -1,9 +1,25 @@
-# COMMANDS TO RUN THIS TEST:
-# $env:NUMPY_PERF_PRINT_RESULTS="0"; pytest tests/test_MilkyWayAxionHalo.py -s -q --tb=no
-# $env:NUMPY_PERF_PRINT_RESULTS="1"; pytest tests/test_MilkyWayAxionHalo.py -s
-# pytest tests/test_MilkyWayAxionHalo.py -q -s
-# pytest tests/test_MilkyWayAxionHalo.py::test_MilkyWayAxionHalo_initialization -q -s
-# pytest tests/test_MilkyWayAxionHalo.py -k "initialization or RabiFreq" -q -s
+"""Tests for axionbloch.MilkyWayAxionHalo and related utilities.
+
+Also covers :func:`~axionbloch.utils.check_norm` and the end-to-end
+``Simulations`` pipeline that ties together an axion model, an NMR sample,
+and a magnet.
+
+Environment variables
+---------------------
+PRINT_RESULTS=1
+    Print intermediate values and call ``displayTrjries()`` after simulation.
+SEED
+    Integer random seed (default 42).
+NUM_FIELD
+    Number of stochastic field realisations (default 1000).
+
+Useful run commands::
+
+    pytest tests/test_MilkyWayAxionHalo.py -q -s
+    pytest tests/test_MilkyWayAxionHalo.py::test_MilkyWayAxionHalo_initialization -q -s
+    pytest tests/test_MilkyWayAxionHalo.py -k "initialization or RabiFreq" -q -s
+    $env:PRINT_RESULTS="1"; pytest tests/test_MilkyWayAxionHalo.py -s
+"""
 import os
 import warnings
 import pytest
@@ -81,6 +97,18 @@ magnets = []
 
 
 def test_MilkyWayAxionHalo_initialization():
+    """MilkyWayAxionHalo initialises with nu_a or m_a alone, and raises when neither is given.
+
+    Verified cases:
+    1. ``nu_a`` only — minimum valid input.
+    2. ``m_a`` only — alternative mass-based input.
+    3. All optional parameters explicit — full construction path.
+    4. No ``nu_a`` / ``m_a`` — must raise an AssertionError (counted as the
+       expected single error).
+
+    TODO: test illegal units for parameters.
+    TODO: test inconsistent nu_a / m_a pair.
+    """
     # TODO: test illegal units for parameters
     # TODO: test inconsistent parameters (e.g. nu_a and m_a that do not match)
     msgPrefix = f"{test_MilkyWayAxionHalo_initialization.__name__} "
@@ -145,6 +173,7 @@ def test_MilkyWayAxionHalo_initialization():
 
 
 def test_getRabiFreq():
+    """getRabiFreq returns a finite quantity with units of Hz."""
     rabi_freq = MilkyWayAxionHalo.getRabiFreq(
         gaNN=1e-9 * unit.GeV ** (-1), verbose=PRINT_RESULTS
     )
@@ -157,6 +186,7 @@ def test_getRabiFreq():
 
 
 def test_check_norm_with_quantities():
+    """check_norm is silent for a unit-normalised Quantity array and warns when integral ≠ 1."""
     x = np.array([0.0, 1.0, 2.0]) * unit.Hz
     y = np.array([0.0, 1.0, 0.0]) / unit.Hz
 
@@ -171,6 +201,7 @@ def test_check_norm_with_quantities():
 
 
 def test_check_norm_with_values():
+    """check_norm works identically with plain ndarrays (no units)."""
     x = np.array([0.0, 1.0, 2.0])
     y = np.array([0.0, 1.0, 0.0])
 
@@ -233,7 +264,7 @@ def test_axion_lineshape():
 
 
 def test_getAmpSpectra_stochastic():
-    """Test that without stochasticity, |ampSpectra|^2 integrates to 1."""
+    """Stochastic amplitude spectra have the right shape, units, and mean integral ≈ 1."""
 
     nu_a = 1 * unit.MHz
     v_0 = 220.0 * unit.km / unit.s
@@ -282,7 +313,7 @@ def test_getAmpSpectra_stochastic():
 
 
 def test_getAmpSpectra_deterministic():
-    """Test that without stochasticity, |ampSpectra|^2 integrates to 1."""
+    """Deterministic amplitude spectrum (use_stoch=False) has |A|² integral ≈ 1."""
     nu_a = 1 * unit.MHz
     v_0 = 220.0 * unit.km / unit.s
     v_lab = 233.0 * unit.km / unit.s
@@ -343,6 +374,12 @@ def test_getAmpSpectra_deterministic():
     ids=["1ppb", "2ppm", "10ppm"],
 )
 def test_Simulation(sample: Sample, magnet_kwargs: dict):
+    """End-to-end Bloch simulation: axion + sample + magnet → Simulations.run().
+
+    Parametrised over three samples (LXe, methanol, ethanol) and three
+    magnet homogeneities (1 ppb / 2 ppm / 10 ppm).  Verifies that exactly one
+    simulation entry is created and that the run completes without error.
+    """
     g_aNN = 1.0e-9 * unit.GeV ** (-1)
 
     axion = MilkyWayAxionHalo(

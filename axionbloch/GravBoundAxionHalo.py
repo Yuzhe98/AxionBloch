@@ -1,3 +1,12 @@
+"""Solver for gravitationally-bound axion halos around compact bodies.
+
+:class:`GravBoundAxionHalo` solves the time-independent Schrödinger equation
+(TISE) on a 1-D radial grid using a finite-difference Hamiltonian, returning
+bound-state wavefunctions and energies for each orbital quantum number *l*.
+
+:class:`EarthBoundAxionHalo` (in :mod:`axionbloch.EarthBoundAxionHalo`) is a
+subclass pre-configured with the Earth's gravitational potential.
+"""
 import time
 
 import numpy as np
@@ -44,6 +53,28 @@ class GravBoundAxionHalo:
         g_aNN: Quantity | None = None,
         verbose: bool = False,
     ):
+        """
+        Parameters
+        ----------
+        name : str
+            Human-readable label.
+        nu_a : Quantity [Hz]
+            Axion Compton frequency, used to derive the axion mass.
+        N : int
+            Number of grid points (default 4096).
+        extent : Quantity
+            Full radial range of the grid (centred on r = 0).
+        getPot : callable
+            Zero-argument function returning ``(Phi_func, r_unit, Phi_unit)``
+            where ``Phi_func(r_in_r_unit)`` is the gravitational potential
+            profile.
+        mass_enclosed : Quantity, optional
+            Enclosed mass profile (used for gradient calculations).
+        g_aNN : Quantity, optional
+            Axion-nucleon coupling constant (GeV⁻¹).
+        verbose : bool
+            Print axion mass and frequency after construction.
+        """
         self.name = name
         self.nu_a = nu_a
         # axion mass

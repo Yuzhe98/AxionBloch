@@ -1,5 +1,25 @@
-# COMMAND TO RUN THIS TEST:
-# $env:PRINT_RESULTS="1"; pytest tests/test_numpy_unit_performance.py -q -s
+"""Performance benchmarks: plain NumPy arrays vs Astropy Quantity arrays.
+
+These tests do NOT enforce timing thresholds — they only assert that all
+operations produce valid results.  The purpose is to measure and document the
+overhead introduced by carrying units through NumPy operations and FFTs so that
+hot-path code can make informed decisions about when to strip units.
+
+Environment variables
+---------------------
+ARRAY_SIZE
+    Length of the test arrays (default 1 000 000).
+REPEAT
+    Number of timed repetitions per operation (default 10).
+PRINT_RESULTS=1
+    Print the full timing table to stdout.
+SEED
+    Integer random seed (default 42).
+
+Run with::
+
+    $env:PRINT_RESULTS="1"; pytest tests/test_numpy_unit_performance.py -q -s
+"""
 import os
 import time
 import pytest
@@ -203,6 +223,7 @@ def compare_fft_efficiency(
 
 
 def test_fft_efficiency_comparison():
+    """FFT / invFFT benchmark across numpy and scipy, with and without units."""
     results = compare_fft_efficiency(print_results=PRINT_RESULTS)
 
     for op in ("np_fft", "sp_fft", "np_ifft", "sp_ifft"):

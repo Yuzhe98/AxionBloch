@@ -1,30 +1,35 @@
+"""General-purpose utilities for the axionbloch package.
+
+Contents
+--------
+- Debugging helpers: :func:`check`
+- Simple polynomial and lineshape functions: :func:`poly1`, :func:`poly2`,
+  :func:`Lorentzian`, :func:`dualLorentzian`, :func:`tribLorentzian`
+- Curve-fit estimators: :func:`estimateLorzfit`, :func:`estimatedualLorzfit`
+- Unit-aware base class: :class:`PhysicalObject`
+- Misc: :func:`giveDateAndTime`, :func:`sci_fmt`, :func:`save_phys_quantity`
+"""
+
 import inspect  # for check()
 import re  # for check()
 import time
 import sys
 import warnings
 
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
+from axionbloch.dependency import *
 
 from matplotlib.patches import FancyArrowPatch
 
 from mpl_toolkits.mplot3d import proj3d
 
 from functools import partial
-
-from axionbloch.enphylope import PhysicalQuantity, _safe_convert
-
-# Physical constants
-from astropy import units as unit
-from astropy.constants import codata2018 as const
 from typing import Sequence
 
 import h5py
 
 
-def giveDateAndTime():
+def giveDateAndTime() -> str:
+    """Return the current date and time as a compact string ``'YYYYMMDD_HHMMSS'``."""
     timestr = time.strftime("%Y%m%d_%H%M%S")
     # timestr = 'session_'+timestr
     return timestr
@@ -104,10 +109,12 @@ def check(arg):
 
 
 def poly1(x, C0, C1):
+    """Evaluate the linear polynomial ``C0 + C1*x``."""
     return C0 + C1 * x
 
 
 def poly2(x, C0, C1, C2):
+    """Evaluate the quadratic polynomial ``C0 + C1*x + C2*x^2``."""
     return C0 + C1 * x + C2 * x**2
 
 
@@ -2654,7 +2661,7 @@ def get_FWHM_indice(x, y):
 
 class PhysicalObject:
     """
-    Base class for physical objects with PhysicalQuantity attributes.
+    Base class for physical objects with Quantity attributes.
     Automatically converts units and saves quantities to HDF5.
     """
 
@@ -2664,7 +2671,7 @@ class PhysicalObject:
 
     def useCommonUnits(self, verbose: bool = False):
         """
-        Convert all PhysicalQuantity attributes to their common units.
+        Convert all Quantity attributes to their common units.
         Subclasses should define a dict `quantities` mapping attribute names
         to desired units.
         """
@@ -2672,15 +2679,15 @@ class PhysicalObject:
 
         for attr_name, unit in self.quantities.items():
             attr = getattr(self, attr_name, None)
-            if isinstance(attr, PhysicalQuantity):
-                setattr(self, attr_name, _safe_convert(attr, unit))
+            if isinstance(attr, Quantity):
+                setattr(self, attr_name, attr.to(unit))
             elif attr is None:
                 pass
             else:
                 print(
                     "WARNING: the variable "
                     + attr_name
-                    + " should be an instance of PhysicalQuantity but it is not. "
+                    + " should be an instance of Quantity but it is not. "
                 )
 
         if verbose:
@@ -2702,7 +2709,7 @@ class PhysicalObject:
         group: h5py.Group,
         verbose: bool = False,
     ):
-        """Save all PhysicalQuantity attributes to the HDF5 group."""
+        """Save all Quantity attributes to the HDF5 group."""
         assert hasattr(self, "quantities")
         assert hasattr(self, "generalQuantities")
 
@@ -2724,10 +2731,10 @@ class PhysicalObject:
                 "name", data=["nameless" if self.name is None else self.name]
             )
 
-        # Save all PhysicalQuantity attributes
+        # Save all Quantity attributes
         for attr_name, unit in self.quantities.items():
             attr = getattr(self, attr_name, None)
-            if isinstance(attr, PhysicalQuantity):
+            if isinstance(attr, Quantity):
                 save_phys_quantity(
                     group=group, name=attr_name, value=attr.value, unit=attr.unit
                 )
@@ -2764,7 +2771,7 @@ class PhysicalObject:
         for name, unit_expected in self.quantities.items():
 
             if name not in group:
-                raise KeyError(f"Missing PhysicalQuantity '{name}' in HDF5 group")
+                raise KeyError(f"Missing Quantity '{name}' in HDF5 group")
 
             subgroup = group[name]
 
@@ -2782,7 +2789,7 @@ class PhysicalObject:
                 )
 
             # Restore into the instance
-            setattr(self, name, PhysicalQuantity(value, unit_stored))
+            setattr(self, name, Quantity(value, unit_stored))
         # load general quantities
         for attr_name, dtype_str in self.generalQuantities.items():
 
@@ -2911,17 +2918,15 @@ def coh_time_g1(x, dt):
     return tau
 
 
-def boltzmann_probabilities(
-    energies: Sequence[PhysicalQuantity], T: PhysicalQuantity
-) -> np.ndarray:
+def boltzmann_probabilities(energies: Sequence[Quantity], T: Quantity) -> np.ndarray:
     """
     Compute Boltzmann probabilities for a set of energy eigenstates.
 
     Parameters
     ----------
-    energies : sequence of PhysicalQuantity
+    energies : sequence of Quantity
         energies with units of energy
-    T : PhysicalQuantity
+    T : Quantity
         Temperature (must be > 0)
 
     Returns
@@ -2930,14 +2935,14 @@ def boltzmann_probabilities(
         Dimensionless probabilities
     """
 
-    assert T.value_in("K") > 0
+    assert T.to_value(unit.K) > 0
 
     # energies = np.array(energies)
     # energies = np.array([E.to(energies[0].unit) for E in energies])
-    energies_eV = np.array([E.value_in("eV") for E in energies])
+    energies_eV = np.array([E.to_value(unit.eV) for E in energies])
 
     # beta = 1 / (kB * T)
-    beta_eV_1 = (1.0 / (const.kB * T)).value_in("eV**(-1)")
+    beta_eV_1 = (1.0 / (const.kB * T)).to_value(unit.eV ** (-1))
 
     E_min = energies_eV.min()
     scaled_energies_eV = [E - E_min for E in energies_eV]
@@ -2950,15 +2955,13 @@ def boltzmann_probabilities(
     return probabilities
 
 
-def deBroglie_wavelength(
-    mass: PhysicalQuantity, speed: PhysicalQuantity
-) -> PhysicalQuantity:
+def deBroglie_wavelength(mass: Quantity, speed: Quantity) -> Quantity:
     """
     Calculate the de Broglie wavelength of a particle given its mass and speed.
     Here we adopt SI units.
     """
-    mass = mass.to("eV/c**2")
+    mass = mass.to(unit.kg)
     speed = speed.to("km/s")
-    gamma = 1 / np.sqrt(1 - (speed.value_in("km/s") / const.c)) ** 2
-    lambda_db = (const.h / (gamma * mass * speed)).to("m")
+    gamma = 1 / np.sqrt(1 - (speed.to_value(unit.km / unit.s) / const.c)) ** 2
+    lambda_db = (const.h / (gamma * mass * speed)).to(unit.m)
     return lambda_db

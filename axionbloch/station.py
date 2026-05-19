@@ -1,4 +1,10 @@
-# axionbloch/Station.py
+"""Geographic station definitions for axion-wind calculations.
+
+A :class:`Station` stores the location of an experimental site on Earth and
+exposes the corresponding unit vector and distance from the Earth's centre.
+Three pre-built instances are provided: :data:`Mainz`, :data:`Baltimore`, and
+:data:`Sanya`.
+"""
 import numpy as np
 from astropy import units as unit
 from astropy.units import Quantity
@@ -6,6 +12,36 @@ from axionbloch.constants import earth_radius
 
 
 class Station:
+    """A geographic location on Earth's surface.
+
+    Converts latitude / longitude / elevation to spherical coordinates
+    (theta, phi) with the following convention:
+
+    - theta = 0 at the north pole, increases towards the south pole.
+    - phi = 0 on the prime meridian (Greenwich), increases eastward.
+    - ``nvec`` is the outward unit normal at the station's location.
+    - ``R`` is the distance from Earth's centre to the station.
+
+    Attributes
+    ----------
+    name : str
+    NSsemisphere : str
+        ``'N'`` or ``'S'``.
+    EWsemisphere : str
+        ``'E'`` or ``'W'``.
+    latitude, longitude : Quantity
+        Absolute values; hemisphere is tracked via ``NSsemisphere`` /
+        ``EWsemisphere``.
+    elevation : Quantity
+        Height above sea level.
+    theta, phi : Quantity
+        Spherical coordinates (rad).
+    nvec : ndarray, shape (3,)
+        Outward unit normal vector in Cartesian coordinates.
+    R : Quantity
+        Distance from Earth's centre.
+    """
+
     def __init__(
         self,
         name: str,
@@ -18,10 +54,21 @@ class Station:
         verbose: bool = False,
     ):
         """
-        A station on Earth. 
-        The station's position is specified by its latitude, longitude, and elevation.
-        The latitude and longitude are specified by astropy.unit.Quantity objects, with the N/S and E/W semispheres indicated. 
-        The loaction is converted to spherical coordinates (theta, phi). phi=0 is the prime meridian, and phi increases towards the east. theta=0 is the north pole, and theta increases towards the south pole.
+        Parameters
+        ----------
+        name : str
+            Human-readable label for the station.
+        NSsemisphere : str
+            ``'N'`` for northern hemisphere, ``'S'`` for southern.
+        EWsemisphere : str
+            ``'E'`` for east of prime meridian, ``'W'`` for west.
+        latitude, longitude : Quantity
+            Geographic coordinates (positive magnitude, direction given by
+            the hemisphere flags).
+        elevation : Quantity
+            Height above mean sea level.
+        verbose : bool
+            Print derived spherical coordinates after construction.
         """
 
         self.name = name

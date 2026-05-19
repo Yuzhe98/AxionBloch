@@ -1,22 +1,21 @@
-# example script to simulate CW NMR experiment
-import numpy as np
+# Example script: CW (continuous-wave) NMR free-induction-decay simulation
+#
+# A CW excitation field drives the spin ensemble continuously at signalFreqRot_Hz
+# in the rotating frame.  The simulation records the magnetisation trajectory
+# over `duration` seconds.
 import time
 
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-from matplotlib import font_manager
-
+from axionbloch.dependency import *
 from axionbloch.SimuTools import MagField, Simulation
 from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet
-from axionbloch.enphylope import PhysicalQuantity
 from axionbloch.constants import gamma_p, mu_p
 from axionbloch.utils import check
 
 
-RCF_Freq_Hz = 1e6
-signalFreqRot_Hz = 1
-T1_s = 1e10
+RCF_Freq_Hz = 1e6       # rotating-frame carrier frequency (Hz)
+signalFreqRot_Hz = 1    # signal offset from carrier in the rotating frame (Hz)
+T1_s = 1e10             # longitudinal relaxation time (s)
 
 # short Tdelta, long T2
 Tdelta_s = 1.0
@@ -34,83 +33,63 @@ T2_s = 10.0
 # Tdelta_s = 10.0
 # T2_s = 10.0
 
-simuRate = PhysicalQuantity(500, "Hz")  #
-duration = PhysicalQuantity(20, "s")
-timeLen = int((simuRate * duration).to("").value)
+simuRate = 500 * unit.Hz
+duration = 20 * unit.s
 
-
-# CH3CH2OH
+# CH3CH2OH sample
 sample = Sample(
-    name="Ethanol",  # name of the sample
-    gamma=gamma_p,  # [Hz/T]. Remember input it with 2 * np.pi
-    massDensity=PhysicalQuantity(0.78945, "g / cm**3 "),
-    molarMass=PhysicalQuantity(46.069, "g / mol"),  # molar mass
-    numOfSpinsPerMolecule=PhysicalQuantity(6, ""),  # number of spins per molecule
-    T2=PhysicalQuantity(T2_s, "s"),  #
-    T1=PhysicalQuantity(T1_s, "s"),  #
-    vol=PhysicalQuantity(1, "cm**3"),
-    mu=mu_p,  # magnetic dipole moment
+    name="Ethanol",
+    gamma=gamma_p,
+    massDensity=0.78945 * unit.g / unit.cm**3,
+    molarMass=46.069 * unit.g / unit.mol,
+    numOfSpinsPerMolecule=6 * unit.one,
+    T2=T2_s * unit.s,
+    T1=T1_s * unit.s,
+    vol=1 * unit.cm**3,
+    mu=mu_p,
     verbose=False,
 )
 
-# set detection magnet
+# Detection (bias) magnet — B0 tuned so that the Larmor frequency equals
+# the carrier plus signalFreqRot_Hz
 magnet = Magnet(
     name="detection magnet",
-    B0=PhysicalQuantity(RCF_Freq_Hz - signalFreqRot_Hz, "Hz")
-    / (sample.gamma / (2 * np.pi)),
-    FWHM=PhysicalQuantity(1 / (np.pi * Tdelta_s) / RCF_Freq_Hz, ""),
+    B0=(RCF_Freq_Hz - signalFreqRot_Hz) * unit.Hz / (sample.gamma / (2 * np.pi)),
+    FWHM=(1 / (np.pi * Tdelta_s) / RCF_Freq_Hz) * unit.one,
     nFWHM=20.0,
 )
-# magnet.setHomogeneity(
-#     numPt=int(
-#         11
-#         + duration.value_in("s")
-#         * 2
-#         * magnet.nFWHM
-#         * magnet.FWHM_T
-#         * sample.gamma.value_in("Hz/T")
-#         * 1
-#     ),
-# )
-magnet.setHomogeneity(
-    numPt=500,
-)
+magnet.setHomogeneity(numPt=500)
 print(f"numPt for magnet homogeneity = {magnet.numPt}")
 
-
-# set excitation field
-excField = MagField(name="RF pulse")
+# Excitation field (CW)
+excField = MagField(name="CW excitation")
 
 simu = Simulation(
     name="simulation template",
     sample=sample,
     magnet=magnet,
     excField=excField,
-    RCF_freq=PhysicalQuantity(RCF_Freq_Hz, "Hz"),
-    rate=simuRate,  #
+    RCF_freq=RCF_Freq_Hz * unit.Hz,
+    rate=simuRate,
     duration=duration,
     verbose=False,
 )
 
-# set excitation pulse: 90 degree hard pulse
-# t90_s = 10 * simu.timeStep_s
+# CW drive: constant-envelope XY pulse at the signal frequency
 simu.excField.setXYPulse(
-    timeStep_s=simu.timeStep,
+    timeStep_s=simu.timeStep.to_value(unit.s),
     timeLen=simu.timeLen,
     B1_T=1.0e-11,
     nu_rot_Hz=signalFreqRot_Hz,
 )
 
 tic = time.perf_counter()
-# simu.generateTrajectories(integrator="taylor")
 simu.generateTrajectories(integrator="RK4")
 toc = time.perf_counter()
-print(f"GenerateTrajectory time consumption = {toc-tic:.6f} s")
+print(f"GenerateTrajectory time consumption = {toc - tic:.6f} s")
 
 simu.monitorTrajectories(verbose=True)
-# simu.visualizeTrajectory3D(
-#     verbose=False,
-# )
+
 save_data = False
 if save_data:
     timeStamp_s = simu.getTimeStamp()

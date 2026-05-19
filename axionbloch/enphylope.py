@@ -1,6 +1,13 @@
-##############################################
-# for unit management and physical calculation
-##############################################
+"""Unit management and physical-quantity arithmetic using Pint.
+
+Provides :class:`PhysicalQuantity`, a thin wrapper around a Pint ``Quantity``
+that supports arithmetic, unit conversion, and atomic-unit conversion while
+remaining compatible with NumPy ufuncs.
+
+The module-level :data:`ureg` extends the default Pint registry with several
+custom units used throughout axionbloch (gauss_SI, parsec, solar/earth mass and
+radius, fractional parts-per-* units, and atomic-unit time ``tau``).
+"""
 
 from dataclasses import dataclass
 from pint import UnitRegistry
@@ -31,94 +38,29 @@ ureg.define("tau = 2.4188843265863416e-17 second")
 
 @dataclass
 class PhysicalQuantity:
-    """
-    1. Base Units
-        Length:
-            meter (m), centimeter (cm), kilometer (km), millimeter (mm),
-            micrometer (µm), nanometer (nm), etc.
-        Mass:
-            kilogram (kg), gram (g), milligram (mg), microgram (µg),
-            tonne (t), etc.
-        Time:
-            second (s), minute (min), hour (h), day (d).
-        Electric Current:
-            ampere (A).
-        Temperature:
-            kelvin (K), degree Celsius (°C).
-        Amount of Substance:
-            mole (mol).
-        Luminous Intensity:
-            candela (cd).
-    2. Derived Units
-        Area:
-            square meter (m²), square kilometer (km²), hectare (ha), acre.
-        Volume:
-            cubic meter (m³), liter (L), milliliter (mL).
-        Speed/Velocity:
-            meter per second (m/s), kilometer per hour (km/h), miles per hour (mph).
-        Acceleration:
-            meter per second squared (m/s²).
-        Force:
-            newton (N).
-        Energy:
-            joule (J), kilojoule (kJ), calorie (cal), electronvolt (eV), kilowatt-hour (kWh).
-        Power:
-            watt (W), kilowatt (kW), horsepower (hp).
-        Pressure:
-            pascal (Pa), atmosphere (atm), bar, millibar (mbar), torr.
-        Charge:
-            coulomb (C).
-        Voltage:
-            volt (V).
-        Resistance:
-            ohm (Ω).
-        Capacitance:
-            farad (F).
-        Inductance:
-            henry (H).
-        Magnetic Field Strength:
-            tesla (T), gauss (G).
-        Magnetic Flux:
-            weber (Wb).
-        Frequency:
-            hertz (Hz).
-        Angular Velocity:
-            radian per second (rad/s).
-    3. Atomic and Particle Physics Units
-        Atomic Mass Unit:
-            unified atomic mass unit (u or amu).
-        Electronvolt:
-            electronvolt (eV), megaelectronvolt (MeV), gigaelectronvolt (GeV).
-        Planck Units:
-            Planck length, Planck time, Planck mass, Planck charge, Planck temperature.
-        Photon Energy:
-            joule (J), electronvolt (eV).
-        Magnetic Moment:
-            joule per tesla (J/T), ampere meter squared (A·m²).
-    4. Thermodynamics
-        Entropy:
-            joule per kelvin (J/K).
-        Specific Heat Capacity:
-            joule per kilogram kelvin (J/(kg·K)).
-        Thermal Conductivity:
-            watt per meter kelvin (W/(m·K)).
-    5. Other Common Units in Physics
-        Luminance:
-            candela per square meter (cd/m²).
-        Radiance:
-            watt per steradian square meter (W/(sr·m²)).
-        Irradiance/Flux:
-            watt per square meter (W/m²).
-        Solar Mass:
-            mass of the sun (M☉).
-        Astronomical Unit:
-            distance from Earth to the Sun (au).
-        Light-Year:
-            distance light travels in one year.
-        Parsec:
-            3.26 light-years.
-        Barn:
-            area used in nuclear physics (10⁻²⁸ m²).
+    """A physical quantity with associated units, backed by Pint.
+
+    Wraps a ``pint.Quantity`` and exposes arithmetic operators (``+``, ``-``,
+    ``*``, ``/``, ``**``) as well as unit conversions (:meth:`to`,
+    :meth:`value_in`, :meth:`to_atomic_units`, :meth:`to_base_units`,
+    :meth:`to_compact`).  NumPy ufuncs (``np.exp``, ``np.tanh``, etc.) are
+    intercepted via :meth:`__array_ufunc__`.
+
+    Parameters
+    ----------
+    value : float
+        Numerical magnitude.
+    unit : str
+        Pint-compatible unit string, e.g. ``'T'``, ``'GeV/cm**3'``, ``'km/s'``.
+
+    Examples
+    --------
+    >>> from axionbloch.enphylope import PhysicalQuantity
+    >>> B = PhysicalQuantity(1.0, "T")
+    >>> B.to("G")
+    10000.0 gauss_SI
+    >>> B.value_in("mT")
+    1000.0
     """
 
     def __init__(self, value: float, unit: str):

@@ -1,3 +1,22 @@
+"""NMR / Bloch-equation simulation tools.
+
+Core classes
+------------
+MagField
+    Build time-domain magnetic-field arrays (excitation pulses, CPMG sequences,
+    axion pseudo-magnetic fields) ready to pass to the C++ Bloch solver.
+
+Simulation
+    Wrapper around the compiled ``blochsimulation`` extension that runs the
+    Bloch equations and stores the resulting magnetisation trajectory.
+
+Module-level constants
+----------------------
+RECORD_RUNTIME : bool
+    When ``True``, elapsed wall-clock times are printed after long operations.
+T_SETFIELD_S, T_SIMUSTEP_S : float
+    Per-step runtime estimates (seconds) used to project total run time.
+"""
 import os
 import time
 import warnings
@@ -163,8 +182,27 @@ class MagField(PhysicalObject):
         init_phase: float = 0.0,
         verbose: bool = False,
     ):
-        """
-        generate a 90 deg pulse in the rotating frame
+        """Generate a continuous XY excitation pulse in the rotating frame.
+
+        Constructs ``self.B_vec`` and ``self.dBdt_vec`` arrays for a constant-
+        envelope circularly-polarised pulse at frequency ``nu_rot_Hz`` and
+        amplitude ``B1_T``.  Unlike :meth:`set90DegPulse`, the pulse fills the
+        entire time window with no flip-angle calibration.
+
+        Parameters
+        ----------
+        timeStep_s : float
+            Simulation time step (s).
+        timeLen : int
+            Total number of time steps (including the final boundary point).
+        B1_T : float
+            Peak field amplitude (T).
+        nu_rot_Hz : float
+            Rotation frequency in the lab frame (Hz).
+        init_phase : float
+            Initial phase of the pulse (rad).
+        verbose : bool
+            Unused; reserved for future diagnostic output.
         """
         startDelayLen = 0  # this should stay 0.
         timeStamp_s = timeStep_s * np.arange(timeLen - 1)
@@ -217,8 +255,28 @@ class MagField(PhysicalObject):
         init_phase: float = 0.0,
         verbose: bool = False,
     ):
-        """
-        generate a 90 deg pulse in the rotating frame
+        """Generate a calibrated 90° (π/2) pulse in the rotating frame.
+
+        The pulse amplitude is chosen so that ``gamma * B90 * t90 = π``, giving
+        an exact 90° flip.  The pulse occupies the first ``t90_s`` seconds of
+        the time window; the remainder is zero.
+
+        Parameters
+        ----------
+        timeStep_s : float
+            Simulation time step (s).
+        timeLen : int
+            Total number of time steps.
+        gamma_HzToT : float
+            Gyromagnetic ratio in Hz/T (without 2π factor).
+        t90_s : float
+            Desired 90° pulse duration (s).
+        nu_rot_Hz : float
+            Carrier frequency of the rotating frame (Hz).
+        init_phase : float
+            Initial phase offset (rad).
+        verbose : bool
+            Unused; reserved for future diagnostic output.
         """
         startDelayLen = 0  # this should stay 0. It does not help in anything
         timeStamp_s = timeStep_s * np.arange(timeLen - 1)
@@ -276,9 +334,12 @@ class MagField(PhysicalObject):
         init_phase: float = 0.0,
         verbose: bool = False,
     ):
-        """
-        generate a CPMG pulse train in the rotating frame
-        A schematic of the envelop of the pulse train can be found below.
+        """Generate a CPMG (Carr-Purcell-Meiboom-Gill) pulse train in the rotating frame.
+
+        Produces a π/2 pulse followed by ``numEcho`` refocusing π pulses
+        separated by free-precession intervals of length ``tau_s``.  The
+        envelope schematic below uses the pulse-timing notation from the
+        original CPMG paper:
           90deg pulse       180deg pulse                     180deg pulse                  180deg pulse
                              ┌───────┐                       ┌───────┐                       ┌───────┐
             ┌───┐            |       |                       |       |                       |       |
@@ -286,6 +347,27 @@ class MagField(PhysicalObject):
             ↑   ↑            ↑       ↑                       ↑       ↑                       ↑       ↑
             0  t90          tau   tau+t180                  3tau   3tau+t180                5tau   5tau+t180
 
+        Parameters
+        ----------
+        timeStep_s : float
+            Simulation time step (s).
+        timeLen : int
+            Total number of time steps.
+        gamma_HzToT : float
+            Gyromagnetic ratio in Hz/T (without 2π factor).
+        t90_s : float
+            Desired 90° pulse duration (s); 180° pulses use the same duration.
+        tau_s : float
+            Half-echo spacing: free precession interval between π/2 and first π
+            pulse, and between consecutive π pulses.
+        numEcho : int
+            Number of spin echoes (= number of π pulses).
+        nu_rot_Hz : float
+            Carrier frequency of the rotating frame (Hz).
+        init_phase : float
+            Initial phase offset for all pulses (rad).
+        verbose : bool
+            Print diagnostic information (e.g. ``t90Len``).
         """
         timeStamp_s = timeStep_s * np.arange(timeLen - 1)
         t90Len = int(np.round(t90_s / timeStep_s))

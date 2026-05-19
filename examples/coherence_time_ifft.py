@@ -28,7 +28,7 @@ nu_a = 1 * unit.MHz
 # axion mass
 m_a = nu_a * const.h / const.c**2
 print("axion Compton frequency =", nu_a)
-print("axion mass =", m_a.to(unit.kg), " =", m_a.to(unit.eV/const.c))
+print("axion mass =", m_a.to(unit.kg), " =", (m_a * const.c**2).to(unit.eV))
 
 
 duration_s = 1e2  # in seconds

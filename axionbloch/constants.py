@@ -1,9 +1,19 @@
-# Physical constants
+"""
+Physical constants and unit conversion factors used throughout the axionbloch package.
+
+Provides:
+- Nuclear magneton helper ``mu_N``
+- Proton and Xe-129 gyromagnetic ratios / magnetic moments
+- ``AtomicUnits``: a namespace of conversion factors from SI to Hartree atomic units
+
+All constants with units are astropy Quantity objects.
+"""
 from astropy import units as unit
 from astropy.constants import codata2018 as const
 
-# Nuclear magneton
+
 def mu_N(m):
+    """Return the nuclear magneton e*hbar / (2*m) for a nucleus of mass m."""
     return (const.e * const.hbar) / (2 * m)
 
 
@@ -25,9 +35,17 @@ gamma_Xe129 = -7.441e7 * unit.rad * unit.Hz / unit.T
 earth_radius = 1 * unit.R_earth
 
 
-# atomic unit
-# conversion constants to atomic units
 class AtomicUnits:
+    """Conversion factors from SI to Hartree atomic units (hbar = m_e = e = 4πε₀ = 1).
+
+    Multiply a value in SI by the corresponding attribute to obtain the value in atomic units.
+
+    Example::
+
+        energy_au = energy_joule * AtomicUnits.joule
+        length_au = length_m   * AtomicUnits.meter
+    """
+
     hbar = 1.0
     m_e = 1.0
     a_0 = 1.0
