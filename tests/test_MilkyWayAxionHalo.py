@@ -379,6 +379,7 @@ def test_Simulation(sample: Sample, magnet_kwargs: dict):
     Parametrised over three samples (LXe, methanol, ethanol) and three
     magnet homogeneities (1 ppb / 2 ppm / 10 ppm).  Verifies that exactly one
     simulation entry is created and that the run completes without error.
+    TODO test all scenarios (axion / magnet / sample and test if theory agrees with the simulation)
     """
     g_aNN = 1.0e-9 * unit.GeV ** (-1)
 

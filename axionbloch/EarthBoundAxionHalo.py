@@ -647,7 +647,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         self.timeLen: int = timeLen
         self.duration_s: float = self.timeLen / self.rate_Hz
         eigenEnergies_eV = np.asarray(eigenEnergies_eV)
-        eigenFreqs_Hz: np.ndarray = eigenEnergies_eV  # / h_Planck.value_in("eV * s")
+        eigenFreqs_Hz: np.ndarray = eigenEnergies_eV
         if verbose:
             print(eigenFreqs_Hz.mean())
         B_rms_T = 1e-15

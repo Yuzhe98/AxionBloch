@@ -150,5 +150,4 @@ if save_data:
         Tdelta_s=simu_all.pool[i].simu.Tdelta_s,
         T_1_s=sample.T1.to_value(unit.s),
         pol=sample.pol,
-        # init_M=simu.init_M.value_in(""),
     )

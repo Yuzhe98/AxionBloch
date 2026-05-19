@@ -671,8 +671,6 @@ class GravBoundAxionHalo:
         )
         axes[0].set_xticks([0, 1, 2, 3, 4, 5])
         axes[-1].legend(bbox_to_anchor=(1.05, 1), loc="upper left")
-
-        # fig.suptitle(f"Axion $\\nu_a$ {self.nu_a.value_in('Hz'):.0e} Hz")
         # plt.tight_layout()
         plt.show()
 

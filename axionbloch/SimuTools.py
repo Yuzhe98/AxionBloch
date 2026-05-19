@@ -645,10 +645,6 @@ class Simulations:
                 print("", flush=True)
                 for key, pq in params["key_info"].items():
                     print(key, "=", pq, flush=True)
-                # print("Axion Compton frequency =", axion.nu_a)
-                # print(
-                #     f"simulation duration = {duration.value_in('s'):e} (s).", flush=True
-                # )
                 print(
                     logPrefix, f"simu.magnet.numPt =",
                     simu.magnet.numPt,
@@ -736,8 +732,6 @@ class Simulations:
                 timeLen=simu.timeLen,
                 simuRate=simu.rate,
                 duration=simu.duration,
-                # nu_a_rot_Hz=params["axion"].nu_a.value_in("Hz")
-                # - simu.RCF_freq_Hz,  # frequency in the rotating frame
                 use_stoch=True,
                 RCF_freq_Hz=simu.RCF_freq_Hz,
                 numFields=params["numFields"],
