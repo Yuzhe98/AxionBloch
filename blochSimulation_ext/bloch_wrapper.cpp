@@ -12,21 +12,16 @@ py::array_t<double> add_3d_arrays_3loops(py::array_t<double> A, py::array_t<doub
     if (A.shape(0) != B.shape(0) || A.shape(1) != B.shape(1) || A.shape(2) != B.shape(2))
         throw std::runtime_error("Shapes do not match");
 
-    // prepare output
-    std::vector<py::ssize_t> shape = {A.shape(0), A.shape(1), A.shape(2)};
-    // py::array_t<double> C = py::array_t<double>(shape);
     py::array_t<double> C({A.shape(0), A.shape(1), A.shape(2)});
 
     auto bufA = A.request();
     auto bufB = B.request();
     auto bufC = C.request();
 
-    // native pointers
     const double *pA = static_cast<double *>(bufA.ptr);
     const double *pB = static_cast<double *>(bufB.ptr);
     double *pC = static_cast<double *>(bufC.ptr);
 
-    // call native C++
     _add_3d_arrays_3loops(pA, pB, pC, A.shape(0), A.shape(1), A.shape(2));
 
     return C;
@@ -39,21 +34,16 @@ py::array_t<double> add_3d_arrays_parallel(py::array_t<double> A, py::array_t<do
     if (A.shape(0) != B.shape(0) || A.shape(1) != B.shape(1) || A.shape(2) != B.shape(2))
         throw std::runtime_error("Shapes do not match");
 
-    // prepare output
-    std::vector<py::ssize_t> shape = {A.shape(0), A.shape(1), A.shape(2)};
-    // py::array_t<double> C = py::array_t<double>(shape);
     py::array_t<double> C({A.shape(0), A.shape(1), A.shape(2)});
 
     auto bufA = A.request();
     auto bufB = B.request();
     auto bufC = C.request();
 
-    // native pointers
     const double *pA = static_cast<double *>(bufA.ptr);
     const double *pB = static_cast<double *>(bufB.ptr);
     double *pC = static_cast<double *>(bufC.ptr);
 
-    // call native C++
     _add_3d_arrays_parallel(pA, pB, pC, A.shape(0), A.shape(1), A.shape(2));
 
     return C;
@@ -66,21 +56,16 @@ py::array_t<double> add_3d_arrays_flattern_parallel(py::array_t<double> A, py::a
     if (A.shape(0) != B.shape(0) || A.shape(1) != B.shape(1) || A.shape(2) != B.shape(2))
         throw std::runtime_error("Shapes do not match");
 
-    // prepare output
-    std::vector<py::ssize_t> shape = {A.shape(0), A.shape(1), A.shape(2)};
-    // py::array_t<double> C = py::array_t<double>(shape);
     py::array_t<double> C({A.shape(0), A.shape(1), A.shape(2)});
 
     auto bufA = A.request();
     auto bufB = B.request();
     auto bufC = C.request();
 
-    // native pointers
     const double *pA = static_cast<double *>(bufA.ptr);
     const double *pB = static_cast<double *>(bufB.ptr);
     double *pC = static_cast<double *>(bufC.ptr);
 
-    // call native C++
     _add_3d_arrays_flattern_parallel(pA, pB, pC, A.shape(0), A.shape(1), A.shape(2));
 
     return C;
@@ -93,21 +78,16 @@ py::array_t<double> add_3d_arrays_flattern_SIMD(py::array_t<double> A, py::array
     if (A.shape(0) != B.shape(0) || A.shape(1) != B.shape(1) || A.shape(2) != B.shape(2))
         throw std::runtime_error("Shapes do not match");
 
-    // prepare output
-    std::vector<py::ssize_t> shape = {A.shape(0), A.shape(1), A.shape(2)};
-    // py::array_t<double> C = py::array_t<double>(shape);
     py::array_t<double> C({A.shape(0), A.shape(1), A.shape(2)});
 
     auto bufA = A.request();
     auto bufB = B.request();
     auto bufC = C.request();
 
-    // native pointers
     const double *pA = static_cast<double *>(bufA.ptr);
     const double *pB = static_cast<double *>(bufB.ptr);
     double *pC = static_cast<double *>(bufC.ptr);
 
-    // call native C++
     _add_3d_arrays_flattern_SIMD(pA, pB, pC, A.shape(0), A.shape(1), A.shape(2));
 
     return C;
@@ -213,6 +193,8 @@ py::tuple generateTrajectories(py::array_t<double> B_vec, py::array_t<double> dB
             M0eqb, // equilibrium magnetization
             // ouputs
             ptrj, pdM, pd2M);
+    } else {
+        throw std::runtime_error("Unknown integrator '" + integrator + "'. Use \"RK4\" or \"taylor\".");
     }
 
     return py::make_tuple(trjry, dMdt, d2Mdt2);
@@ -225,13 +207,8 @@ PYBIND11_MODULE(blochsimulation, m) {
     m.def("add_3d_arrays_flattern_parallel", &add_3d_arrays_flattern_parallel,
           "Add two X×Y×Z arrays");
     m.def("add_3d_arrays_flattern_SIMD", &add_3d_arrays_flattern_SIMD, "Add two X×Y×Z arrays");
-    // Scalar function
-    // m.def("burkert_potential", &burkert_potential, "Compute Burkert potential at a single r");
-    // Vectorized function
     m.def("burkert_potential_vector", &burkert_potential_vector,
           "Compute Burkert potential for a list of r values");
-
-    // new Bloch trajectory function
     m.def("generateTrajectories", &generateTrajectories,
           "Compute magnetization trajectories (trjry, dMdt, d2Mdt2)");
 }

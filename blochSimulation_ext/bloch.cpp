@@ -11,11 +11,9 @@
 
 void _add_3d_arrays_3loops(const double *A, const double *B, double *C, std::size_t X,
                            std::size_t Y, std::size_t Z) {
-    std::size_t N = X * Y * Z;
-
-    for (int i = 0; i < X; i++) {
-        for (int j = 0; j < Y; j++) {
-            for (int k = 0; k < Z; k++) {
+    for (std::size_t i = 0; i < X; i++) {
+        for (std::size_t j = 0; j < Y; j++) {
+            for (std::size_t k = 0; k < Z; k++) {
                 std::size_t idx = i * (Y * Z) + j * Z + k;
                 C[idx] = A[idx] + B[idx];
             }
@@ -25,12 +23,10 @@ void _add_3d_arrays_3loops(const double *A, const double *B, double *C, std::siz
 
 void _add_3d_arrays_parallel(const double *A, const double *B, double *C, std::size_t X,
                              std::size_t Y, std::size_t Z) {
-    std::size_t N = X * Y * Z;
-
 #pragma omp parallel for schedule(static)
-    for (int i = 0; i < X; i++) {
-        for (int j = 0; j < Y; j++) {
-            for (int k = 0; k < Z; k++) {
+    for (std::size_t i = 0; i < X; i++) {
+        for (std::size_t j = 0; j < Y; j++) {
+            for (std::size_t k = 0; k < Z; k++) {
                 std::size_t idx = i * (Y * Z) + j * Z + k;
                 C[idx] = A[idx] + B[idx];
             }
@@ -67,26 +63,13 @@ void _add_3d_arrays_flattern_SIMD(const double *A, const double *B, double *C, s
         C[i] = A[i] + B[i];
 }
 
-// Scalar function
 double _burkert_potential(double r, double amp, double a) {
     return amp / ((1 + r / a) * (1 + (r / a) * (r / a)));
 }
 
-// Vectorized function
-// std::vector<double> _burkert_potential_vector(const double *r_vals,
-//                                              const double amp, const double a) {
-//     std::vector<double> out(r_vals.size());
-//     for (size_t i = 0; i < r_vals.size(); ++i) {
-//         out[i] = _burkert_potential(r_vals[i], amp, a);
-//     }
-//     return out;
-// }
-
 void _burkert_potential_vector(const double *r_vals, double *pot, const double amp, const double a,
                                std::size_t N) {
-    std::size_t i = 0;
-    // handle remaining elements
-    for (; i < N; ++i)
+    for (std::size_t i = 0; i < N; ++i)
         pot[i] = _burkert_potential(r_vals[i], amp, a);
 }
 

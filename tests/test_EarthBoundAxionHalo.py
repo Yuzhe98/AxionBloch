@@ -39,12 +39,13 @@ def test_earth_grav_potential_earth_center_returns_valid_objects():
 
 def test_earth_grav_potential_earth_center_is_symmetric_and_finite():
     """The gravitational potential is finite and symmetric about r = 0 (even function)."""
-    phi_func, _, _ = earth_grav_potential_earth_center()
-    
+    phi_func, r_unit, _ = earth_grav_potential_earth_center()
+
+    # phi_func takes values in r_unit (R_earth); sample within the interpolation domain
     test_radius = 1e3 * unit.R_earth
-    radii_m = np.linspace(-1 * test_radius.to_value(unit.meter), test_radius.to_value(unit.meter), num=1000)
-    phi_pos = phi_func(radii_m)
-    phi_neg = phi_func(-radii_m)
+    radii = np.linspace(-test_radius.to_value(r_unit), test_radius.to_value(r_unit), num=1000)
+    phi_pos = phi_func(radii)
+    phi_neg = phi_func(-radii)
 
     assert np.all(np.isfinite(phi_pos))
     assert np.all(np.isfinite(phi_neg))
