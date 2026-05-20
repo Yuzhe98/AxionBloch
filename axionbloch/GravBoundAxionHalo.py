@@ -32,13 +32,18 @@ from axionbloch.utils import high_contrast_extended as colors, check
 
 
 class GravBoundAxionHalo:
-    """
-    A class to solve the time-independent Schrodinger equation for axions gravitationally bound to to objects like Earth or Sun.
+    """Solve the TISE for axions gravitationally bound to compact bodies.
+
+    Constructs a 1-D radial finite-difference Hamiltonian ``H = T + V`` on a
+    uniform grid spanning ``[-extent/2, extent/2]``, diagonalises it for each
+    requested angular-momentum channel *l*, and stores the resulting
+    wavefunctions and energy expectation values in :attr:`states`.
+
+    Note: input / output units are in SI, while internal calculations are in
+    atomic units.
     """
 
-    # Note: input / output units are in SI, while internal calculations are in atomic units.
-
-    # Map l to labels (s, p, d, f, ...)
+    # Map l to spectroscopic labels (s, p, d, f, ...)
     orbitalLabels = ["s", "p", "d", "f", "g", "h", "i", "k", "l", "m"]
     pot: Quantity
 
@@ -75,13 +80,15 @@ class GravBoundAxionHalo:
         verbose : bool
             Print axion mass and frequency after construction.
         """
+        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
         self.name = name
         self.nu_a = nu_a
-        # axion mass
+        # axion mass derived from Compton frequency: m = h * nu / c²
         ma = self.nu_a * const.h / const.c**2
         if verbose:
-            print("axion Compton frequency =", self.nu_a)
+            print(logPrefix, "axion Compton frequency =", self.nu_a)
             print(
+                logPrefix,
                 "axion mass =",
                 ma.to(unit.kg),
                 " =",
@@ -94,13 +101,13 @@ class GravBoundAxionHalo:
         self.N = N
         self.extent: Quantity = extent
         self.dr: Quantity = self.extent / self.N
-        # r = np.linspace(dr * 1e-12, extent, N)  # starts at dr (not zero)
+        # symmetric grid centred on r=0
         self.r: Quantity = np.linspace(
             -self.extent / 2, self.extent / 2, self.N
-        )  # starts at dr (not zero)
+        )
         Phi_func, r_unit, Phi_unit = getPot()
         # TODO: Try also to use the infinity as the reference point
-        # gravitational potential
+        # gravitational potential V = m_a * Phi(r), evaluated on the radial grid
         self.pot: Quantity = self.ma * np.asarray(
             Phi_func((self.r / r_unit).to_value(unit.one))
         ) * Phi_unit  # convert r to meter for potential function
@@ -108,6 +115,7 @@ class GravBoundAxionHalo:
         self.mass_enclosed: Quantity = mass_enclosed
         self.g_aNN: Quantity = g_aNN
 
+        # prefactor for the kinetic energy finite-difference stencil: ℏ²/(2m dr²)
         self.T_magnitude: Quantity = (const.hbar**2) / (2 * self.ma) / self.dr**2
 
         self.states: dict = {}
@@ -138,9 +146,30 @@ class GravBoundAxionHalo:
         max_n_r: int = 10,  # maximum radial quantum number to plot
         verbose: bool = False,
     ):
+        """Solve the TISE for a single angular-momentum channel *l*.
+
+        Builds the finite-difference Hamiltonian ``H = T + V_eff`` (with the
+        centrifugal barrier included in ``V_eff``), diagonalises it with
+        ``scipy.linalg.eigh``, normalises the lowest ``max_n_r`` eigenstates,
+        computes expectation values of T, V, and V_eff, and stores the results
+        in :attr:`states`.
+
+        Parameters
+        ----------
+        l : int
+            Orbital angular-momentum quantum number.
+        showPlot : bool
+            If True, plot the reduced radial wavefunctions after solving.
+        max_n_r : int
+            Number of radial eigenstates to retain (counted from the ground
+            state of channel *l*).
+        verbose : bool
+            Print timing and eigen-energy tables.
+        """
+        logPrefix = f"[{self.__class__.__name__}.{self.solve_TISE_3D_l.__name__}]"
         # TODO: check the units and the constants. I do not think we are safe with the equations here.
         # I believe if we set V and T units correctly, everthing should be fine then.
-        # Parameters
+        # Effective potential including centrifugal term l(l+1)ℏ²/(2m r²)
         Veff = Quantity(self.pot + l * (l + 1) * const.hbar**2 / (
             2 * self.ma * self.r**2
         ))
@@ -148,36 +177,38 @@ class GravBoundAxionHalo:
         check(self.pot.unit)
         check(Veff[0].to("eV"))
         # ----------------- start of dimensionless computation ---------------- #
-        # Kinetic energy operator
+        # Kinetic energy operator: T = -(ℏ²/2m) ∇², discretised as a tridiagonal matrix
         main = -2.0 * np.ones(self.N)
         off = 1.0 * np.ones(self.N - 1)
 
         lap = diags([off, main, off], [-1, 0, 1])
         T = -1 * self.T_magnitude.to_value(self.pot.unit) * lap
 
-        # Hamiltonian
+        # Hamiltonian H = T + diag(V_eff), all values in self.pot.unit
         H = T + diags(Veff.to_value(self.pot.unit), 0)
 
         H_dense = H.toarray()
 
-        # Solve eigenvalue problem
+        # Solve eigenvalue problem; energies in self.pot.unit, states are dimensionless
         tic = time.time()
         energies, states = eigh(H_dense)
         toc = time.time()
         if verbose:
-            print(f"N={self.N} l={l} Eigensolver took {toc - tic:.3f} seconds")
+            print(logPrefix, f"N={self.N} l={l} Eigensolver took {toc - tic:.3f} seconds")
         # ----------------- end of dimensionless computation ---------------- #
 
         if verbose:
-            print("Eigen-energies in eV:")
+            print(logPrefix, "Eigen-energies in eV:")
             print("[")
             for i, e in enumerate(energies[0:max_n_r]):
                 print(f"{e:.6e},")
             print("]")
             print(f"* {self.E_unit}")
 
-        start_index = self.N // 2 + 5  # avoid r=0 singularity
+        # Skip the first half of the grid (r < 0) plus a few extra points to avoid r=0 singularity
+        start_index = self.N // 2 + 5
 
+        # For l>0 the even-indexed eigenstates carry the correct parity; skip odd ones
         if l == 0:
             iter_range = np.arange(max_n_r)
         else:
@@ -186,10 +217,10 @@ class GravBoundAxionHalo:
         for i, _n_r in enumerate(iter_range):
 
             u_r = states[:, _n_r]
-            # radial wavefunction
+            # radial wavefunction R(r) = u(r)/r
             R_r = u_r / self.r
 
-            # normalize
+            # Normalise so that 4π ∫ |u(r)|² dr = 1
             integral = np.sqrt(
                 4 * np.pi * np.trapezoid(
                     np.abs(u_r[start_index:]) ** 2,
@@ -199,21 +230,22 @@ class GravBoundAxionHalo:
             R_r = R_r / integral
             u_r = u_r / integral
 
-            # Potential energy (V only)
+            # Potential energy expectation value ⟨V⟩ = ∫ |u|² V dr
             V_expect = np.trapezoid(
                 np.abs(u_r[start_index:]) ** 2
                 * self.pot[start_index:],
                 self.r[start_index:],
             )
 
-            # Potential energy (V effective)
+            # Effective potential expectation value ⟨V_eff⟩ = ∫ |u|² V_eff dr
             Veff_expect = np.trapezoid(
                 np.abs(u_r[start_index:]) ** 2
                 * Veff[start_index:],
                 self.r[start_index:],
             )
 
-            # Kinetic energy via second derivative of u_r
+            # Kinetic energy via second derivative of u_r: ⟨T⟩ = -(ℏ²/2m) ∫ u* u'' dr
+            # Initialise with correct units: [u''] = [u] / [r]²
             du2_dr2 = np.zeros(u_r.shape) * u_r.unit / self.r.unit**2
             du2_dr2[1:-1] = (u_r[2:] - 2 * u_r[1:-1] + u_r[:-2]) / (
                 self.r[1] - self.r[0]
@@ -221,6 +253,7 @@ class GravBoundAxionHalo:
             T_expect = -(const.hbar**2 / (2 * self.ma)) * np.trapezoid(
                 np.conj(u_r[start_index:]) * du2_dr2[start_index:], self.r[start_index:]
             )
+            # Reduced wavefunction normalised by discrete L2 norm (used for plotting only)
             R_reduced = (
                 1.0
                 * (states[:, _n_r]) ** 1
@@ -274,7 +307,26 @@ class GravBoundAxionHalo:
         showPlot: bool = False,
         verbose: bool = False,
     ):
+        """Solve the TISE for all requested angular-momentum channels.
+
+        Iterates over ``l_vals``, calling :meth:`solve_TISE_3D_l` for each,
+        then sorts all accumulated states by eigen-energy.
+
+        Parameters
+        ----------
+        l_vals : list of int
+            Orbital angular-momentum quantum numbers to solve.
+        max_n_r : int
+            Number of radial eigenstates to retain per channel.
+        showPlot : bool
+            Forwarded to :meth:`solve_TISE_3D_l`.
+        verbose : bool
+            Forwarded to :meth:`solve_TISE_3D_l`.
+        """
+        logPrefix = f"[{self.__class__.__name__}.{self.solve_TISE_3D.__name__}]"
         for l in l_vals:
+            if verbose:
+                print(logPrefix, f"Solving for l={l}")
             self.solve_TISE_3D_l(
                 l=l,
                 showPlot=showPlot,
@@ -285,17 +337,32 @@ class GravBoundAxionHalo:
         self.sortByEigenE()
 
     def getStateNames(self):
+        """Return a list of state label strings (e.g. ``['1s', '2s', '2p']``)."""
+        logPrefix = f"[{self.__class__.__name__}.{self.getStateNames.__name__}]"
         return [state["name"] for state in self.states.values()]
 
     def getStateEnergies(self):
+        """Return a list of eigen-energies in the units stored in ``self.states``."""
+        logPrefix = f"[{self.__class__.__name__}.{self.getStateEnergies.__name__}]"
         return [state["eigenE_eV"] for state in self.states.values()]
 
     def findGradients(self, stateNames=[], station: Station = None):
-        """_summary_
+        """Compute and plot the 3-D gradient of the total wavefunction at a station.
 
-        Args:
-            stateNames (list, optional): _description_. Defaults to [].
-            station (Station, optional): _description_. Defaults to None.
+        Superimposes the requested eigenstates (with equal weight), computes the
+        spherical-coordinate gradient (∂_r, ∂_θ/r, ∂_φ/(r sinθ)), interpolates
+        each component onto a radial line pointing toward ``station``, and plots
+        all four quantities (wavefunction + three gradient components) on a
+        shared radial axis.
+
+        Parameters
+        ----------
+        stateNames : list of str
+            Labels of eigenstates to include (e.g. ``['1s', '2p']``).
+            Defaults to the lowest-energy state.
+        station : Station
+            Observer location providing polar angle ``theta`` and azimuthal
+            angle ``phi`` used to project the gradient.
         """
         logPrefix = f"[{self.__class__.__name__}.{self.findGradients.__name__}]"
         # avoid r=0 singularity
@@ -315,49 +382,45 @@ class GravBoundAxionHalo:
         dtheta = theta[1] - theta[0]
         dphi = phi[1] - phi[0]
 
-        # mesh
-        # tic = time.time()
+        # 3-D spherical mesh of shape (Nr, Ntheta, Nphi)
         max_n_r = len(self.states.keys())
         R_grid, Theta_grid, Phi_grid = np.meshgrid(r, theta, phi, indexing="ij")
         # R_grid.shape=(Nr, Ntheta, Nphi)
 
-        # toc = time.time()
-        # print(f"mesh time: {toc-tic:.2e} s")
-        # chosenOnes = 3
         if stateNames is None or len(stateNames) == 0:
             stateNames = [state["name"] for state in self.states.values()][:1]
 
+        # Accumulate superposition of eigenstates on the 3-D mesh
         WF_total = np.zeros(R_grid.shape, dtype=complex) * self.states[stateNames[0]]["R_r"].unit
 
-        # for name, state in list(self.eigenStates.items())[:1]:
         for name in stateNames:
-            # print(name, state["E_eV"], "eV")
             state = self.states[name]
             n_r, l, m = state["n_r"], state["l"], 0
             c = 1.0
             E_eV = state["E_eV"]
-            # radial part (interpolated onto grid)
+            # radial part broadcast over angular axes
             R_nl = state["R_r"][start_index:stop_index, None, None]
 
-            # angular part
+            # angular part: Y_lm(theta, phi) — note argument order for sph_harm_y
             # Y_lm = sph_harm_y(m, l, Phi_grid, Theta_grid) wrong!
             Y_lm = sph_harm_y(l, m, Theta_grid, Phi_grid)
 
             WF_total += c * R_nl * Y_lm  # * np.exp(-1j * E * t)
 
-        # radial derivative
+        # radial derivative ∂Ψ/∂r
         dphi_dr = np.gradient(WF_total, dr, axis=0)
 
         # angular derivatives
         dWF_dtheta = np.gradient(WF_total, dtheta, axis=1)
         dWF_dphi = np.gradient(WF_total, dphi, axis=2)
 
-        # components of gradient
+        # spherical-coordinate gradient components
         grad_r = dphi_dr
         grad_theta = dWF_dtheta / R_grid
+        # small regularisation prevents division by zero at theta=0 and π
         grad_phi = dWF_dphi / (R_grid * np.sin(Theta_grid) + 1e-12 * R_grid.unit)
 
-        # project the spherical gradient onto a specific direction (from the center of the sphere to the station)
+        # station direction in radians
         theta_station_rad = station.theta.to_value(unit.rad)  # polar angle
         phi_station_rad = station.phi.to_value(unit.rad)  # azimuthal angle
 
@@ -366,28 +429,19 @@ class GravBoundAxionHalo:
 
         tic = time.time()
         interp_r = RegularGridInterpolator(
-            (r.value, theta.value, phi.value),
-            grad_r.value,
-            bounds_error=False,
-            fill_value=None,
+            (r, theta, phi), grad_r, bounds_error=False, fill_value=None
         )
         interp_theta = RegularGridInterpolator(
-            (r.value, theta.value, phi.value),
-            grad_theta.value,
-            bounds_error=False,
-            fill_value=None,
+            (r, theta, phi), grad_theta, bounds_error=False, fill_value=None
         )
         interp_phi = RegularGridInterpolator(
-            (r.value, theta.value, phi.value),
-            grad_phi.value,
-            bounds_error=False,
-            fill_value=None,
+            (r, theta, phi), grad_phi, bounds_error=False, fill_value=None
         )
-        interp_r *= grad_r.unit  # add *= unit for the other two
+        interp_r *= grad_r.unit
         toc = time.time()
         print(logPrefix, f"interp time: {toc-tic:.2e} s")
 
-        # sample points along radial line
+        # sample gradient along the radial line toward the station
         Nr_plot = 2**10
         r_line = np.linspace(r[0], 3 * unit.earthRad, Nr_plot)
 
@@ -399,7 +453,7 @@ class GravBoundAxionHalo:
         grad_theta_line = np.asarray(interp_theta(points))
         grad_phi_line = np.asarray(interp_phi(points))
         toc = time.time()
-        print(f"get gradient along a certain direction time: {toc-tic:.2e} s")
+        print(logPrefix, f"gradient along station direction time: {toc-tic:.2e} s")
 
         plt.rc("font", size=16)  # Default text
 
@@ -530,6 +584,19 @@ class GravBoundAxionHalo:
         n_r: int,
         l: int,
     ):
+        """Plot the reduced radial wavefunction for a single eigenstate.
+
+        If the requested state has not been solved yet, calls
+        :meth:`solve_TISE_3D_l` automatically.
+
+        Parameters
+        ----------
+        n_r : int
+            Radial quantum number (number of radial nodes).
+        l : int
+            Orbital angular-momentum quantum number.
+        """
+        logPrefix = f"[{self.__class__.__name__}.{self.plotEigenstate.__name__}]"
         n = n_r + l + 1
         name = f"{n}{self.orbitalLabels[l]}"
         # key = f"{n_r}_{l}"
@@ -547,12 +614,11 @@ class GravBoundAxionHalo:
 
         start_index = self.N // 2 + 5  # avoid r=0 singularity
 
-        # font size
         plt.rc("font", size=14)  # Default text
         plt.rc("figure", titlesize=14)  # Figure title
-        fig = plt.figure(figsize=(6.0, 4.0), dpi=150)  # initialize a figure
+        fig = plt.figure(figsize=(6.0, 4.0), dpi=150)
 
-        gs = gridspec.GridSpec(nrows=1, ncols=1)  # create grid for multiple figures
+        gs = gridspec.GridSpec(nrows=1, ncols=1)
 
         ax00 = fig.add_subplot(gs[0, 0])
 
@@ -597,9 +663,23 @@ class GravBoundAxionHalo:
         xlim=(-0.3, 5.3),
         ylim=None,
     ):
+        """Plot a vertical stack of reduced radial wavefunctions.
+
+        Eigenstates are plotted from lowest energy (bottom) to highest (top),
+        sharing a common y-scale so amplitudes can be compared visually.
+
+        Parameters
+        ----------
+        numStates : int
+            How many consecutive states (starting from ``startState``) to show.
+        startState : int
+            Index into the energy-sorted state list at which to begin.
+        xlim : tuple or None
+            x-axis limits in units of Earth radii.
+        ylim : tuple or None
+            Shared y-axis limits.  Auto-computed from peak amplitude if None.
         """
-        Plot eigenstate wavefunction in column. From low to high, this functions plots the eigenstates with increasing eigen-energy.
-        """
+        logPrefix = f"[{self.__class__.__name__}.{self.stackEigenStates.__name__}]"
         self.sortByEigenE()
 
         mass_eV_c2 = 4.135667696e-09  # axion mass in eV/c^2
@@ -607,7 +687,7 @@ class GravBoundAxionHalo:
 
         plt.rc("font", size=14)  # Default text
         plt.rc("figure", titlesize=14)  # Figure title
-        fig = plt.figure(figsize=(5.3, 9.0), dpi=150)  # initialize a figure
+        fig = plt.figure(figsize=(5.3, 9.0), dpi=150)
         gs = gridspec.GridSpec(
             nrows=numStates, ncols=1
         )  # create grid for multiple figures
@@ -697,18 +777,19 @@ class GravBoundAxionHalo:
     def plotEigenEnergiesInPot(
         self,
     ):
-        """
-        Plot eigen-energies in the gravitational potential
-        """
-        self.sortByEigenE()
+        """Plot eigen-energies superimposed on the gravitational potential.
 
-        mass_eV_c2 = 4.135667696e-09  # axion mass in eV/c^2
-        c_m_s = 2.99792458e8  # speed of light in m/s
+        Draws a horizontal line for each bound state at its eigen-energy,
+        spanning the classical turning points where the potential crosses that
+        energy level.
+        """
+        logPrefix = f"[{self.__class__.__name__}.{self.plotEigenEnergiesInPot.__name__}]"
+        self.sortByEigenE()
 
         start_index = 0  # start from r>0
 
-        fig = plt.figure(figsize=(6.0, 4.0), dpi=150)  # initialize a figure
-        gs = gridspec.GridSpec(nrows=1, ncols=1)  # create grid for multiple figures
+        fig = plt.figure(figsize=(6.0, 4.0), dpi=150)
+        gs = gridspec.GridSpec(nrows=1, ncols=1)
         ax = fig.add_subplot(gs[0, 0])
         ax.plot(
             self.r[start_index:],
@@ -719,6 +800,7 @@ class GravBoundAxionHalo:
         )
 
         for key, eigenstate in self.states.items():
+            # find the classical turning point (where V(r) ≈ E)
             cross_x_indx = np.argmin(
                 np.abs(self.pot[start_index:] - eigenstate["eigenE_eV"])
             )
@@ -744,6 +826,8 @@ class GravBoundAxionHalo:
         plt.show()
 
     def sortByEigenE(self):
+        """Sort ``self.states`` in-place by ascending eigen-energy."""
+        logPrefix = f"[{self.__class__.__name__}.{self.sortByEigenE.__name__}]"
         self.states = dict(
             sorted(self.states.items(), key=lambda item: item[1]["eigenE_eV"])
         )
@@ -756,6 +840,21 @@ class GravBoundAxionHalo:
         ],
         threshold=1e-2,
     ):
+        """Print and plot eigenstates with significant probability in a radial shell.
+
+        Iterates over all solved states, computes the integrated probability
+        inside ``radius_range``, and reports the norm and partial integral for
+        each state.
+
+        Parameters
+        ----------
+        radius_range : list of Quantity
+            ``[r_min, r_max]`` defining the radial shell of interest.
+        threshold : float
+            Minimum probability fraction to flag a state (currently unused,
+            reserved for future filtering).
+        """
+        logPrefix = f"[{self.__class__.__name__}.{self.findHighProbStates.__name__}]"
         # find eigen-states which has high probability around earth radius
         self.sortByEigenE()
         states = []
@@ -783,7 +882,7 @@ class GravBoundAxionHalo:
                 self.r[start_indx:stop_indx],
             )
             # print("key =", key, "; n_r and l are:", n_r, l_val)
-            print(f"(n_r, l) = ({n_r}, {l_val})")
+            print(logPrefix, f"(n_r, l) = ({n_r}, {l_val})")
             print(f"eigen-energy = {eigenstate['eigenE_eV']:.3e} eV")
             print("norm =", norm)
             print("integral =", integral)
@@ -793,6 +892,13 @@ class GravBoundAxionHalo:
     def listEigenStates(
         self,
     ):
+        """Print a formatted table of all solved eigenstates.
+
+        Columns: radial quantum number, *l*, principal quantum number, label,
+        eigen-energy (eV), kinetic energy (eV), and mean axion speed (m/s).
+        States are listed in ascending eigen-energy order.
+        """
+        logPrefix = f"[{self.__class__.__name__}.{self.listEigenStates.__name__}]"
         # find eigen-states which has high probability around earth radius
         self.sortByEigenE()
 
