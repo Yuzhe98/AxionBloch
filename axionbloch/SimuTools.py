@@ -175,73 +175,42 @@ class MagField(PhysicalObject):
 
     def setXYPulse(
         self,
-        timeStep_s: float,
+        timeStep: Quantity,
         timeLen: int,
-        # gamma_HzToT: float,  # amplitude of the excitation pulse in (T)
-        B1_T: float,
-        nu_rot_Hz: float,
-        init_phase: float = 0.0,
+        B1: Quantity,
+        nu_rot: Quantity,
+        init_phase: Quantity = 0.0 * unit.rad,
         verbose: bool = False,
     ):
         """Generate a continuous XY excitation pulse in the rotating frame.
 
-        Constructs ``self.B_vec`` and ``self.dBdt_vec`` arrays for a constant-
-        envelope circularly-polarised pulse at frequency ``nu_rot_Hz`` and
-        amplitude ``B1_T``.  Unlike :meth:`set90DegPulse`, the pulse fills the
-        entire time window with no flip-angle calibration.
+        Fills the entire time window with a constant-envelope circularly-
+        polarised pulse at frequency ``nu_rot`` and amplitude ``B1``.
 
         Parameters
         ----------
-        timeStep_s : float
-            Simulation time step (s).
+        timeStep : Quantity
+            Simulation time step (e.g. ``1 * unit.ms``).
         timeLen : int
             Total number of time steps (including the final boundary point).
-        B1_T : float
-            Peak field amplitude (T).
-        nu_rot_Hz : float
-            Rotation frequency in the lab frame (Hz).
-        init_phase : float
-            Initial phase of the pulse (rad).
+        B1 : Quantity
+            Peak field amplitude (e.g. ``1e-11 * unit.T``).
+        nu_rot : Quantity
+            Carrier frequency in the rotating frame (e.g. ``2 * unit.Hz``).
+        init_phase : Quantity
+            Initial phase offset (e.g. ``0 * unit.rad``).
         verbose : bool
             Unused; reserved for future diagnostic output.
         """
-        startDelayLen = 0  # this should stay 0.
-        timeStamp_s = timeStep_s * np.arange(timeLen - 1)
-        envelope = np.zeros_like(timeStamp_s)
+        timeStamp = timeStep * np.arange(timeLen - 1)
+        envelope = np.zeros(timeStamp.shape) * unit.T
+        envelope[:] = 0.5 * B1
 
-        envelope[startDelayLen:] = 0.5 * B1_T
-
-        # excitation along x-axis
-        Bx_envelope = np.multiply(
-            envelope, np.cos(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase)
-        )
+        Bx_envelope = envelope * np.cos(2 * PI * nu_rot * timeStamp + init_phase)
         Bx = np.outer(Bx_envelope, np.array([1, 0, 0]))
 
-        # excitation along y-axis
-        By_envelope = np.multiply(
-            envelope, np.sin(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase)
-        )
+        By_envelope = envelope * np.sin(2 * PI * nu_rot * timeStamp + init_phase)
         By = np.outer(By_envelope, np.array([0, 1, 0]))
-
-        # 1st order time-derivate of the excitation along x-axis
-        dBxdt_envelope = np.multiply(
-            envelope,
-            -2
-            * np.pi
-            * nu_rot_Hz
-            * np.sin(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase),
-        )
-        dBxdt = np.outer(dBxdt_envelope, np.array([1, 0, 0]))
-
-        # 1st order time-derivate of the excitation along y-axis
-        dBydt_envelope = np.multiply(
-            envelope,
-            2
-            * np.pi
-            * nu_rot_Hz
-            * np.cos(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase),
-        )
-        dBydt = np.outer(dBydt_envelope, np.array([0, 1, 0]))
 
         self.B_vec = Bx + By
 
@@ -303,119 +272,90 @@ class MagField(PhysicalObject):
 
     def setCPMGPulseTrain(
         self,
-        timeStep_s: float,
+        timeStep: Quantity,
         timeLen: int,
-        gamma_HzToT: float,
-        t90_s: float,
-        tau_s: float,
+        gamma: Quantity,
+        t90: Quantity,
+        tau: Quantity,
         numEcho: int,
-        nu_rot_Hz: float,
-        init_phase: float = 0.0,
+        nu_rot: Quantity,
+        init_phase: Quantity = 0.0 * unit.rad,
         verbose: bool = False,
     ):
         """Generate a CPMG (Carr-Purcell-Meiboom-Gill) pulse train in the rotating frame.
 
         Produces a π/2 pulse followed by ``numEcho`` refocusing π pulses
-        separated by free-precession intervals of length ``tau_s``.  The
-        envelope schematic below uses the pulse-timing notation from the
-        original CPMG paper:
-          90deg pulse       180deg pulse                     180deg pulse                  180deg pulse
-                             ┌───────┐                       ┌───────┐                       ┌───────┐
-            ┌───┐            |       |                       |       |                       |       |
-            ┘   └────────────┘       └───────────────────────┘       └───────────────────────┘       └──────────────────────
-            ↑   ↑            ↑       ↑                       ↑       ↑                       ↑       ↑
-            0  t90          tau   tau+t180                  3tau   3tau+t180                5tau   5tau+t180
+        separated by free-precession intervals of length ``tau``.  The
+        envelope schematic uses the pulse-timing notation from the original
+        CPMG paper:
+          90deg pulse       180deg pulse                     180deg pulse
+                             ┌───────┐                       ┌───────┐
+            ┌───┐            |       |                       |       |
+            ┘   └────────────┘       └───────────────────────┘       └──────
+            ↑   ↑            ↑       ↑                       ↑       ↑
+            0  t90          tau   tau+t180                  3tau   3tau+t180
 
         Parameters
         ----------
-        timeStep_s : float
-            Simulation time step (s).
+        timeStep : Quantity
+            Simulation time step (e.g. ``1 * unit.ms``).
         timeLen : int
             Total number of time steps.
-        gamma_HzToT : float
-            Gyromagnetic ratio in Hz/T (without 2π factor).
-        t90_s : float
-            Desired 90° pulse duration (s); 180° pulses use the same duration.
-        tau_s : float
-            Half-echo spacing: free precession interval between π/2 and first π
-            pulse, and between consecutive π pulses.
+        gamma : Quantity
+            Gyromagnetic ratio (e.g. ``gamma_p`` in ``unit.rad * unit.Hz / unit.T``).
+        t90 : Quantity
+            Desired 90° pulse duration; 180° pulses use the same duration.
+        tau : Quantity
+            Half-echo spacing: free precession time between π/2 and first π pulse.
         numEcho : int
             Number of spin echoes (= number of π pulses).
-        nu_rot_Hz : float
-            Carrier frequency of the rotating frame (Hz).
-        init_phase : float
-            Initial phase offset for all pulses (rad).
+        nu_rot : Quantity
+            Carrier frequency offset in the rotating frame (e.g. ``2 * unit.Hz``).
+        init_phase : Quantity
+            Initial phase offset for all pulses (e.g. ``0 * unit.rad``).
         verbose : bool
             Print diagnostic information (e.g. ``t90Len``).
         """
-        timeStamp_s = timeStep_s * np.arange(timeLen - 1)
-        t90Len = int(np.round(t90_s / timeStep_s))
+        timeStamp = timeStep * np.arange(timeLen - 1)
+        t90Len = int(np.round(t90 / timeStep))
         if verbose:
             print(f"t90Len = {t90Len} time steps")
         if t90Len < 2:
             print(f"WARNING: t90Len = {t90Len} < 3")
-        t180Len: int = 1 * (t90Len)
+        t180Len = t90Len
 
-        t90_s = t90Len * timeStep_s
+        t90 = t90Len * timeStep  # snap to grid
 
-        B90_T = 1.0 * PI / (gamma_HzToT * t90_s)
-        B180_T = 2.0 * B90_T
+        B90 = PI / (gamma * t90)
+        B180 = 2.0 * B90
 
-        tauLen = int(np.round(tau_s / timeStep_s))
+        tauLen = int(np.round(tau / timeStep))
         if tauLen < 10 * t180Len:
-            print(
-                f"WARNING: tauLen = {tauLen} < 10 * t180Len = {10 * t180Len}. Too short! "
-            )
+            print(f"WARNING: tauLen = {tauLen} < 10 * t180Len = {10 * t180Len}. Too short!")
 
-        # envelope = np.zeros_like(timeStamp_s)
-        Bx = np.zeros_like(timeStamp_s)
-        By = np.zeros_like(timeStamp_s)
-        dBxdt = np.zeros_like(timeStamp_s)
-        dBydt = np.zeros_like(timeStamp_s)
+        Bx = np.zeros(timeStamp.shape) * unit.T
+        By = np.zeros(timeStamp.shape) * unit.T
 
-        # set pulses
-        # envelope[0:t90Len] += 1
+        t90Stamp = 2 * PI * nu_rot * timeStamp[0:t90Len] + init_phase
+        t180Stamp = 2 * PI * nu_rot * timeStamp[0:t180Len] + init_phase
 
-        t90Stamp = 2 * PI * nu_rot_Hz * timeStamp_s[0:t90Len] + init_phase
-        t180Stamp = 2 * PI * nu_rot_Hz * timeStamp_s[0:t180Len] + init_phase
+        Bx_90pulse = 0.5 * B90 * np.cos(t90Stamp)
+        By_90pulse = 0.5 * B90 * np.sin(t90Stamp)
+        Bx_180pulse = 0.5 * B180 * np.cos(t180Stamp)
+        By_180pulse = 0.5 * B180 * np.sin(t180Stamp)
 
-        Bx_90pulse = 0.5 * B90_T * np.cos(t90Stamp)
-        By_90pulse = 0.5 * B90_T * np.sin(t90Stamp)
-        dBxdt_90pulse = 0.5 * B90_T * (-2) * PI * nu_rot_Hz * np.sin(t90Stamp)
-        dBydt_90pulse = 0.5 * B90_T * 2 * PI * nu_rot_Hz * np.cos(t90Stamp)
-        piHalfPulses = [Bx_90pulse, By_90pulse, dBxdt_90pulse, dBydt_90pulse]
+        Bx[0:t90Len] = Bx_90pulse
+        By[0:t90Len] = By_90pulse
 
-        Bx_180pulse = 0.5 * B180_T * np.cos(t180Stamp)
-        By_180pulse = 0.5 * B180_T * np.sin(t180Stamp)
-        dBxdt_180pulse = 0.5 * B180_T * (-2) * PI * nu_rot_Hz * np.sin(t180Stamp)
-        dBydt_180pulse = 0.5 * B180_T * 2 * PI * nu_rot_Hz * np.cos(t180Stamp)
-        piPulses = [Bx_180pulse, By_180pulse, dBxdt_180pulse, dBydt_180pulse]
-
-        # set pi/2 pulses
-        for i, B in enumerate([Bx, By, dBxdt, dBydt]):
-            B[0:t90Len] = piHalfPulses[i]
-
-        # set pi pulses
         for i in range(numEcho):
-            if (1 + i * 2) * tauLen + t180Len >= len(timeStamp_s):
+            if (1 + i * 2) * tauLen + t180Len >= len(timeStamp):
                 break
-            for j, B in enumerate([Bx, By, dBxdt, dBydt]):
-                B[(1 + i * 2) * tauLen : (1 + i * 2) * tauLen + t180Len] = piPulses[j]
+            Bx[(1 + i * 2) * tauLen : (1 + i * 2) * tauLen + t180Len] = Bx_180pulse
+            By[(1 + i * 2) * tauLen : (1 + i * 2) * tauLen + t180Len] = By_180pulse
 
-        self.B_vec = np.zeros((1, len(Bx), 3))
-        # self.dBdt_vec = np.zeros((1, len(Bx), 3))
-
-        self.B_vec[:, :, 0] = Bx
-        self.B_vec[:, :, 1] = By
-        # self.dBdt_vec[:, :, 0] = dBxdt
-        # self.dBdt_vec[:, :, 1] = dBydt
-        # sanCheck(Bx, tag="Bx")
-        # sanCheck(self.B_vec, tag="self.B_vec")
-        # self.dBdt_vec = np.outer(dBxdt + dBydt, direction)
-        # self.nu = nu_rot
-        # def envelope(timeStamp):
-        #     return duty_func(timeStamp) * B1 * np.sin(2 * PI * nu_e * timeStamp + init_phase)
-        # return
+        self.B_vec = np.zeros((1, len(Bx), 3)) * unit.T
+        self.B_vec[0, :, 0] = Bx
+        self.B_vec[0, :, 1] = By
 
     def setNPulsesArbDelay(
         self,

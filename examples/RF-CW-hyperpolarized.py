@@ -1,4 +1,4 @@
-# example script to simulate CW NMR experiment with hyperpolarized sample
+# Example script: CW NMR simulation with a hyperpolarized sample
 import time
 
 from axionbloch.dependency import *
@@ -9,25 +9,25 @@ from axionbloch.constants import gamma_p, mu_p
 from axionbloch.utils import check
 
 
-RCF_Freq_Hz = 1e6
-signalFreqRot_Hz = 1
-T1_s = 1.0
+RCF_Freq = 1 * unit.MHz
+signalFreqRot = 1 * unit.Hz
+T1 = 1.0 * unit.s
 
 # short Tdelta, long T2
-Tdelta_s = 1.0e-1
-T2_s = 1.0e-1
+Tdelta = 1.0e-1 * unit.s
+T2 = 1.0e-1 * unit.s
 
 # # short T2, long Tdelta
-# Tdelta_s = 10.0
-# T2_s = 1.0
+# Tdelta = 10.0 * unit.s
+# T2 = 1.0 * unit.s
 
 # # short Tdelta and T2
-# Tdelta_s = 1.0
-# T2_s = 1.0
+# Tdelta = 1.0 * unit.s
+# T2 = 1.0 * unit.s
 
 # # long Tdelta and T2
-# Tdelta_s = 10.0
-# T2_s = 10.0
+# Tdelta = 10.0 * unit.s
+# T2 = 10.0 * unit.s
 
 simuRate = 500 * unit.Hz
 duration = 20 * unit.s
@@ -39,8 +39,8 @@ sample = Sample(
     massDensity=0.78945 * unit.g / unit.cm**3,
     molarMass=46.069 * unit.g / unit.mol,
     numOfSpinsPerMolecule=6 * unit.one,
-    T2=T2_s * unit.s,
-    T1=T1_s * unit.s,
+    T2=T2,
+    T1=T1,
     vol=1 * unit.cm**3,
     mu=mu_p,
     temp=300 * unit.K,
@@ -48,58 +48,46 @@ sample = Sample(
     verbose=False,
 )
 
+FWHM = (1 / (np.pi * Tdelta) / RCF_Freq) * unit.one
+
 # set detection magnet
 magnet = Magnet(
     name="detection magnet",
-    B0=(RCF_Freq_Hz - signalFreqRot_Hz) * unit.Hz / (sample.gamma / (2 * np.pi)),
-    FWHM=(1 / (np.pi * Tdelta_s) / RCF_Freq_Hz) * unit.one,
+    B0=(RCF_Freq - signalFreqRot) / (sample.gamma / (2 * PI)),
+    FWHM=FWHM,
     nFWHM=20.0,
 )
 magnet.setHomogeneity(numPt=500)
 print(f"numPt for magnet homogeneity = {magnet.numPt}")
 
 # set excitation field
-excField = MagField(name="RF pulse")
+excField = MagField(name="CW excitation")
 
 simu = Simulation(
-    name="simulation template",
+    name="CW NMR hyperpolarized simulation",
     sample=sample,
     magnet=magnet,
     excField=excField,
-    RCF_freq=RCF_Freq_Hz * unit.Hz,
+    RCF_freq=RCF_Freq,
     rate=simuRate,
     duration=duration,
     verbose=False,
 )
 
-# set excitation pulse: CW drive with zero amplitude (free-induction decay)
+# CW drive with zero amplitude — pure free-induction decay
 simu.excField.setXYPulse(
-    timeStep_s=simu.timeStep.to_value(unit.s),
+    timeStep=simu.timeStep,
     timeLen=simu.timeLen,
-    B1_T=0,
-    nu_rot_Hz=signalFreqRot_Hz,
+    B1=0 * unit.T,
+    nu_rot=signalFreqRot,
 )
 
 tic = time.perf_counter()
 simu.generateTrajectories(integrator="RK4")
 toc = time.perf_counter()
-print(f"GenerateTrajectory time consumption = {toc-tic:.6f} s")
+print(f"GenerateTrajectory time consumption = {toc - tic:.6f} s")
 
-simu.monitorTrajectories(verbose=True)
+simu.keepMeanStd()
+simu.displayTrjries(verbose=True)
 
-save_data = True
-if save_data:
-    timeStamp_s = simu.getTimeStamp()
-    check(simu.excField.B_vec.shape)
-    check(simu.trjry.shape)
-    np.savez(
-        "C:\\Users\\zhenf\\D\\Yu0702\\CASPEr-Collaboration\\AxionBloch-paper/figures/RF_CW_hyperpolarized.npz",
-        timeStamp_s=timeStamp_s,
-        B_vec=simu.excField.B_vec,
-        trjry=simu.trjry,
-        T2_s=T2_s,
-        Tdelta_s=Tdelta_s,
-        T_1_s=T1_s,
-        pol=sample.pol.to_value(unit.one),
-        init_M=simu.init_M.to_value(unit.dimensionless_unscaled),
-    )
+save_data = False
