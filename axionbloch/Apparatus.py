@@ -64,6 +64,7 @@ class Magnet:
         verbose : bool
             Print diagnostic information.
         """
+        logPrefix = f"[{self.__class__.__name__}.__init__]"
         self.name = name
         assert nFWHM >= 0
         self.nFWHM = nFWHM
@@ -110,6 +111,7 @@ class Magnet:
         verbose : bool
             Print diagnostic information.
         """
+        logPrefix = f"[{self.__class__.__name__}.{self.setHomogeneity.__name__}]"
         # update self.numPt if
         if numPt is not None:
             self.numPt = max(1, int(numPt))

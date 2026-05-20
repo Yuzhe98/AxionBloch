@@ -84,6 +84,7 @@ class MilkyWayAxionHalo(PhysicalObject):
         verbose : bool
             Print derived quantities after construction.
         """
+        logPrefix = f"[{self.__class__.__name__}.__init__]"
         super().__init__()
         self.name = name
         self.v_0 = v_0
@@ -465,6 +466,7 @@ class MilkyWayAxionHalo(PhysicalObject):
             Complex amplitude spectra.
         """
 
+        logPrefix = f"[{self.__class__.__name__}.{self.getAmpSpectra.__name__}]"
         PSD_lineshape = MilkyWayAxionHalo.axion_lineshape(
             v_0=self.v_0,
             v_lab=self.v_lab,

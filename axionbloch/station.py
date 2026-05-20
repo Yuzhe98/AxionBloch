@@ -69,6 +69,7 @@ class Station:
             Print derived spherical coordinates after construction.
         """
 
+        logPrefix = f"[{self.__class__.__name__}.__init__]"
         self.name = name
         self.NSsemisphere = NSsemisphere
         self.EWsemisphere = EWsemisphere

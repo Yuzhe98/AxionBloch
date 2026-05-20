@@ -70,6 +70,7 @@ class FineGrainedAxionStream(PhysicalObject):
         verbose : bool
             Print input parameters and computed properties.
         """
+        logPrefix = f"[{self.__class__.__name__}.__init__]"
         super().__init__()
         self.name = name
         self.v_lab = v_lab
