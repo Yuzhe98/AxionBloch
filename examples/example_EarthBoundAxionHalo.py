@@ -27,4 +27,4 @@ halo.solve_TISE_3D(l_vals=[1],  # angular momentum quantum number
 # print(halo.getStateNames())
 # print(halo.getStateEnergies())
 
-halo.findGradients(stateNames=['2p'], station=Mainz)
+halo.findGradients(stateNames=['2p'], station=Mainz, truncRadius=2 * unit.earthRad, verbose=True)

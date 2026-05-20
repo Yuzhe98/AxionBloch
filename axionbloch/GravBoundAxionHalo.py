@@ -9,17 +9,9 @@ subclass pre-configured with the Earth's gravitational potential.
 """
 import time
 
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-
-from astropy import units as unit
-from astropy.constants import codata2018 as const
-from astropy.units import Quantity
+from axionbloch.dependency import *
 
 from scipy.sparse import diags
-
-# from scipy.sparse.linalg import eigsh
 from scipy.linalg import eigh
 
 # for wavefunction construction
@@ -27,7 +19,6 @@ from scipy.special import sph_harm_y
 from scipy.interpolate import RegularGridInterpolator
 
 from axionbloch.Station import Station
-from axionbloch.constants import AtomicUnits as AU
 from axionbloch.utils import high_contrast_extended as colors, check
 
 
@@ -174,8 +165,7 @@ class GravBoundAxionHalo:
             2 * self.ma * self.r**2
         ))
         Veff = Veff.to(self.pot.unit)
-        check(self.pot.unit)
-        check(Veff[0].to("eV"))
+
         # ----------------- start of dimensionless computation ---------------- #
         # Kinetic energy operator: T = -(ℏ²/2m) ∇², discretised as a tridiagonal matrix
         main = -2.0 * np.ones(self.N)
@@ -222,7 +212,7 @@ class GravBoundAxionHalo:
 
             # Normalise so that 4π ∫ |u(r)|² dr = 1
             integral = np.sqrt(
-                4 * np.pi * np.trapezoid(
+                4 * PI * np.trapezoid(
                     np.abs(u_r[start_index:]) ** 2,
                     self.r[start_index:],
                 )
@@ -260,10 +250,10 @@ class GravBoundAxionHalo:
                 / np.sqrt(np.trapezoid(np.abs(states[:, _n_r]) ** 2, self.r))
             )
             # print(
-            #     f"n_r={n_r}, l={l_val}: T={T_expect/AU.eV:.3e}, V={V_expect/AU.eV:.3e}, Veff={Veff_expect/AU.eV:.3e}, \
-            #     E_total={(T_expect+Veff_expect)/AU.eV:.3e}, eigen_E={E[n_r]/AU.eV:.3e}"
+            #     f"n_r={n_r}, l={l_val}: T={T_expect:.3e}, V={V_expect:.3e}, Veff={Veff_expect:.3e}, \
+            #     E_total={(T_expect+Veff_expect):.3e}, eigen_E={E[n_r]:.3e}"
             # )
-            # print(f"{T_expect/AU.eV:.6e},")
+            # print(f"{T_expect:.6e},")
             n = i + l + 1
             self.states[f"{n}{self.orbitalLabels[l]}"] = {
                 "key_info": "",
@@ -346,7 +336,7 @@ class GravBoundAxionHalo:
         logPrefix = f"[{self.__class__.__name__}.{self.getStateEnergies.__name__}]"
         return [state["eigenE_eV"] for state in self.states.values()]
 
-    def findGradients(self, stateNames=[], station: Station = None):
+    def findGradients(self, stateNames:list[str], station: Station, truncRadius:Quantity|None=None, verbose:bool=False):
         """Compute and plot the 3-D gradient of the total wavefunction at a station.
 
         Superimposes the requested eigenstates (with equal weight), computes the
@@ -363,21 +353,34 @@ class GravBoundAxionHalo:
         station : Station
             Observer location providing polar angle ``theta`` and azimuthal
             angle ``phi`` used to project the gradient.
+        truncRadius : Quantity
+            Truncation radius for reducing computation. 
         """
+
         logPrefix = f"[{self.__class__.__name__}.{self.findGradients.__name__}]"
         # avoid r=0 singularity
         start_index = self.N // 2 + 5
-        stop_index = (
-            start_index + 2**7
-        )  # TODO: this should not be a number, but a radius range
+        # stop at a desired radius to make computation more efficient
+        if truncRadius is None or type(truncRadius) != Quantity:
+            stop_index = -1
+        elif truncRadius.unit.is_equivalent(self.r.unit):
+            stop_index = start_index + np.argmin(
+                np.abs(self.r[start_index:] - truncRadius)
+            )
+        else:
+            raise TypeError(logPrefix + " truncRadius unit is not equivalent to length. ")
+
+        if verbose:
+            print(logPrefix, "(start_index, stop_index) =", (start_index, stop_index))
+
         # update r and Nr
         r = self.r[start_index:stop_index]
         Nr = len(r)
         self.sortByEigenE()
 
         Nr, Ntheta, Nphi = len(r), 100, 100
-        theta = np.linspace(0, np.pi, Ntheta)
-        phi = np.linspace(0, 2 * np.pi, Nphi)
+        theta = np.linspace(0, PI, Ntheta)
+        phi = np.linspace(0, 2 * PI, Nphi)
         dr = r[1] - r[0]
         dtheta = theta[1] - theta[0]
         dphi = phi[1] - phi[0]
@@ -385,7 +388,9 @@ class GravBoundAxionHalo:
         # 3-D spherical mesh of shape (Nr, Ntheta, Nphi)
         max_n_r = len(self.states.keys())
         R_grid, Theta_grid, Phi_grid = np.meshgrid(r, theta, phi, indexing="ij")
-        # R_grid.shape=(Nr, Ntheta, Nphi)
+        # grid.shape=(Nr, Ntheta, Nphi)
+        # R_grid unit: [length]
+        # Theta_grid / Phi_grid unit: radian
 
         if stateNames is None or len(stateNames) == 0:
             stateNames = [state["name"] for state in self.states.values()][:1]
@@ -409,7 +414,6 @@ class GravBoundAxionHalo:
 
         # radial derivative ∂Ψ/∂r
         dphi_dr = np.gradient(WF_total, dr, axis=0)
-
         # angular derivatives
         dWF_dtheta = np.gradient(WF_total, dtheta, axis=1)
         dWF_dphi = np.gradient(WF_total, dphi, axis=2)
@@ -420,6 +424,14 @@ class GravBoundAxionHalo:
         # small regularisation prevents division by zero at theta=0 and π
         grad_phi = dWF_dphi / (R_grid * np.sin(Theta_grid) + 1e-12 * R_grid.unit)
 
+        if verbose:
+            print(logPrefix, "grad_r.shape =", grad_r.shape, "grad_r.unit =", grad_r.unit)
+            print(logPrefix, "grad_theta.shape =", grad_theta.shape, "grad_theta.unit =", grad_theta.unit)
+            print(logPrefix, "grad_phi.shape =", grad_phi.shape, "grad_phi.unit =", grad_phi.unit)
+            # grad_r.shape = (Nr, Ntheta, Nphi) grad_r.unit = 1 / (rad(1/2) [length](5/2))
+            # grad_theta.shape = (Nr, Ntheta, Nphi) grad_theta.unit = 1 / (rad(3/2) earthRad(5/2))
+            # grad_phi.shape = (Nr, Ntheta, Nphi) grad_phi.unit = 1 / (rad(3/2) earthRad(5/2))
+
         # station direction in radians
         theta_station_rad = station.theta.to_value(unit.rad)  # polar angle
         phi_station_rad = station.phi.to_value(unit.rad)  # azimuthal angle
@@ -429,35 +441,47 @@ class GravBoundAxionHalo:
 
         tic = time.time()
         interp_r = RegularGridInterpolator(
-            (r, theta, phi), grad_r, bounds_error=False, fill_value=None
+            (r.value, theta.value, phi.value),
+            grad_r.value,
+            bounds_error=False,
+            fill_value=None,
         )
         interp_theta = RegularGridInterpolator(
-            (r, theta, phi), grad_theta, bounds_error=False, fill_value=None
+            (r.value, theta.value, phi.value),
+            grad_theta.value,
+            bounds_error=False,
+            fill_value=None,
         )
         interp_phi = RegularGridInterpolator(
-            (r, theta, phi), grad_phi, bounds_error=False, fill_value=None
+            (r.value, theta.value, phi.value),
+            grad_phi.value,
+            bounds_error=False,
+            fill_value=None,
         )
-        interp_r *= grad_r.unit
         toc = time.time()
-        print(logPrefix, f"interp time: {toc-tic:.2e} s")
+        if verbose:
+            print(logPrefix, f"interpolation time: {toc-tic:.2e} s")
 
         # sample gradient along the radial line toward the station
         Nr_plot = 2**10
-        r_line = np.linspace(r[0], 3 * unit.earthRad, Nr_plot)
+        r_line = np.linspace(r[0], truncRadius, Nr_plot)
 
         # points = [[r, theta_station, phi_station], ...]
-        points = np.array([[ri, theta_station_rad, phi_station_rad] for ri in r_line])
+        points = np.array(
+            [
+                [r_pt, station.theta.to_value(unit.rad), station.phi.to_value(unit.rad)]
+                for r_pt in r_line.value
+            ]
+        )
 
         tic = time.time()
-        grad_r_line = np.asarray(interp_r(points))
-        grad_theta_line = np.asarray(interp_theta(points))
-        grad_phi_line = np.asarray(interp_phi(points))
+        grad_r_line = np.asarray(interp_r(points)) * grad_r.unit
+        grad_theta_line = np.asarray(interp_theta(points))* grad_theta.unit
+        grad_phi_line = np.asarray(interp_phi(points)) * grad_phi.unit
         toc = time.time()
         print(logPrefix, f"gradient along station direction time: {toc-tic:.2e} s")
 
-        plt.rc("font", size=16)  # Default text
-
-        fig = plt.figure(figsize=(8, 10))
+        fig = plt.figure(figsize=(8.5 / 2.54, 6.5  / 2.54), dpi=300)
         grid = gridspec.GridSpec(
             nrows=4,
             ncols=1,
@@ -482,8 +506,6 @@ class GravBoundAxionHalo:
         grad_phi_ax = fig.add_subplot(grid[3, 0], sharex=axion_ax)
 
         axes = [axion_ax, grad_r_ax, grad_theta_ax, grad_phi_ax]
-
-        grad_phi_ax.set_xlabel("r (earth radius)")
 
         # for name, state in list(self.states.items())[:1]:
         for name in stateNames:
@@ -553,7 +575,9 @@ class GravBoundAxionHalo:
         #     label="phi gradient imag",
         # )
 
-        grad_phi_ax.set_xlabel("r (earth radius)")
+        # grad_phi_ax.set_xlabel("r (earth radius)")
+
+        grad_phi_ax.set_xlabel(f"r ({r.unit.to_string('unicode')})")
         ylables = [
             "",
             "$\\partial_r\\phi$",
