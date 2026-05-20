@@ -134,17 +134,14 @@ py::array_t<double> burkert_potential_vector(py::array_t<double> r_vals, double 
     return pot;
 }
 
-py::tuple generateTrajectories(py::array_t<double> B_vec, py::array_t<double> dBdt_vec,
+py::tuple generateTrajectories(py::array_t<double> B_vec,
                                py::array_t<double> B_vals_T, py::array_t<double> ratios,
                                double gamma, double timeStep, double T1, double T2,
                                double RCF_freq_Hz, double Mx0, double My0, double Mz0, double M0eqb,
                                const std::string &integrator = "RK4") {
     // check input dims
-    if (B_vec.ndim() != 3 || dBdt_vec.ndim() != 3)
-        throw std::runtime_error("B_vec and dBdt_vec must be 3D");
-    if (B_vec.shape(0) != dBdt_vec.shape(0) || B_vec.shape(1) != dBdt_vec.shape(1) ||
-        B_vec.shape(2) != dBdt_vec.shape(2))
-        throw std::runtime_error("B_vec and dBdt_vec shapes must match");
+    if (B_vec.ndim() != 3)
+        throw std::runtime_error("B_vec must be 3D");
 
     if (B_vals_T.ndim() != 1 || ratios.ndim() != 1)
         throw std::runtime_error("B_vals_T and ratios must be 1D");
@@ -170,7 +167,6 @@ py::tuple generateTrajectories(py::array_t<double> B_vec, py::array_t<double> dB
 
     // get raw pointers
     auto bufB = B_vec.request();
-    auto bufdB = dBdt_vec.request();
     auto bufBvals = B_vals_T.request();
     auto bufratios = ratios.request();
     auto bufTrj = trjry.request();
@@ -178,7 +174,6 @@ py::tuple generateTrajectories(py::array_t<double> B_vec, py::array_t<double> dB
     auto bufd2Mdt2 = d2Mdt2.request();
 
     const double *pB = static_cast<double *>(bufB.ptr);
-    const double *pdB = static_cast<double *>(bufdB.ptr);
     const double *pBvals = static_cast<double *>(bufBvals.ptr);
     const double *pratios = static_cast<double *>(bufratios.ptr);
 
@@ -193,20 +188,6 @@ py::tuple generateTrajectories(py::array_t<double> B_vec, py::array_t<double> dB
             static_cast<int>(numFields), static_cast<int>(numSteps),
             static_cast<int>(numSpinPkts), // int
             pB,                            // shape (numFields, numSteps, 3)
-            pdB,                           // shape (numFields, numSteps, 3)
-            pBvals,                        // shape (numSpinPkts)
-            pratios,                       // shape (numSpinPkts)
-            gamma, timeStep, T1, T2, RCF_freq_Hz, Mx0, My0, Mz0,
-            M0eqb, // equilibrium magnetization
-            // ouputs
-            ptrj, pdM, pd2M);
-    } else if (integrator == "taylor") {
-        _generateTrajectories_TE(
-            // inputs
-            static_cast<int>(numFields), static_cast<int>(numSteps),
-            static_cast<int>(numSpinPkts), // int
-            pB,                            // shape (numFields, numSteps, 3)
-            pdB,                           // shape (numFields, numSteps, 3)
             pBvals,                        // shape (numSpinPkts)
             pratios,                       // shape (numSpinPkts)
             gamma, timeStep, T1, T2, RCF_freq_Hz, Mx0, My0, Mz0,

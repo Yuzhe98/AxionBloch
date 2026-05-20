@@ -17,6 +17,7 @@ RECORD_RUNTIME : bool
 T_SETFIELD_S, T_SIMUSTEP_S : float
     Per-step runtime estimates (seconds) used to project total run time.
 """
+
 import os
 import time
 import warnings
@@ -163,7 +164,7 @@ class MagField(PhysicalObject):
         dBydt = np.outer(dBydt_envelope, np.array([0, 1, 0]))
 
         self.B_vec = Bx + By
-        self.dBdt_vec = dBxdt + dBydt
+        # self.dBdt_vec = dBxdt + dBydt
         # sanCheck(Bx, tag="Bx")
         # sanCheck(self.B_vec, tag="self.B_vec")
         # self.dBdt_vec = np.outer(dBxdt + dBydt, direction)
@@ -243,16 +244,15 @@ class MagField(PhysicalObject):
         dBydt = np.outer(dBydt_envelope, np.array([0, 1, 0]))
 
         self.B_vec = Bx + By
-        self.dBdt_vec = dBxdt + dBydt
 
     def set90DegPulse(
         self,
-        timeStep_s: float,
+        timeStep: Quantity,
         timeLen: int,
-        gamma_HzToT: float,  # amplitude of the excitation pulse in (T)
-        t90_s: float,
-        nu_rot_Hz: float,
-        init_phase: float = 0.0,
+        gamma: Quantity,
+        t90: Quantity,
+        nu_rot: Quantity,
+        init_phase: Quantity = 0.0 * unit.rad,
         verbose: bool = False,
     ):
         """Generate a calibrated 90° (π/2) pulse in the rotating frame.
@@ -267,8 +267,8 @@ class MagField(PhysicalObject):
             Simulation time step (s).
         timeLen : int
             Total number of time steps.
-        gamma_HzToT : float
-            Gyromagnetic ratio in Hz/T (without 2π factor).
+        gamma : float
+            Gyromagnetic ratio in Hz/T (2π factor).
         t90_s : float
             Desired 90° pulse duration (s).
         nu_rot_Hz : float
@@ -279,48 +279,27 @@ class MagField(PhysicalObject):
             Unused; reserved for future diagnostic output.
         """
         startDelayLen = 0  # this should stay 0. It does not help in anything
-        timeStamp_s = timeStep_s * np.arange(timeLen - 1)
-        t90Len = int(np.round(t90_s / timeStep_s))
-        B90_T = 1.0 * np.pi / (gamma_HzToT * t90_s)
-        envelope = np.zeros_like(timeStamp_s)
-        t90Len = int(np.round(t90_s / (timeStamp_s[1] - timeStamp_s[0])))
+        timeStamp_s = timeStep * np.arange(timeLen - 1)
+        t90Len = int(np.round(t90 / timeStep))
+        B90 = 2 * .5 * PI / (gamma * t90)
+        envelope = np.zeros(timeStamp_s.shape) * unit.T
+        t90Len = int(np.round(t90 / (timeStamp_s[1] - timeStamp_s[0])))
 
-        envelope[startDelayLen : startDelayLen + t90Len] = 0.5 * B90_T
+        envelope[startDelayLen : startDelayLen + t90Len] = 0.5 * B90
 
         # excitation along x-axis
         Bx_envelope = np.multiply(
-            envelope, np.cos(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase)
+            envelope, np.cos(2 * PI * nu_rot * timeStamp_s + init_phase)
         )
         Bx = np.outer(Bx_envelope, np.array([1, 0, 0]))
 
         # excitation along y-axis
         By_envelope = np.multiply(
-            envelope, np.sin(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase)
+            envelope, np.sin(2 * PI * nu_rot * timeStamp_s + init_phase)
         )
         By = np.outer(By_envelope, np.array([0, 1, 0]))
 
-        # 1st order time-derivate of the excitation along x-axis
-        dBxdt_envelope = np.multiply(
-            envelope,
-            -2
-            * np.pi
-            * nu_rot_Hz
-            * np.sin(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase),
-        )
-        dBxdt = np.outer(dBxdt_envelope, np.array([1, 0, 0]))
-
-        # 1st order time-derivate of the excitation along y-axis
-        dBydt_envelope = np.multiply(
-            envelope,
-            2
-            * np.pi
-            * nu_rot_Hz
-            * np.cos(2 * np.pi * nu_rot_Hz * timeStamp_s + init_phase),
-        )
-        dBydt = np.outer(dBydt_envelope, np.array([0, 1, 0]))
-
         self.B_vec = Bx + By
-        self.dBdt_vec = dBxdt + dBydt
 
     def setCPMGPulseTrain(
         self,
@@ -379,7 +358,7 @@ class MagField(PhysicalObject):
 
         t90_s = t90Len * timeStep_s
 
-        B90_T = 1.0 * np.pi / (gamma_HzToT * t90_s)
+        B90_T = 1.0 * PI / (gamma_HzToT * t90_s)
         B180_T = 2.0 * B90_T
 
         tauLen = int(np.round(tau_s / timeStep_s))
@@ -397,19 +376,19 @@ class MagField(PhysicalObject):
         # set pulses
         # envelope[0:t90Len] += 1
 
-        t90Stamp = 2 * np.pi * nu_rot_Hz * timeStamp_s[0:t90Len] + init_phase
-        t180Stamp = 2 * np.pi * nu_rot_Hz * timeStamp_s[0:t180Len] + init_phase
+        t90Stamp = 2 * PI * nu_rot_Hz * timeStamp_s[0:t90Len] + init_phase
+        t180Stamp = 2 * PI * nu_rot_Hz * timeStamp_s[0:t180Len] + init_phase
 
         Bx_90pulse = 0.5 * B90_T * np.cos(t90Stamp)
         By_90pulse = 0.5 * B90_T * np.sin(t90Stamp)
-        dBxdt_90pulse = 0.5 * B90_T * (-2) * np.pi * nu_rot_Hz * np.sin(t90Stamp)
-        dBydt_90pulse = 0.5 * B90_T * 2 * np.pi * nu_rot_Hz * np.cos(t90Stamp)
+        dBxdt_90pulse = 0.5 * B90_T * (-2) * PI * nu_rot_Hz * np.sin(t90Stamp)
+        dBydt_90pulse = 0.5 * B90_T * 2 * PI * nu_rot_Hz * np.cos(t90Stamp)
         piHalfPulses = [Bx_90pulse, By_90pulse, dBxdt_90pulse, dBydt_90pulse]
 
         Bx_180pulse = 0.5 * B180_T * np.cos(t180Stamp)
         By_180pulse = 0.5 * B180_T * np.sin(t180Stamp)
-        dBxdt_180pulse = 0.5 * B180_T * (-2) * np.pi * nu_rot_Hz * np.sin(t180Stamp)
-        dBydt_180pulse = 0.5 * B180_T * 2 * np.pi * nu_rot_Hz * np.cos(t180Stamp)
+        dBxdt_180pulse = 0.5 * B180_T * (-2) * PI * nu_rot_Hz * np.sin(t180Stamp)
+        dBydt_180pulse = 0.5 * B180_T * 2 * PI * nu_rot_Hz * np.cos(t180Stamp)
         piPulses = [Bx_180pulse, By_180pulse, dBxdt_180pulse, dBydt_180pulse]
 
         # set pi/2 pulses
@@ -424,19 +403,123 @@ class MagField(PhysicalObject):
                 B[(1 + i * 2) * tauLen : (1 + i * 2) * tauLen + t180Len] = piPulses[j]
 
         self.B_vec = np.zeros((1, len(Bx), 3))
-        self.dBdt_vec = np.zeros((1, len(Bx), 3))
+        # self.dBdt_vec = np.zeros((1, len(Bx), 3))
 
         self.B_vec[:, :, 0] = Bx
         self.B_vec[:, :, 1] = By
-        self.dBdt_vec[:, :, 0] = dBxdt
-        self.dBdt_vec[:, :, 1] = dBydt
+        # self.dBdt_vec[:, :, 0] = dBxdt
+        # self.dBdt_vec[:, :, 1] = dBydt
         # sanCheck(Bx, tag="Bx")
         # sanCheck(self.B_vec, tag="self.B_vec")
         # self.dBdt_vec = np.outer(dBxdt + dBydt, direction)
         # self.nu = nu_rot
         # def envelope(timeStamp):
-        #     return duty_func(timeStamp) * B1 * np.sin(2 * np.pi * nu_e * timeStamp + init_phase)
+        #     return duty_func(timeStamp) * B1 * np.sin(2 * PI * nu_e * timeStamp + init_phase)
         # return
+
+    def setNPulsesArbDelay(
+        self,
+        timeStep: Quantity,
+        timeLen: int,
+        gamma: Quantity[unit.rad * unit.Hz / unit.T],
+        t90: Quantity,
+        tip_angles: list[Quantity[unit.rad]],
+        delays: list[Quantity[unit.s]],
+        nu_rot: Quantity[unit.Hz],
+        phases: list[Quantity] | None = None,
+        verbose: bool = False,
+    ):
+        """Generate N hard pulses at arbitrary times in the rotating frame.
+
+        All pulses share the same duration ``t90_s`` (snapped to the time
+        grid) but each has an independently chosen flip angle and phase.
+        The amplitude of pulse *i* is scaled so that
+        ``gamma * 0.5 * B_i * t90_s = flip_angles_deg[i] * pi/180``.
+
+        Timing convention: ``delays_s[i]`` is the free-precession interval
+        between the *end* of pulse *i-1* (or the simulation start for i=0)
+        and the *start* of pulse *i*.
+
+        Parameters
+        ----------
+        timeStep_s : float
+            Simulation time step (s).
+        timeLen : int
+            Total number of time steps (including the final boundary point).
+        gamma_HzToT : float
+            Gyromagnetic ratio in rad·Hz/T (sign is used to set pulse sense).
+        t90_s : float
+            Duration of a 90° pulse (s); all pulses share this duration.
+        flip_angles_deg : list of float
+            Flip angle of each pulse in degrees (e.g. ``[90, 180, 180]``).
+        delays_s : list of float
+            Free-precession time before each pulse (s). ``delays_s[0]`` is
+            the initial delay before pulse 0 (usually 0). Must satisfy
+            ``len(delays_s) == len(flip_angles_deg)``.
+        nu_rot_Hz : float
+            Carrier frequency in the rotating frame (Hz).
+        phases_rad : list of float or None
+            Phase offset of each pulse (rad), setting the rotation axis.
+            ``None`` defaults to all-zero phases (all pulses along x).
+        verbose : bool
+            Print per-pulse diagnostics.
+        """
+        N = len(tip_angles)
+        if len(delays) != N:
+            raise ValueError("delays_s and flip_angles_deg must have the same length")
+        if phases is None:
+            phases = [0.0 * unit.rad] * N
+        if len(phases) != N:
+            raise ValueError("phases_rad and flip_angles_deg must have the same length")
+
+        t90Len = int(np.round(t90 / timeStep))
+        if t90Len < 2:
+            print(f"WARNING: t90Len = {t90Len} < 2")
+        t90 = t90Len * timeStep  # snap to grid
+        if verbose:
+            print(f"t90Len = {t90Len}, t90_s = {t90:.4e} s")
+
+        B90 = PI / (gamma * t90)
+
+        numSteps = timeLen - 1
+        Bx = np.zeros(numSteps) * unit.T
+        By = np.zeros(numSteps) * unit.T
+
+        # Local time template for one pulse window (phase resets at each pulse start,
+        # so the rotation axis is determined solely by phases_rad[i]).
+        local_t = timeStep * np.arange(t90Len)
+
+        current_idx = 0
+        for i in range(N):
+            current_idx += int(np.round(delays[i] / timeStep))
+
+            tip_angle = tip_angles[i]
+            B_i = (2.0 * tip_angle / (PI)) * B90
+            phase_i = phases[i]
+
+            end_idx = min(current_idx + t90Len, numSteps)
+            actual_len = end_idx - current_idx
+            if actual_len <= 0:
+                if verbose:
+                    print(f"Pulse {i}: starts beyond simulation end, skipping")
+                break
+
+            stamp = 2 * PI * nu_rot * local_t[:actual_len] + phase_i
+            Bx[current_idx:end_idx] += 0.5 * B_i * np.cos(stamp)
+            By[current_idx:end_idx] += 0.5 * B_i * np.sin(stamp)
+
+            if verbose:
+                t_start = current_idx * timeStep
+                print(
+                    f"Pulse {i}: {tip_angles[i]:.1f}° at t={t_start:.4f} s, "
+                    f"phase={np.degrees(phase_i):.1f}°, B_i={B_i:.4e} T"
+                )
+
+            current_idx += t90Len
+
+        self.B_vec = np.zeros((1, numSteps, 3)) * unit.T
+        self.B_vec[0, :, 0] = Bx
+        self.B_vec[0, :, 1] = By
 
     def setAxionFields(
         self,
@@ -470,7 +553,7 @@ class MagField(PhysicalObject):
             )
 
             ampSpectra = axion.getAmpSpectra(
-                frequencies=frequencies + RCF_freq_Hz*unit.Hz,
+                frequencies=frequencies + RCF_freq_Hz * unit.Hz,
                 case="grad_perp",
                 numSpectra=numFields,
                 use_stoch=use_stoch,
@@ -530,7 +613,9 @@ class MagField(PhysicalObject):
 
             ax_AS_pos_neg: np.ndarray = np.fft.fftshift(ax_AS, axes=1)
 
-            B_t = np.asarray(sp_ifft(ax_AS_pos_neg.value, axis=1)) * ax_AS_pos_neg.unit  # batch IFFT along time axis
+            B_t = (
+                np.asarray(sp_ifft(ax_AS_pos_neg.value, axis=1)) * ax_AS_pos_neg.unit
+            )  # batch IFFT along time axis
 
             dBdt_FD: np.ndarray = 1j * 2 * np.pi * freq * ax_AS_pos_neg
 
@@ -547,12 +632,12 @@ class MagField(PhysicalObject):
                 tic = time.perf_counter()
 
             self.B_vec = np.zeros((numFields, numSteps, 3)) * B_t.unit
-            self.dBdt_vec = np.zeros((numFields, numSteps, 3)) * dBdt.unit
+            # self.dBdt_vec = np.zeros((numFields, numSteps, 3)) * dBdt.unit
 
             self.B_vec[:, :, 0] = B_t.real
             self.B_vec[:, :, 1] = B_t.imag
-            self.dBdt_vec[:, :, 0] = dBdt.real
-            self.dBdt_vec[:, :, 1] = dBdt.imag
+            # self.dBdt_vec[:, :, 0] = dBdt.real
+            # self.dBdt_vec[:, :, 1] = dBdt.imag
 
             # # Stack real and imaginary parts along the last axis
             # self.B_vec = np.stack((Ba_t.real, Ba_t.imag, np.zeros_like(Ba_t.real)), axis=2)
@@ -646,7 +731,8 @@ class Simulations:
                 for key, pq in params["key_info"].items():
                     print(key, "=", pq, flush=True)
                 print(
-                    logPrefix, f"simu.magnet.numPt =",
+                    logPrefix,
+                    f"simu.magnet.numPt =",
                     simu.magnet.numPt,
                     flush=True,
                 )
@@ -661,16 +747,6 @@ class Simulations:
             est_trjry_s += t_trjry_s
             est_runtime += t_setFields_s + t_trjry_s
             if verbose:
-                # print(
-                #     "[simu.excField.setAxionFields.__name__] time consumption estimated =",
-                #     t_setFields_s / 60,
-                #     "min",
-                # )
-                # print(
-                #     "[generateTrajectories] time consumption estimated =",
-                #     t_trjry_s / 60,
-                #     "min",
-                # )
                 print(
                     logPrefix
                     + "Estimated step runtime = "
@@ -693,17 +769,22 @@ class Simulations:
                 "# ---------------------------------------------------- #", flush=True
             )
             print(
-                logPrefix, f"Estimated setFields time = {est_setFields_s / 60.0:.3g} min",
+                logPrefix,
+                f"Estimated setFields time = {est_setFields_s / 60.0:.3g} min",
                 flush=True,
             )
             print(
-                logPrefix, f"Estimated trjry time = {est_trjry_s / 60.0:.3g} min",
-                logPrefix, f"Estimated trjry time = {est_trjry_s / 60.0:.3g} min",
+                logPrefix,
+                f"Estimated trjry time = {est_trjry_s / 60.0:.3g} min",
+                logPrefix,
+                f"Estimated trjry time = {est_trjry_s / 60.0:.3g} min",
                 flush=True,
             )
             print(
-                logPrefix, f"Estimated total runtime = {est_runtime / 60.0:.3g} min",
-                logPrefix, f"Estimated total runtime = {est_runtime / 60.0:.3g} min",
+                logPrefix,
+                f"Estimated total runtime = {est_runtime / 60.0:.3g} min",
+                logPrefix,
+                f"Estimated total runtime = {est_runtime / 60.0:.3g} min",
                 flush=True,
             )
             answer = input("Continue? (y/n): ").strip().lower()
@@ -932,7 +1013,7 @@ class Simulation(PhysicalObject):
         init_M: Quantity | None = None,  # initial magnetization vector amplitude
         init_M_theta: Quantity | None = 0 * unit.rad,
         init_M_phi: Quantity | None = 0 * unit.rad,
-        RCF_freq: Quantity | None = None,
+        RCF_freq: Quantity[unit.Hz] | None = None,
         rate: Quantity | None = None,  # simulation rate
         duration: Quantity | None = None,  # simulation duration
         verbose: bool = False,
@@ -1025,9 +1106,7 @@ class Simulation(PhysicalObject):
         # set rotating frame frequency
         if RCF_freq is None:
             # gamma is rad·Hz/T; strip rad via dimensionless_angles to get Hz
-            self.RCF_freq = (self.sample.gamma / (2 * np.pi) * self.magnet.B0).to(
-                unit.Hz, equivalencies=unit.dimensionless_angles()
-            )
+            self.RCF_freq = (self.sample.gamma / (2 * PI) * self.magnet.B0).to(unit.Hz)
         else:
             self.RCF_freq = RCF_freq.to(unit.Hz)
         self.RCF_freq_Hz = self.RCF_freq.to_value(unit.Hz)
@@ -1042,9 +1121,7 @@ class Simulation(PhysicalObject):
         self.trjry = None
 
         # ---------------------------- set duration ----------------------------#
-        FWHM_Hz = (
-            self.magnet.FWHM_B0 * sample.gamma / (2 * np.pi * unit.rad)
-        ).to_value(unit.Hz)
+        FWHM_Hz = (self.magnet.FWHM_B0 * sample.gamma / (2 * PI)).to_value(unit.Hz)
         # find Tdelta
         self.Tdelta_s = 1 / (np.pi * FWHM_Hz)
         self.T2star_s = 1 / (1 / self.Tdelta_s + 1 / sample.T2.to_value(unit.s))
@@ -1068,7 +1145,7 @@ class Simulation(PhysicalObject):
         # -----------------------------set magnet--------------------------------------- #
         # estimate the necessary data points for sampling the inhomogeneity
         numPt = abs(
-            (self.duration * 2 * magnet.B0_nW * sample.gamma / (2 * np.pi)).to_value(
+            (self.duration * 2 * magnet.B0_nW * sample.gamma / (2 * PI)).to_value(
                 unit.dimensionless_unscaled, equivalencies=unit.dimensionless_angles()
             )
         )
@@ -1114,12 +1191,14 @@ class Simulation(PhysicalObject):
         # ----- check if parameter values are within reasonable range -----#
         assert self.numSteps >= 5, "number of steps < 5"
         # numPt >= 2 pi * Delta_nu * duration
-        variation = self.magnet.nFWHM * self.magnet.FWHM_B0 * self.sample.gamma / (2 * np.pi * unit.rad) * self.duration
-        if (
-            self.magnet.numPt
-            < 2
-            * variation.to_value(unit.one)
-        ):
+        variation = (
+            self.magnet.nFWHM
+            * self.magnet.FWHM_B0
+            * self.sample.gamma
+            / (2 * PI)
+            * self.duration
+        )
+        if self.magnet.numPt < 2 * variation.to_value(unit.one):
             print(
                 f"{self.__init__.__name__} WARNING: magnet_det.numPt may be too few. "
             )
@@ -1243,18 +1322,18 @@ class Simulation(PhysicalObject):
                 f"excField.B_vec has invalid shape {self.excField.B_vec.shape}, expected (numFields, numSteps, 3) or (numSteps, 3)"
             )
 
-        if self.excField.dBdt_vec.ndim == 2 and self.excField.dBdt_vec.shape[1] == 3:
-            self.excField.dBdt_vec = self.excField.dBdt_vec[np.newaxis, :, :]
-        elif self.excField.dBdt_vec.ndim != 3 or self.excField.dBdt_vec.shape[2] != 3:
-            raise ValueError(
-                f"excField.dBdt_vec has invalid shape {self.excField.dBdt_vec.shape}, expected (numFields, numSteps, 3) or (numSteps, 3)"
-            )
+        # if self.excField.dBdt_vec.ndim == 2 and self.excField.dBdt_vec.shape[1] == 3:
+        #     self.excField.dBdt_vec = self.excField.dBdt_vec[np.newaxis, :, :]
+        # elif self.excField.dBdt_vec.ndim != 3 or self.excField.dBdt_vec.shape[2] != 3:
+        #     raise ValueError(
+        #         f"excField.dBdt_vec has invalid shape {self.excField.dBdt_vec.shape}, expected (numFields, numSteps, 3) or (numSteps, 3)"
+        #     )
         # ------------------------------------------------------------------------------------------------
-
+        check(self.magnet.B_spread.to_value(unit.T).shape)
         # Use the kinetic simulation function from blochsimulation to generate trajectories
         self.trjry, self.dMdt, self.d2Mdt2 = bs.generateTrajectories(
             self.excField.B_vec.to_value(unit.T),
-            self.excField.dBdt_vec.to_value(unit.T / unit.s),
+            # self.excField.dBdt_vec.to_value(unit.T / unit.s),
             self.magnet.B_spread.to_value(unit.T),
             self.magnet.ratios,
             self.sample.gamma.to_value(unit.rad * unit.Hz / unit.T),
@@ -1269,7 +1348,6 @@ class Simulation(PhysicalObject):
             integrator,
         )
         if cleanup:
-            del self.excField.B_vec, self.excField.dBdt_vec
             del self.dMdt, self.d2Mdt2
 
     def cleanup(self):
@@ -1526,8 +1604,8 @@ class Simulation(PhysicalObject):
         # d2Mzdt_ax.set_ylabel("")
 
         fig.suptitle(f"T2={self.T2_s:.1e}s T1={self.T1_s:.1e}s")
-        # gaNN={self.excField.gaNN:.0e} axion_nu={self.excField.nu:.1e}\nXe
-        # print(f'TrajectoryMonitoring_gaNN={self.ALPwind.gaNN:.0e}_axion_nu={self.ALPwind.nu:.1e}_Xe_T2={self.T2:.1g}s_T1={self.T1:.1e}s')
+        # g_aNN={self.excField.g_aNN:.0e} axion_nu={self.excField.nu:.1e}\nXe
+        # print(f'TrajectoryMonitoring_g_aNN={self.ALPwind.g_aNN:.0e}_axion_nu={self.ALPwind.nu:.1e}_Xe_T2={self.T2:.1g}s_T1={self.T1:.1e}s')
         # plt.tight_layout()
         plt.show()
 
@@ -1573,7 +1651,6 @@ class Simulation(PhysicalObject):
         if not debug:
             del (
                 self.excField.B_vec,
-                self.excField.dBdt_vec,
                 self.trjry,
                 Mxy_magnitudes,
                 Mx,

@@ -204,7 +204,6 @@ void _generateTrajectories(
     // input
     const int numFields, const int numTimeSteps, const int numSpinPkts,
     const double *B_vec,    // shape (numFields, numTimeSteps, 3) -> 1D
-    const double *dBdt_vec, // shape (numFields, numTimeSteps, 3) -> 1D
     const double *B_vals_T, // shape (numSpinPkts)
     const double *ratios,   // shape (numSpinPkts)
     const double gamma, const double timeStep, const double T1,
@@ -225,7 +224,6 @@ void _generateTrajectories(
     std::vector<double> dOmegadt_vec(FT3);
     for (int i = 0; i < FT3; i++) {
         Omega_vec[i] = gamma * B_vec[i];
-        dOmegadt_vec[i] = gamma * dBdt_vec[i];
     }
 
     std::vector<double> inhomoOmega_vec(numSpinPkts);

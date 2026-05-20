@@ -20,6 +20,7 @@ Useful run commands::
     pytest tests/test_MilkyWayAxionHalo.py -k "initialization or RabiFreq" -q -s
     $env:PRINT_RESULTS="1"; pytest tests/test_MilkyWayAxionHalo.py -s
 """
+
 import os
 import warnings
 import pytest
@@ -175,7 +176,7 @@ def test_MilkyWayAxionHalo_initialization():
 def test_getRabiFreq():
     """getRabiFreq returns a finite quantity with units of Hz."""
     rabi_freq = MilkyWayAxionHalo.getRabiFreq(
-        gaNN=1e-9 * unit.GeV ** (-1), verbose=PRINT_RESULTS
+        g_aNN=1e-9 * unit.GeV ** (-1), verbose=PRINT_RESULTS
     )
     assert rabi_freq.unit.is_equivalent(
         unit.Hz

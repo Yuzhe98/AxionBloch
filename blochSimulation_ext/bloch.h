@@ -52,7 +52,6 @@ void _generateTrajectories(
     // input
     const int numFields, const int numTimeSteps, const int numSpinPkts,
     const double *B_vec,    // shape (numFields, numTimeSteps, 3)
-    const double *dBdt_vec, // shape (numFields, numTimeSteps, 3)
     const double *B_vals_T, // shape (numSpinPkts)
     const double *ratios,   // shape (numSpinPkts)
     const double gamma, const double timeStep,

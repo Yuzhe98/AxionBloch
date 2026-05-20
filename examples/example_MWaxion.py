@@ -20,7 +20,7 @@ from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
 
 sample = Sample(
     name="Liquid Xe-129",  # name of the sample
-    gamma=gamma_Xe129,  # [Hz/T]. Remember input it with 2 * np.pi
+    gamma=gamma_Xe129,
     massDensity=3.1 * unit.g * unit.cm ** (-3),  # mass density at STP
     molarMass=131.29 * unit.g / unit.mol,  # molar mass [g/mol]
     numOfSpinsPerMolecule=1 * unit.one,  # number of spins per molecule
@@ -28,13 +28,14 @@ sample = Sample(
     T1=15 * unit.minute,  #
     vol=1 * unit.cm**3,
     mu=mu_Xe129,  # magnetic dipole moment
+    temp=163 * unit.K,
     verbose=False,
 )
 
 # # CH3OH
 # methanol = Sample(
 #     name="C-12 Methanol",  # name of the sample
-#     gamma=gamma_p,  # [Hz/T]. Remember input it with 2 * np.pi
+#     gamma=gamma_p,
 #     massDensity=0.792 * unit.g * unit.cm ** (-3),
 #     molarMass=32.04 * unit.g / unit.mol,  # molar mass
 #     numOfSpinsPerMolecule=4 * unit.one,  # number of spins per molecule
@@ -42,15 +43,13 @@ sample = Sample(
 #     T1=5 * unit.s,  #
 #     vol=1 * unit.cm**3,
 #     mu=mu_p,  # magnetic dipole moment
-#     # boilpt=337.8,  # [K]
-#     # meltpt=175.6,  # [K]
 #     verbose=False,
 # )
 
 # # CH3CH2OH
 # ethanol = Sample(
 #     name="Ethanol",  # name of the sample
-#     gamma=gamma_p,  # [Hz/T]. Remember input it with 2 * np.pi
+#     gamma=gamma_p,
 #     massDensity=0.78945 * unit.g * unit.cm ** (-3),
 #     molarMass=46.069 * unit.g / unit.mol,  # molar mass
 #     numOfSpinsPerMolecule=6 * unit.one,  # number of spins per molecule
@@ -58,8 +57,6 @@ sample = Sample(
 #     T1=5 * unit.s,  #
 #     vol=1 * unit.cm**3,
 #     mu=mu_p,  # magnetic dipole moment
-#     # boilpt=351.38,  # [K]
-#     # meltpt=159.01,  # [K]
 #     verbose=False,
 # )
 
@@ -74,12 +71,12 @@ axion = MilkyWayAxionHalo(
 
 # Set the bias field strength, direction, and homogeneity
 magnet = Magnet(
-    B0=axion.nu_a_eff / (sample.gamma / (2 * np.pi)),
+    B0=axion.nu_a_eff / (sample.gamma / (2 * PI)),
     direction=[0, 0, 1],
     FWHM=2 * ppm,
 )
 
-B_a_rms = (axion.getRabiFreq() / (sample.gamma / (2 * np.pi))).to(
+B_a_rms = (axion.getRabiFreq() / (sample.gamma / (2 * PI))).to(
     unit.T, equivalencies=unit.dimensionless_angles()
 )
 
