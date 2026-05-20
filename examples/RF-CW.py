@@ -1,6 +1,6 @@
 # Example script: CW (continuous-wave) NMR free-induction-decay simulation
 #
-# A CW excitation field drives the spin ensemble continuously at signalFreqRot_Hz
+# A CW excitation field drives the spin ensemble continuously at signalFreqRot
 # in the rotating frame.  The simulation records the magnetisation trajectory
 # over `duration` seconds.
 import time
@@ -13,25 +13,25 @@ from axionbloch.constants import gamma_p, mu_p
 from axionbloch.utils import check
 
 
-RCF_Freq_Hz = 1e6       # rotating-frame carrier frequency (Hz)
-signalFreqRot_Hz = 1    # signal offset from carrier in the rotating frame (Hz)
-T1_s = 1e10             # longitudinal relaxation time (s)
+RCF_Freq = 1 * unit.MHz
+signalFreqRot = 1 * unit.Hz
+T1 = 1e10 * unit.s
 
 # short Tdelta, long T2
-Tdelta_s = 1.0
-T2_s = 10.0
+Tdelta = 1.0 * unit.s
+T2 = 10.0 * unit.s
 
 # # short T2, long Tdelta
-# Tdelta_s = 10.0
-# T2_s = 1.0
+# Tdelta = 10.0 * unit.s
+# T2 = 1.0 * unit.s
 
 # # short Tdelta and T2
-# Tdelta_s = 1.0
-# T2_s = 1.0
+# Tdelta = 1.0 * unit.s
+# T2 = 1.0 * unit.s
 
 # # long Tdelta and T2
-# Tdelta_s = 10.0
-# T2_s = 10.0
+# Tdelta = 10.0 * unit.s
+# T2 = 10.0 * unit.s
 
 simuRate = 500 * unit.Hz
 duration = 20 * unit.s
@@ -43,19 +43,22 @@ sample = Sample(
     massDensity=0.78945 * unit.g / unit.cm**3,
     molarMass=46.069 * unit.g / unit.mol,
     numOfSpinsPerMolecule=6 * unit.one,
-    T2=T2_s * unit.s,
-    T1=T1_s * unit.s,
+    T2=T2,
+    T1=T1,
     vol=1 * unit.cm**3,
     mu=mu_p,
+    temp=300 * unit.K,
     verbose=False,
 )
 
+FWHM = (1 / (np.pi * Tdelta) / RCF_Freq) * unit.one
+
 # Detection (bias) magnet — B0 tuned so that the Larmor frequency equals
-# the carrier plus signalFreqRot_Hz
+# the carrier plus signalFreqRot
 magnet = Magnet(
     name="detection magnet",
-    B0=(RCF_Freq_Hz - signalFreqRot_Hz) * unit.Hz / (sample.gamma / (2 * np.pi)),
-    FWHM=(1 / (np.pi * Tdelta_s) / RCF_Freq_Hz) * unit.one,
+    B0=(RCF_Freq - signalFreqRot) / (sample.gamma / (2 * PI)),
+    FWHM=FWHM,
     nFWHM=20.0,
 )
 magnet.setHomogeneity(numPt=500)
@@ -65,11 +68,11 @@ print(f"numPt for magnet homogeneity = {magnet.numPt}")
 excField = MagField(name="CW excitation")
 
 simu = Simulation(
-    name="simulation template",
+    name="CW NMR simulation",
     sample=sample,
     magnet=magnet,
     excField=excField,
-    RCF_freq=RCF_Freq_Hz * unit.Hz,
+    RCF_freq=RCF_Freq,
     rate=simuRate,
     duration=duration,
     verbose=False,
@@ -77,10 +80,10 @@ simu = Simulation(
 
 # CW drive: constant-envelope XY pulse at the signal frequency
 simu.excField.setXYPulse(
-    timeStep_s=simu.timeStep.to_value(unit.s),
+    timeStep=simu.timeStep,
     timeLen=simu.timeLen,
-    B1_T=1.0e-11,
-    nu_rot_Hz=signalFreqRot_Hz,
+    B1=1.0e-11 * unit.T,
+    nu_rot=signalFreqRot,
 )
 
 tic = time.perf_counter()
@@ -88,18 +91,7 @@ simu.generateTrajectories(integrator="RK4")
 toc = time.perf_counter()
 print(f"GenerateTrajectory time consumption = {toc - tic:.6f} s")
 
-simu.monitorTrajectories(verbose=True)
+simu.keepMeanStd()
+simu.displayTrjries(verbose=True)
 
 save_data = False
-if save_data:
-    timeStamp_s = simu.getTimeStamp()
-    check(simu.excField.B_vec.shape)
-    check(simu.trjry.shape)
-    np.savez(
-        "RF_CW_simu.npz",
-        timeStamp_s=timeStamp_s,
-        B_vec=simu.excField.B_vec,
-        trjry=simu.trjry,
-        T2_s=T2_s,
-        Tdelta_s=Tdelta_s,
-    )

@@ -37,9 +37,9 @@ class Magnet:
     def __init__(
         self,
         name="magnet",
-        B0: Quantity | None = None,
+        B0: Quantity[unit.T] | None = None,
         direction: list | None = None,
-        FWHM: Quantity | None = None,
+        FWHM: Quantity[ppm] | None = None,
         numPt: float = 1,
         nFWHM: float = 10.0,
         verbose: bool = False,
@@ -135,7 +135,7 @@ class Magnet:
             # transform uniform sampling to the desired distribution
             self.B_spread = (
                 self.nFWHM * np.sign(uni_samp) * np.abs(uni_samp) ** 2
-            ) * self.FWHM_B0 + self.B0  # exponent < 1 increases central density
+            ) * self.FWHM_B0 + self.B0
             # plot histogram of the sampled B values
             if showPlot:
                 fig = plt.figure(

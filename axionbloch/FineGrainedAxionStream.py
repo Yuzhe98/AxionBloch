@@ -9,6 +9,7 @@ This module provides :class:`FineGrainedAxionStream` for computing the
 properties (coherence time, effective frequency, quality factor) of such a
 stream.
 """
+
 from axionbloch.dependency import *
 from axionbloch.utils import PhysicalObject
 
@@ -36,10 +37,12 @@ class FineGrainedAxionStream(PhysicalObject):
         self,
         name="axion stream",
         nu_a: Quantity = None,  # compton frequency
-        gaNN: Quantity = None,
+        g_aNN: Quantity = None,
         Qa: Quantity = None,
         # v_0: Quantity = 220.0 * unit.km / unit.s,  # Local (@ solar radius) galaxy circular rotation speed
-        v_lab: Quantity = 233.0 * unit.km / unit.s,  # Laboratory speed relative to the galactic rest frame
+        v_lab: Quantity = 233.0
+        * unit.km
+        / unit.s,  # Laboratory speed relative to the galactic rest frame
         # dark matter axion density in [GeV/cm**3]
         # Standard halo model (SHM): 0.3
         # A commonly-used value: 0.4
@@ -54,7 +57,7 @@ class FineGrainedAxionStream(PhysicalObject):
         ----------
         nu_a : Quantity
             Axion Compton frequency.
-        gaNN : Quantity
+        g_aNN : Quantity
             Axion-nucleon coupling in 1/GeV.
         Qa : Quantity, optional
             Axion quality factor (dimensionless). Derived from ``v_lab`` if not given.
@@ -73,7 +76,7 @@ class FineGrainedAxionStream(PhysicalObject):
 
         self.rho_E_DM = rho_E_DM
         self.nu_a = nu_a
-        self.gaNN = gaNN
+        self.g_aNN = g_aNN
 
         if Qa is None:
             self.Q_a = (const.c / self.v_lab).to(unit.one) ** 2
@@ -93,7 +96,7 @@ class FineGrainedAxionStream(PhysicalObject):
             "v_lab": "km/s",
             "rho_E_DM": "GeV/cm**3",
             "nu_a": "Hz",
-            "gaNN": "GeV**-1",
+            "g_aNN": "GeV**-1",
             "Qa": "",
             "FWHM": "",
             "nu_a_eff": "Hz",

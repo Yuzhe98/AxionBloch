@@ -109,7 +109,7 @@ class MilkyWayAxionHalo(PhysicalObject):
             self.m_a = m_a
             self.nu_a = m_a * const.c**2 / const.hbar
 
-        self.gaNN = g_aNN
+        self.g_aNN = g_aNN
 
         if Qa is None:
             self.Qa = (const.c / self.v_lab) ** 2.0
@@ -130,20 +130,20 @@ class MilkyWayAxionHalo(PhysicalObject):
             "v_lab": "km/s",
             "rho_E_DM": "GeV/cm**3",
             "nu_a": "Hz",
-            "gaNN": "1/GeV",
+            "g_aNN": "1/GeV",
             "Qa": "",
             "FWHM": "",
             "nu_a_eff": "Hz",
             "tau_a_est": "s",
         }
         # # self.generalQuantities = {"RCF_freq": "Hz", "rate": "Hz", "duration": "s"}
-        # # self.Omega_a_rms = 0.5 * self.gaNN * (2 * const.hbar * const.c * self.rho_E_DM)**(1/2) * self.v_lab * np.cos(windAngle) * Quantity(1e-15, "T")
+        # # self.Omega_a_rms = 0.5 * self.g_aNN * (2 * const.hbar * const.c * self.rho_E_DM)**(1/2) * self.v_lab * np.cos(windAngle) * Quantity(1e-15, "T")
         # self.useCommonUnits()
 
-    @classmethod
+    # @classmethod
     def getRabiFreq(
-        cls,
-        gaNN: Quantity[unit.GeV ** (-1)] | None = None,
+        self,
+        g_aNN: Quantity[unit.GeV ** (-1)] | None = None,
         case="grad_perp",
         verbose=False,
     ) -> Quantity:
@@ -151,27 +151,27 @@ class MilkyWayAxionHalo(PhysicalObject):
         get the Rabi frequency of the pseudomagnetic field amplitude in [Hz] for the specified case
         case: "non-grad", "grad_par" or "grad_perp", determines the lineshape function to use
         """
-        logPrefix = f"[{cls.__name__}.{cls.getRabiFreq.__name__}]"
-        if gaNN is None:
-            if cls.gaNN is None:
-                raise ValueError("gaNN cannot be None")
+        logPrefix = f"[{self.__class__.__name__}.{self.getRabiFreq.__name__}]"
+        if g_aNN is None:
+            if self.g_aNN is None:
+                raise ValueError("g_aNN cannot be None")
             else:
-                gaNN = cls.gaNN
+                g_aNN = self.g_aNN
         # if case == "non-grad":
-        #     Omega_rms = 0.5 * cls.gaNN * (2 * const.c * cls.rho_E_DM) ** (
+        #     Omega_rms = 0.5 * self.g_aNN * (2 * const.c * self.rho_E_DM) ** (
         #         1 / 2
-        #     ) * cls.v_lab * np.cos(cls.windAngle)
+        #     ) * self.v_lab * np.cos(self.windAngle)
         # elif case == "grad_par":
-        #     Omega_rms = 0.5 * cls.gaNN * (2 * const.c * cls.rho_E_DM) ** (
+        #     Omega_rms = 0.5 * self.g_aNN * (2 * const.c * self.rho_E_DM) ** (
         #         1 / 2
-        #     ) * cls.v_lab * np.cos(cls.windAngle) * cls.FWHM**(1 / 2)
+        #     ) * self.v_lab * np.cos(self.windAngle) * self.FWHM**(1 / 2)
         # el
         if case == "grad_perp":
             Omega_rms = (
                 0.5
-                * gaNN
-                * (2 * const.hbar * const.c * cls.rho_E_DM) ** (1 / 2)
-                * cls.v_lab
+                * g_aNN
+                * (2 * const.hbar * const.c * self.rho_E_DM) ** (1 / 2)
+                * self.v_lab
             )
             Omega_rms = Omega_rms
         else:

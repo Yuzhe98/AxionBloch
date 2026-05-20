@@ -1,5 +1,4 @@
-# $env:PYTHONPATH = "your:\path\here;$env:PYTHONPATH"
-# $env:PYTHONPATH = "C:\Users\zhenf\D\Yu0702\axionbloch;$env:PYTHONPATH"
+# Example script: spin-echo NMR simulation using a CPMG pulse train
 import time
 
 from axionbloch.dependency import *
@@ -10,13 +9,13 @@ from axionbloch.constants import gamma_p, mu_p
 from axionbloch.utils import check
 
 
-RCF_Freq_Hz = 1e6
-signalFreqRot_Hz = 1
-T1_s = 1e6
+RCF_Freq = 1 * unit.MHz
+signalFreqRot = 1 * unit.Hz
+T1 = 1e6 * unit.s
 
 # short Tdelta
-Tdelta_s = 1.0
-T2_s = 10.0
+Tdelta = 1.0 * unit.s
+T2 = 10.0 * unit.s
 
 # CH3CH2OH
 sample = Sample(
@@ -25,68 +24,57 @@ sample = Sample(
     massDensity=0.78945 * unit.g / unit.cm**3,
     molarMass=46.069 * unit.g / unit.mol,
     numOfSpinsPerMolecule=6 * unit.one,
-    T2=T2_s * unit.s,
-    T1=T1_s * unit.s,
+    T2=T2,
+    T1=T1,
     vol=1 * unit.cm**3,
     mu=mu_p,
     temp=300 * unit.K,
     verbose=False,
 )
 
+FWHM = (1 / (np.pi * Tdelta) / RCF_Freq) * unit.one
+
 # set detection magnet
 magnet = Magnet(
     name="detection magnet",
-    B0=(RCF_Freq_Hz - signalFreqRot_Hz) * unit.Hz / (sample.gamma / (2 * np.pi)),
-    FWHM=(1 / (np.pi * Tdelta_s) / RCF_Freq_Hz) * unit.one,
+    B0=(RCF_Freq - signalFreqRot) / (sample.gamma / (2 * PI)),
+    FWHM=FWHM,
     nFWHM=20.0,
 )
+magnet.setHomogeneity(numPt=500)
+print(f"numPt for magnet homogeneity = {magnet.numPt}")
 
-excField = MagField(name="RF pulse")
-
-rand_seed = 0
+excField = MagField(name="CPMG pulse train")
 
 simu = Simulation(
-    name="NMR simulation",
+    name="Spin-echo CPMG simulation",
     sample=sample,
     magnet=magnet,
     excField=excField,
     rate=500 * unit.Hz,
-    RCF_freq=RCF_Freq_Hz * unit.Hz,
+    RCF_freq=RCF_Freq,
     duration=20 * unit.s,
-    verbose=True,
+    verbose=False,
 )
 
-magnet.setHomogeneity(numPt=500)
-
 simu.excField.setCPMGPulseTrain(
-    timeStep_s=simu.timeStep.to_value(unit.s),
+    timeStep=simu.timeStep,
     timeLen=simu.timeLen,
-    gamma_HzToT=simu.gamma_HzToT,
-    t90_s=10 * simu.timeStep.to_value(unit.s),
-    tau_s=4 * Tdelta_s,
+    gamma=simu.sample.gamma,
+    t90=10 * simu.timeStep,
+    tau=4 * Tdelta,
     numEcho=2,
-    nu_rot_Hz=signalFreqRot_Hz,
-    init_phase=0,
+    nu_rot=signalFreqRot,
+    init_phase=0 * unit.rad,
     verbose=True,
 )
 
 tic = time.perf_counter()
 simu.generateTrajectories(integrator="RK4")
 toc = time.perf_counter()
-print(f"{simu.generateTrajectories.__name__} time consumption = {toc-tic:.3g} s")
+print(f"{simu.generateTrajectories.__name__} time consumption = {toc - tic:.3g} s")
 
-simu.monitorTrajectories(verbose=True)
+simu.keepMeanStd()
+simu.displayTrjries(verbose=True)
 
-save_data = True
-if save_data:
-    timeStamp_s = simu.getTimeStamp()
-    check(simu.excField.B_vec.shape)
-    check(simu.trjry.shape)
-    np.savez(
-        "SpinEcho_CPMG_simu.npz",
-        timeStamp_s=timeStamp_s,
-        B_vec=simu.excField.B_vec,
-        trjry=simu.trjry,
-        T2_s=T2_s,
-        Tdelta_s=Tdelta_s,
-    )
+save_data = False

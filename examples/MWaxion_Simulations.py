@@ -43,8 +43,8 @@ mag_FWHMs = np.array([nu * ppm for nu in [2]])
 
 # set the strength of the pseudomagnetic field (rms of the field) Brms
 B_a_rms = None
-# or by setting the axion-nucleon coupling strength gaNN
-# gaNN = 1.0e-9 * unit.GeV**(-1)
+# or by setting the axion-nucleon coupling strength g_aNN
+# g_aNN = 1.0e-9 * unit.GeV**(-1)
 
 # set number of simulation runs
 numFields = 1
@@ -66,7 +66,7 @@ for nu_a in nu_a_array:
         axion = MilkyWayAxionHalo(
             name="axion",
             nu_a=nu_a,
-            g_aNN=1.0e-9 * unit.GeV**(-1),
+            g_aNN=1.0e-9 * unit.GeV ** (-1),
         )
 
         # set RCF frequency to it RCF_Freq_Hz = nu_a*(1+v_a^2/c^2)
@@ -86,12 +86,12 @@ for nu_a in nu_a_array:
         excField = MagField(name="ALP field gradient")
 
         if B_a_rms is None:
-            if axion.gaNN is None:
-                raise ValueError("B_a_rms and gaNN cannot be both None")
+            if axion.g_aNN is None:
+                raise ValueError("B_a_rms and g_aNN cannot be both None")
             else:
                 B_a_rms = axion.getRabiFreq(verbose=True) / (sample.gamma)
                 B_a_rms = B_a_rms.to("T")
-                print(f"Calculated B_a_rms from gaNN = {B_a_rms}", flush=True)
+                print(f"Calculated B_a_rms from g_aNN = {B_a_rms}", flush=True)
         key_info = {"mag_FWHM": mag_FWHM, "nu_a": axion.nu_a}
         # duration = 10 * axion.tau_a_est
         duration = 4000 * unit.s

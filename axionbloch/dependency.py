@@ -15,6 +15,8 @@ from astropy import units as unit
 from astropy.units import Quantity, CompositeUnit
 from astropy.constants import codata2018 as const
 
+PI = np.pi * unit.rad
+
 # dimensionless scale units
 # parts per million
 ppm = unit.def_unit("ppm", 1e-6 * unit.one)
