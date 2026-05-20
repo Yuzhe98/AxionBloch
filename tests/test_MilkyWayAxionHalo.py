@@ -392,18 +392,14 @@ def test_Simulation(sample: Sample, magnet_kwargs: dict):
     )
 
     # B0 is always determined by the sample's gamma and the axion frequency
-    B0 = (axion.nu_a_eff / (sample.gamma / (2 * np.pi))).to(
-        unit.T, equivalencies=unit.dimensionless_angles()
-    )
+    B0 = (axion.nu_a_eff / (sample.gamma / (2 * np.pi))).to(unit.T)
     magnet = Magnet(
         B0=B0,
         direction=[0, 0, 1],
         **magnet_kwargs,
     )
 
-    B_a_rms = (axion.getRabiFreq() / (sample.gamma / (2 * np.pi))).to(
-        unit.T, equivalencies=unit.dimensionless_angles()
-    )
+    B_a_rms = (axion.getRabiFreq() / (sample.gamma / (2 * np.pi))).to(unit.T)
 
     params: SimuParams = {
         "key_info": {"nu_a": axion.nu_a},

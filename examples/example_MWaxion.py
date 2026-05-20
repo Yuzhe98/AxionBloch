@@ -76,9 +76,7 @@ magnet = Magnet(
     FWHM=2 * ppm,
 )
 
-B_a_rms = (axion.getRabiFreq() / (sample.gamma / (2 * PI))).to(
-    unit.T, equivalencies=unit.dimensionless_angles()
-)
+B_a_rms = (axion.getRabiFreq() / (sample.gamma / (2 * PI))).to(unit.T)
 
 # Bundle all inputs into one dictionary
 params: SimuParams = {

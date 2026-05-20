@@ -422,7 +422,7 @@ class MagField(PhysicalObject):
         timeStep: Quantity,
         timeLen: int,
         gamma: Quantity[unit.rad * unit.Hz / unit.T],
-        t90: Quantity,
+        pulseDur: Quantity,
         tip_angles: list[Quantity[unit.rad]],
         delays: list[Quantity[unit.s]],
         nu_rot: Quantity[unit.Hz],
@@ -472,14 +472,14 @@ class MagField(PhysicalObject):
         if len(phases) != N:
             raise ValueError("phases_rad and flip_angles_deg must have the same length")
 
-        t90Len = int(np.round(t90 / timeStep))
-        if t90Len < 2:
-            print(f"WARNING: t90Len = {t90Len} < 2")
-        t90 = t90Len * timeStep  # snap to grid
+        pulseLen = int(np.round(pulseDur / timeStep))
+        if pulseLen < 2:
+            print(f"WARNING: pulseLen = {pulseLen} < 2")
+        pulseDur = pulseLen * timeStep  # snap to grid
         if verbose:
-            print(f"t90Len = {t90Len}, t90_s = {t90:.4e} s")
+            print(f"pulseLen = {pulseLen}, pulseDur = {pulseDur:.4e} s")
 
-        B90 = PI / (gamma * t90)
+        B90 = PI / (gamma * pulseDur)
 
         numSteps = timeLen - 1
         Bx = np.zeros(numSteps) * unit.T
@@ -487,7 +487,7 @@ class MagField(PhysicalObject):
 
         # Local time template for one pulse window (phase resets at each pulse start,
         # so the rotation axis is determined solely by phases_rad[i]).
-        local_t = timeStep * np.arange(t90Len)
+        local_t = timeStep * np.arange(pulseLen)
 
         current_idx = 0
         for i in range(N):
@@ -497,7 +497,7 @@ class MagField(PhysicalObject):
             B_i = (2.0 * tip_angle / (PI)) * B90
             phase_i = phases[i]
 
-            end_idx = min(current_idx + t90Len, numSteps)
+            end_idx = min(current_idx + pulseLen, numSteps)
             actual_len = end_idx - current_idx
             if actual_len <= 0:
                 if verbose:
@@ -515,7 +515,7 @@ class MagField(PhysicalObject):
                     f"phase={np.degrees(phase_i):.1f}°, B_i={B_i:.4e} T"
                 )
 
-            current_idx += t90Len
+            current_idx += pulseLen
 
         self.B_vec = np.zeros((1, numSteps, 3)) * unit.T
         self.B_vec[0, :, 0] = Bx
@@ -1045,7 +1045,7 @@ class Simulation(PhysicalObject):
 
 
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}] "
+        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
         super().__init__()
         self.quantities = {
             "RCF_freq": "Hz",
@@ -1146,7 +1146,7 @@ class Simulation(PhysicalObject):
         # estimate the necessary data points for sampling the inhomogeneity
         numPt = abs(
             (self.duration * 2 * magnet.B0_nW * sample.gamma / (2 * PI)).to_value(
-                unit.dimensionless_unscaled, equivalencies=unit.dimensionless_angles()
+                unit.dimensionless_unscaled
             )
         )
         if numPt <= 1:
@@ -1206,25 +1206,26 @@ class Simulation(PhysicalObject):
         # simulation rate must be 20 times larger than maximum Larmor frequency
         # from experience, simulation rate should be 20 times greater than the max. of signal frequency in the rotating frame
         if self.rate_Hz < 20 * nuL_Hz_abs_max:
-            print(
+            print(logPrefix,
                 f"WARNING: the simulation rate ({self.rate_Hz:g} Hz) might be too small compared to signal frequency ({nuL_Hz_abs_max:g} Hz) . "
             )
 
         if self.T2_s > self.T1_s:
-            print("WARNING: T2 is larger than T1")
+            print(logPrefix,"WARNING: T2 is larger than T1")
 
         if self.rate_Hz <= 10 * (1.0 / self.T2_s):
-            print(
+            print(logPrefix,
                 f"WARNING: the simulation rate ({self.rate_Hz:g} Hz) might be too small compared to T2 relaxation rate ({1.0 / self.T2_s:g} Hz) . "
             )
         if self.rate_Hz <= 1 / self.duration_s:
-            print(
+            print(logPrefix,
                 f"WARNING: the simulation rate ({self.rate_Hz:g} Hz) might be too small so there are only {self.numSteps:d} step(s) in the duration of {self.duration_s:g} s. "
             )
         # ----- ----------------------------------------------------- -----#
 
     def setRate(self, rate: Quantity):
-        assert rate is not None, f"[{self.setRate.__name__}] rate is None"
+        logPrefix = f"[{self.__class__.__name__}.{self.setRate.__name__}]"
+        assert rate is not None, f"{logPrefix} rate is None"
         self.rate = rate
         self.rate_Hz = float(rate.to_value(unit.Hz))
         self.timeStep = (
@@ -1233,7 +1234,7 @@ class Simulation(PhysicalObject):
         self.timeLen: int = int(np.ceil(self.duration_s * self.rate_Hz))
         self.numSteps: int = self.timeLen - 1
         if self.numSteps > 1e8:
-            print(f"WARNING: Simulation.numSteps = {self.numSteps:.1e} > 1e8")
+            print(logPrefix, f"WARNING: Simulation.numSteps = {self.numSteps:.1e} > 1e8")
             # return
         # self.timeStamp_s = np.arange(start=0, stop=(self.timeLen) * self.timeStep_s, step=self.timeStep_s)
 
