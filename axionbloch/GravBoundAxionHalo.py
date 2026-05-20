@@ -117,9 +117,13 @@ class GravBoundAxionHalo:
         # usually we do not need all N eigenstates, so we store only the first max_n_r states for each l.
 
     def showValueAndUnits(self):
+        """Print values and units of the key physical quantities.
+
+        Ideally the numerical values should be close to 1 and units should be
+        identical for quantities compared or added together, making unit
+        mismatches easy to spot during development.
         """
-        Print values and units of physical quantities. Ideally, the values should be close to 1 and units should be identical for quantities that are compared or added together in the code.
-        """
+        logPrefix = f"[{self.__class__.__name__}.{self.showValueAndUnits.__name__}]"
         check(self.r.mean())
         check(self.r.std())
         check(self.dr)
@@ -163,7 +167,7 @@ class GravBoundAxionHalo:
         if verbose:
             print(f"N={self.N} l={l} Eigensolver took {toc - tic:.3f} seconds")
         # ----------------- end of dimensionless computation ---------------- #
-        
+
         if verbose:
             print("Eigen-energies in eV:")
             print("[")
@@ -173,8 +177,6 @@ class GravBoundAxionHalo:
             print(f"* {self.E_unit}")
 
         start_index = self.N // 2 + 5  # avoid r=0 singularity
-        # print("Kinetic-energies in eV:")
-        # print("[")
 
         if l == 0:
             iter_range = np.arange(max_n_r)
@@ -184,36 +186,35 @@ class GravBoundAxionHalo:
         for i, _n_r in enumerate(iter_range):
 
             u_r = states[:, _n_r]
+            # radial wavefunction
             R_r = u_r / self.r
 
-            # Normalize
+            # normalize
             integral = np.sqrt(
-                np.trapezoid(
-                    np.abs(R_r[start_index:]) ** 2 * self.r[start_index:] ** 2,
+                4 * np.pi * np.trapezoid(
+                    np.abs(u_r[start_index:]) ** 2,
                     self.r[start_index:],
                 )
             )
-            R_r /= integral
-            u_r /= integral
+            R_r = R_r / integral
+            u_r = u_r / integral
 
             # Potential energy (V only)
             V_expect = np.trapezoid(
-                np.abs(R_r[start_index:]) ** 2
-                * self.r[start_index:] ** 2
+                np.abs(u_r[start_index:]) ** 2
                 * self.pot[start_index:],
                 self.r[start_index:],
             )
 
             # Potential energy (V effective)
             Veff_expect = np.trapezoid(
-                np.abs(R_r[start_index:]) ** 2
-                * self.r[start_index:] ** 2
+                np.abs(u_r[start_index:]) ** 2
                 * Veff[start_index:],
                 self.r[start_index:],
             )
 
             # Kinetic energy via second derivative of u_r
-            du2_dr2 = np.zeros_like(u_r)
+            du2_dr2 = np.zeros(u_r.shape) * u_r.unit / self.r.unit**2
             du2_dr2[1:-1] = (u_r[2:] - 2 * u_r[1:-1] + u_r[:-2]) / (
                 self.r[1] - self.r[0]
             ) ** 2
@@ -256,9 +257,9 @@ class GravBoundAxionHalo:
                 )
             )
             # R_reduced.shape = (N, max_n_r)
-            # TODO: complete this or delete this
+            # TODO: complete this
             # slider_plot_earth(
-            #     dataX=self.r[start_index:] / AU.earth_radius,
+            #     dataX=self.r[start_index:],
             #     dataY=(R_reduced[start_index:, :]),
             #     title=f"Reduced radial wavefunction (l={l})",
             #     # xlabel="r (earth_radius)",
@@ -290,6 +291,13 @@ class GravBoundAxionHalo:
         return [state["eigenE_eV"] for state in self.states.values()]
 
     def findGradients(self, stateNames=[], station: Station = None):
+        """_summary_
+
+        Args:
+            stateNames (list, optional): _description_. Defaults to [].
+            station (Station, optional): _description_. Defaults to None.
+        """
+        logPrefix = f"[{self.__class__.__name__}.{self.findGradients.__name__}]"
         # avoid r=0 singularity
         start_index = self.N // 2 + 5
         stop_index = (
@@ -315,10 +323,12 @@ class GravBoundAxionHalo:
 
         # toc = time.time()
         # print(f"mesh time: {toc-tic:.2e} s")
-        WF_total = np.zeros_like(R_grid, dtype=complex)
         # chosenOnes = 3
         if stateNames is None or len(stateNames) == 0:
             stateNames = [state["name"] for state in self.states.values()][:1]
+
+        WF_total = np.zeros(R_grid.shape, dtype=complex) * self.states[stateNames[0]]["R_r"].unit
+
         # for name, state in list(self.eigenStates.items())[:1]:
         for name in stateNames:
             # print(name, state["E_eV"], "eV")
@@ -345,7 +355,7 @@ class GravBoundAxionHalo:
         # components of gradient
         grad_r = dphi_dr
         grad_theta = dWF_dtheta / R_grid
-        grad_phi = dWF_dphi / (R_grid * np.sin(Theta_grid) + 1e-12)
+        grad_phi = dWF_dphi / (R_grid * np.sin(Theta_grid) + 1e-12 * R_grid.unit)
 
         # project the spherical gradient onto a specific direction (from the center of the sphere to the station)
         theta_station_rad = station.theta.to_value(unit.rad)  # polar angle
@@ -356,20 +366,30 @@ class GravBoundAxionHalo:
 
         tic = time.time()
         interp_r = RegularGridInterpolator(
-            (r, theta, phi), grad_r, bounds_error=False, fill_value=None
+            (r.value, theta.value, phi.value),
+            grad_r.value,
+            bounds_error=False,
+            fill_value=None,
         )
         interp_theta = RegularGridInterpolator(
-            (r, theta, phi), grad_theta, bounds_error=False, fill_value=None
+            (r.value, theta.value, phi.value),
+            grad_theta.value,
+            bounds_error=False,
+            fill_value=None,
         )
         interp_phi = RegularGridInterpolator(
-            (r, theta, phi), grad_phi, bounds_error=False, fill_value=None
+            (r.value, theta.value, phi.value),
+            grad_phi.value,
+            bounds_error=False,
+            fill_value=None,
         )
+        interp_r *= grad_r.unit  # add *= unit for the other two
         toc = time.time()
-        print(f"interp time: {toc-tic:.2e} s")
+        print(logPrefix, f"interp time: {toc-tic:.2e} s")
 
         # sample points along radial line
         Nr_plot = 2**10
-        r_line = np.linspace(r[0], 3 * AU.earth_radius, Nr_plot)
+        r_line = np.linspace(r[0], 3 * unit.earthRad, Nr_plot)
 
         # points = [[r, theta_station, phi_station], ...]
         points = np.array([[ri, theta_station_rad, phi_station_rad] for ri in r_line])
@@ -416,8 +436,8 @@ class GravBoundAxionHalo:
             # print(name, state["E_eV"], "eV")
             state = self.states[name]
             axion_ax.plot(
-                r / AU.earth_radius,
-                np.real(state["R_r"][start_index:stop_index]) * (AU.earth_radius**1.5),
+                r,
+                np.real(state["R_r"][start_index:stop_index]),
                 label=name + " $\\mathrm{Re}[R(r)]$",
                 # np.abs(state["R_r"]) ** 2,
                 # label=name + " $R^{2}(r)$",
@@ -427,7 +447,7 @@ class GravBoundAxionHalo:
                 linewidth=2,
             )
             # ax.plot(
-            #     r / AU.earth_radius,
+            #     r,
             #     np.imag(state["u_r"]),
             #     label="$\\mathrm{Im}[R(r) r]$",
             #     linestyle="--",
@@ -444,37 +464,37 @@ class GravBoundAxionHalo:
             # )
 
         grad_r_ax.plot(
-            r_line / AU.earth_radius,
-            grad_r_line.real * (AU.earth_radius**2.5),
+            r_line,
+            grad_r_line.real,
             label="r gradient real",
             color=colors[1],
         )
         # grad_r_ax.plot(
-        #     r_line / AU.earth_radius,
+        #     r_line,
         #     grad_r_line.imag,
         #     label="r gradient imag",
         # )
 
         grad_theta_ax.plot(
-            r_line / AU.earth_radius,
-            grad_theta_line.real * (AU.earth_radius**2.5),
+            r_line,
+            grad_theta_line.real,
             label="theta gradient real",
             color=colors[2],
         )
         # grad_theta_ax.plot(
-        #     r_line / AU.earth_radius,
+        #     r_line,
         #     grad_theta_line.imag,
         #     label="theta gradient imag",
         # )
 
         grad_phi_ax.plot(
-            r_line / AU.earth_radius,
-            grad_phi_line.real * (AU.earth_radius**2.5),
+            r_line,
+            grad_phi_line.real,
             label="phi gradient real",
             color=colors[3],
         )
         # grad_phi_ax.plot(
-        #     r_line / AU.earth_radius,
+        #     r_line,
         #     grad_phi_line.imag,
         #     label="phi gradient imag",
         # )
@@ -537,7 +557,7 @@ class GravBoundAxionHalo:
         ax00 = fig.add_subplot(gs[0, 0])
 
         ax00.plot(
-            self.r[start_index:] / AU.earth_radius,
+            self.r[start_index:],
             R_reduced[start_index:].real,
             label="real",
             # color="tab:blue",
@@ -545,7 +565,7 @@ class GravBoundAxionHalo:
             linestyle="-",
         )
         ax00.plot(
-            self.r[start_index:] / AU.earth_radius,
+            self.r[start_index:],
             R_reduced[start_index:].imag,
             label="imaginary",
             # color="tab:blue",
@@ -624,14 +644,14 @@ class GravBoundAxionHalo:
             # )
             ax = fig.add_subplot(gs[numStates - i - 1, 0])
             ax.plot(
-                self.r[start_index:] / AU.earth_radius,
+                self.r[start_index:],
                 eigenstate["R_reduced"][start_index:].real,
                 label="real",
                 alpha=1,
                 linestyle="-",
             )
             ax.plot(
-                self.r[start_index:] / AU.earth_radius,
+                self.r[start_index:],
                 eigenstate["R_reduced"][start_index:].imag,
                 label="imaginary",
                 alpha=1,
@@ -691,7 +711,7 @@ class GravBoundAxionHalo:
         gs = gridspec.GridSpec(nrows=1, ncols=1)  # create grid for multiple figures
         ax = fig.add_subplot(gs[0, 0])
         ax.plot(
-            self.r[start_index:] / AU.earth_radius,
+            self.r[start_index:],
             self.pot[start_index:],
             label="Grav. Potential",
             alpha=1,
@@ -703,10 +723,10 @@ class GravBoundAxionHalo:
                 np.abs(self.pot[start_index:] - eigenstate["eigenE_eV"])
             )
             xmax = (
-                self.extent / 2 / AU.earth_radius
-                - np.abs(self.r[cross_x_indx]) / AU.earth_radius
+                self.extent / 2
+                - np.abs(self.r[cross_x_indx])
             )
-            xmax = np.abs(self.r[cross_x_indx]) / AU.earth_radius
+            xmax = np.abs(self.r[cross_x_indx])
             ax.hlines(
                 y=eigenstate["eigenE_eV"],
                 xmin=-xmax,

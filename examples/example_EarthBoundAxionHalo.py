@@ -5,7 +5,7 @@ from axionbloch.EarthBoundAxionHalo import (
     earth_grav_potential_earth_center,
     plot_earth_grav_potential,
 )
-from axionbloch.Station import Mainz, Baltimore, Sanya
+from axionbloch.Station import Mainz
 
 halo = EarthBoundAxionHalo(
     nu_a=1.348 * unit.MHz,  # axion Compton frequency in Hz
@@ -17,9 +17,9 @@ halo = EarthBoundAxionHalo(
 halo.showValueAndUnits()
 
 # tic = time.time()
-halo.solve_TISE_3D(l_vals=[0],  # angular momentum quantum number
+halo.solve_TISE_3D(l_vals=[1],  # angular momentum quantum number
         max_n_r = 64,  # maximum principal quantum number to plot
-        verbose=True,
+        verbose=False,
         )
 # toc = time.time()
 # print(f"Time taken to solve TISE: {toc - tic:.2e} seconds")
