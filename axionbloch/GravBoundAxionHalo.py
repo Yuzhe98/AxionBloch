@@ -7,6 +7,7 @@ bound-state wavefunctions and energies for each orbital quantum number *l*.
 :class:`EarthBoundAxionHalo` (in :mod:`axionbloch.EarthBoundAxionHalo`) is a
 subclass pre-configured with the Earth's gravitational potential.
 """
+
 import time
 
 from axionbloch.dependency import *
@@ -93,15 +94,15 @@ class GravBoundAxionHalo:
         self.extent: Quantity = extent
         self.dr: Quantity = self.extent / self.N
         # symmetric grid centred on r=0
-        self.r: Quantity = np.linspace(
-            -self.extent / 2, self.extent / 2, self.N
-        )
+        self.r: Quantity = np.linspace(-self.extent / 2, self.extent / 2, self.N)
         Phi_func, r_unit, Phi_unit = getPot()
         # TODO: Try also to use the infinity as the reference point
         # gravitational potential V = m_a * Phi(r), evaluated on the radial grid
-        self.pot: Quantity = self.ma * np.asarray(
-            Phi_func((self.r / r_unit).to_value(unit.one))
-        ) * Phi_unit  # convert r to meter for potential function
+        self.pot: Quantity = (
+            self.ma
+            * np.asarray(Phi_func((self.r / r_unit).to_value(unit.one)))
+            * Phi_unit
+        )  # convert r to meter for potential function
 
         self.mass_enclosed: Quantity = mass_enclosed
         self.g_aNN: Quantity = g_aNN
@@ -161,9 +162,9 @@ class GravBoundAxionHalo:
         # TODO: check the units and the constants. I do not think we are safe with the equations here.
         # I believe if we set V and T units correctly, everthing should be fine then.
         # Effective potential including centrifugal term l(l+1)ℏ²/(2m r²)
-        Veff = Quantity(self.pot + l * (l + 1) * const.hbar**2 / (
-            2 * self.ma * self.r**2
-        ))
+        Veff = Quantity(
+            self.pot + l * (l + 1) * const.hbar**2 / (2 * self.ma * self.r**2)
+        )
         Veff = Veff.to(self.pot.unit)
 
         # ----------------- start of dimensionless computation ---------------- #
@@ -184,7 +185,9 @@ class GravBoundAxionHalo:
         energies, states = eigh(H_dense)
         toc = time.time()
         if verbose:
-            print(logPrefix, f"N={self.N} l={l} Eigensolver took {toc - tic:.3f} seconds")
+            print(
+                logPrefix, f"N={self.N} l={l} Eigensolver took {toc - tic:.3f} seconds"
+            )
         # ----------------- end of dimensionless computation ---------------- #
 
         if verbose:
@@ -212,7 +215,8 @@ class GravBoundAxionHalo:
 
             # Normalise so that 4π ∫ |u(r)|² dr = 1
             integral = np.sqrt(
-                4 * PI * np.trapezoid(
+                1.0 
+                * np.trapezoid(
                     np.abs(u_r[start_index:]) ** 2,
                     self.r[start_index:],
                 )
@@ -222,15 +226,13 @@ class GravBoundAxionHalo:
 
             # Potential energy expectation value ⟨V⟩ = ∫ |u|² V dr
             V_expect = np.trapezoid(
-                np.abs(u_r[start_index:]) ** 2
-                * self.pot[start_index:],
+                np.abs(u_r[start_index:]) ** 2 * self.pot[start_index:],
                 self.r[start_index:],
             )
 
             # Effective potential expectation value ⟨V_eff⟩ = ∫ |u|² V_eff dr
             Veff_expect = np.trapezoid(
-                np.abs(u_r[start_index:]) ** 2
-                * Veff[start_index:],
+                np.abs(u_r[start_index:]) ** 2 * Veff[start_index:],
                 self.r[start_index:],
             )
 
@@ -336,7 +338,13 @@ class GravBoundAxionHalo:
         logPrefix = f"[{self.__class__.__name__}.{self.getStateEnergies.__name__}]"
         return [state["eigenE_eV"] for state in self.states.values()]
 
-    def findGradients(self, stateNames:list[str], station: Station, truncRadius:Quantity|None=None, verbose:bool=False):
+    def findGradients(
+        self,
+        stateNames: list[str],
+        station: Station,
+        truncRadius: Quantity | None = None,
+        verbose: bool = False,
+    ):
         """Compute and plot the 3-D gradient of the total wavefunction at a station.
 
         Superimposes the requested eigenstates (with equal weight), computes the
@@ -354,7 +362,7 @@ class GravBoundAxionHalo:
             Observer location providing polar angle ``theta`` and azimuthal
             angle ``phi`` used to project the gradient.
         truncRadius : Quantity
-            Truncation radius for reducing computation. 
+            Truncation radius for reducing computation.
         """
 
         logPrefix = f"[{self.__class__.__name__}.{self.findGradients.__name__}]"
@@ -368,7 +376,9 @@ class GravBoundAxionHalo:
                 np.abs(self.r[start_index:] - truncRadius)
             )
         else:
-            raise TypeError(logPrefix + " truncRadius unit is not equivalent to length. ")
+            raise TypeError(
+                logPrefix + " truncRadius unit is not equivalent to length. "
+            )
 
         if verbose:
             print(logPrefix, "(start_index, stop_index) =", (start_index, stop_index))
@@ -396,7 +406,10 @@ class GravBoundAxionHalo:
             stateNames = [state["name"] for state in self.states.values()][:1]
 
         # Accumulate superposition of eigenstates on the 3-D mesh
-        WF_total = np.zeros(R_grid.shape, dtype=complex) * self.states[stateNames[0]]["R_r"].unit
+        WF_total = (
+            np.zeros(R_grid.shape, dtype=complex)
+            * self.states[stateNames[0]]["R_r"].unit
+        )
 
         for name in stateNames:
             state = self.states[name]
@@ -425,9 +438,23 @@ class GravBoundAxionHalo:
         grad_phi = dWF_dphi / (R_grid * np.sin(Theta_grid) + 1e-12 * R_grid.unit)
 
         if verbose:
-            print(logPrefix, "grad_r.shape =", grad_r.shape, "grad_r.unit =", grad_r.unit)
-            print(logPrefix, "grad_theta.shape =", grad_theta.shape, "grad_theta.unit =", grad_theta.unit)
-            print(logPrefix, "grad_phi.shape =", grad_phi.shape, "grad_phi.unit =", grad_phi.unit)
+            print(
+                logPrefix, "grad_r.shape =", grad_r.shape, "grad_r.unit =", grad_r.unit
+            )
+            print(
+                logPrefix,
+                "grad_theta.shape =",
+                grad_theta.shape,
+                "grad_theta.unit =",
+                grad_theta.unit,
+            )
+            print(
+                logPrefix,
+                "grad_phi.shape =",
+                grad_phi.shape,
+                "grad_phi.unit =",
+                grad_phi.unit,
+            )
             # grad_r.shape = (Nr, Ntheta, Nphi) grad_r.unit = 1 / (rad(1/2) [length](5/2))
             # grad_theta.shape = (Nr, Ntheta, Nphi) grad_theta.unit = 1 / (rad(3/2) earthRad(5/2))
             # grad_phi.shape = (Nr, Ntheta, Nphi) grad_phi.unit = 1 / (rad(3/2) earthRad(5/2))
@@ -476,12 +503,12 @@ class GravBoundAxionHalo:
 
         tic = time.time()
         grad_r_line = np.asarray(interp_r(points)) * grad_r.unit
-        grad_theta_line = np.asarray(interp_theta(points))* grad_theta.unit
+        grad_theta_line = np.asarray(interp_theta(points)) * grad_theta.unit
         grad_phi_line = np.asarray(interp_phi(points)) * grad_phi.unit
         toc = time.time()
         print(logPrefix, f"gradient along station direction time: {toc-tic:.2e} s")
 
-        fig = plt.figure(figsize=(8.5 / 2.54, 6.5  / 2.54), dpi=300)
+        fig = plt.figure(figsize=(8.5 / 2.54, 8.5 / 2.54), dpi=300)
         grid = gridspec.GridSpec(
             nrows=4,
             ncols=1,
@@ -490,7 +517,7 @@ class GravBoundAxionHalo:
             # hspace=0.1,
             # wspace=0.2,
         )
-        left = 0.125
+        left = 0.22
         bottom = 0.07
         right = 0.67
         top = 0.95
@@ -522,15 +549,15 @@ class GravBoundAxionHalo:
                 zorder=4,
                 linewidth=2,
             )
-            # ax.plot(
-            #     r,
-            #     np.imag(state["u_r"]),
-            #     label="$\\mathrm{Im}[R(r) r]$",
-            #     linestyle="--",
-            #     color="tab:red",
-            #     zorder=4,
-            #     linewidth=2,
-            # )
+            axion_ax.plot(
+                r,
+                np.imag(state["u_r"][start_index:stop_index]),
+                label="$\\mathrm{Im}[R(r) r]$",
+                linestyle="--",
+                color="tab:red",
+                zorder=4,
+                linewidth=2,
+            )
             # ax.plot(
             #     r,
             #     np.abs(state["u_r"]),
@@ -545,11 +572,11 @@ class GravBoundAxionHalo:
             label="r gradient real",
             color=colors[1],
         )
-        # grad_r_ax.plot(
-        #     r_line,
-        #     grad_r_line.imag,
-        #     label="r gradient imag",
-        # )
+        grad_r_ax.plot(
+            r_line,
+            grad_r_line.imag,
+            label="r gradient imag",
+        )
 
         grad_theta_ax.plot(
             r_line,
@@ -557,11 +584,11 @@ class GravBoundAxionHalo:
             label="theta gradient real",
             color=colors[2],
         )
-        # grad_theta_ax.plot(
-        #     r_line,
-        #     grad_theta_line.imag,
-        #     label="theta gradient imag",
-        # )
+        grad_theta_ax.plot(
+            r_line,
+            grad_theta_line.imag,
+            label="theta gradient imag",
+        )
 
         grad_phi_ax.plot(
             r_line,
@@ -569,34 +596,38 @@ class GravBoundAxionHalo:
             label="phi gradient real",
             color=colors[3],
         )
-        # grad_phi_ax.plot(
-        #     r_line,
-        #     grad_phi_line.imag,
-        #     label="phi gradient imag",
-        # )
-
-        # grad_phi_ax.set_xlabel("r (earth radius)")
+        grad_phi_ax.plot(
+            r_line,
+            grad_phi_line.imag,
+            label="phi gradient imag",
+        )
 
         grad_phi_ax.set_xlabel(f"r ({r.unit.to_string('unicode')})")
-        ylables = [
-            "",
-            "$\\partial_r\\phi$",
-            "$\\frac{1}{r}\\partial_\\theta \\phi$",
-            "$\\frac{1}{r\\sin\\theta}\\partial_\\varphi\\phi$",
-        ]  # "$a(\\mathbf{r}, t)$"
-
-        axion_ax.set_xlim(right=3)
+        ylabels = [
+            "$R_{nl}\\,($" + state["R_r"].unit.to_string("latex") + "$)$",
+            "$\\partial_r\\phi\\,($"
+            + grad_r_line.unit.to_string("latex")
+            + "$)$",
+            "$\\frac{1}{r}\\partial_\\theta \\phi\\,($"
+            + grad_theta_line.unit.to_string("latex")
+            + "$)$",
+            "$\\frac{1}{r\\sin\\theta}\\partial_\\varphi\\phi\\,($"
+            + grad_phi_line.unit.to_string("latex")
+            + "$)$",
+        ]
+        print(ylabels)
+        axion_ax.set_xlim(right=truncRadius.value)
         for i, ax in enumerate(axes):
             ax.axvline(
                 x=1,
                 color="red",
                 linestyle="dotted",
-                linewidth=2,
+                # linewidth=2,
                 alpha=1,
                 label="Earth radius",
             )
             ax.legend(loc="upper left")
-            ax.set_ylabel(ylables[i])
+            ax.set_ylabel(ylabels[i], rotation=0, loc="center", labelpad=22)
 
         for ax in axes:
             ax.legend(loc="upper left", bbox_to_anchor=(1.0, 1.0))
@@ -807,7 +838,9 @@ class GravBoundAxionHalo:
         spanning the classical turning points where the potential crosses that
         energy level.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.plotEigenEnergiesInPot.__name__}]"
+        logPrefix = (
+            f"[{self.__class__.__name__}.{self.plotEigenEnergiesInPot.__name__}]"
+        )
         self.sortByEigenE()
 
         start_index = 0  # start from r>0
@@ -828,10 +861,7 @@ class GravBoundAxionHalo:
             cross_x_indx = np.argmin(
                 np.abs(self.pot[start_index:] - eigenstate["eigenE_eV"])
             )
-            xmax = (
-                self.extent / 2
-                - np.abs(self.r[cross_x_indx])
-            )
+            xmax = self.extent / 2 - np.abs(self.r[cross_x_indx])
             xmax = np.abs(self.r[cross_x_indx])
             ax.hlines(
                 y=eigenstate["eigenE_eV"],

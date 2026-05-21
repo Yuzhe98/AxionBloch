@@ -2,10 +2,8 @@ import time
 from astropy import units as unit
 from axionbloch.EarthBoundAxionHalo import (
     EarthBoundAxionHalo,
-    earth_grav_potential_earth_center,
-    plot_earth_grav_potential,
 )
-from axionbloch.Station import Mainz
+from axionbloch.Station import Mainz, Baltimore
 
 halo = EarthBoundAxionHalo(
     nu_a=1.348 * unit.MHz,  # axion Compton frequency in Hz
@@ -27,4 +25,6 @@ halo.solve_TISE_3D(l_vals=[1],  # angular momentum quantum number
 # print(halo.getStateNames())
 # print(halo.getStateEnergies())
 
-halo.findGradients(stateNames=['2p'], station=Mainz, truncRadius=2 * unit.earthRad, verbose=True)
+halo.findGradients(
+    stateNames=["2p"], station=Baltimore, truncRadius=2 * unit.earthRad, verbose=True
+)
