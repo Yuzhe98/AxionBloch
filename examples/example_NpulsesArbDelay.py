@@ -21,8 +21,8 @@ from axionbloch.utils import check
 
 
 T1 = 15 * unit.minute  # very long longitudinal relaxation (not the focus here)
-T2 = 10.0 * unit.minute  # transverse relaxation time
-Tdelta = 1.0 * unit.ms  # dephasing time set by field inhomogeneity
+T2 = 10.0 * unit.min  # transverse relaxation time
+Tdelta = 10 * unit.ms  # dephasing time set by field inhomogeneity
 
 # ──────────────────────────────────────────────────────────────────────────── #
 # Sample
@@ -61,28 +61,30 @@ B0 = 14.0 * unit.T  # magnet field magnitude
 # Larmor frequency of Xe-129 at 14 T  (take |gamma| since gamma_Xe129 < 0)
 nu_L = (np.abs(sample.gamma) / (2 * PI) * B0).to(unit.Hz)  # ≈ 165.7 MHz
 
-signalFreqRot = 2.0 * unit.Hz  # signal offset in the rotating frame
+signalFreqRot = 0.0 * unit.Hz  # signal offset in the rotating frame
 RCF_freq = nu_L - signalFreqRot  # rotating-frame carrier frequency
 
 
 # ──────────────────────────────────────────────────────────────────────────── #
 # Pulse sequence definition (all as Quantity)
 # ──────────────────────────────────────────────────────────────────────────── #
-Npulses = 3
+Npulses = 120
 
 #   pulse index:  0        1        2
-tip_angles = [PI / 2, PI, PI]
-
+# tip_angles = [PI / 2, PI, PI]
+tip_angles = (18 / 123) * PI / 2 * np.ones(Npulses)
 # delays[i] = free-precession time from end of pulse i-1 to start of pulse i
 # delays = [0.0 * unit.s,  tau1,  tau1 + tau2]
 # #            ↑              ↑          ↑
 # #       before 90°     before 180°#1  before 180°#2 (after echo₁ + extra τ₂)
 # # for i in range(Npulses):
 # #     pass
-delays = np.arange(5, 5 * (Npulses + 1), 5) * unit.ms
+delays = np.arange(55, 55 * (Npulses + 1), 5) * unit.ms
+# delays = 10 * unit.ms * np.ones(Npulses)
 
-phases = [0.0 * unit.rad, (PI / 2), (PI / 2)]
-phases = [0.0, 0, 0] * unit.rad
+# phases = [0.0 * unit.rad, (PI / 2), (PI / 2)]
+# phases = [0.0, 0, 0] * unit.rad
+phases = 0 * unit.rad * np.ones(Npulses)
 # 90°(x) → 180°(y) → 180°(y)  — CPMG-style phase cycle
 
 
@@ -90,7 +92,7 @@ tip_angles = tip_angles[0:Npulses]
 delays = delays[0:Npulses]
 phases = phases[0:Npulses]
 
-simuRate = 70 * unit.kHz
+simuRate = 7 * unit.kHz
 duration = np.sum(delays) + 10.0 * unit.ms  # ≈ 17 s; covers both echoes
 check(duration)
 # ──────────────────────────────────────────────────────────────────────────── #
@@ -109,7 +111,7 @@ magnet = Magnet(
     FWHM=FWHM,
     nFWHM=10.0,
 )
-magnet.setHomogeneity(numPt=500, showPlot=True)
+magnet.setHomogeneity(numPt=500, showPlot=False)
 print(f"B0           = {magnet.B0:.4g}")
 print(f"numPt        = {magnet.numPt}")
 
