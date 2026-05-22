@@ -250,7 +250,7 @@ class MagField(PhysicalObject):
         startDelayLen = 0  # this should stay 0. It does not help in anything
         timeStamp_s = timeStep * np.arange(timeLen - 1)
         t90Len = int(np.round(t90 / timeStep))
-        B90 = 2 * .5 * PI / (gamma * t90)
+        B90 = 2 * 0.5 * PI / (gamma * t90)
         envelope = np.zeros(timeStamp_s.shape) * unit.T
         t90Len = int(np.round(t90 / (timeStamp_s[1] - timeStamp_s[0])))
 
@@ -321,7 +321,7 @@ class MagField(PhysicalObject):
         if verbose:
             print(f"t90Len = {t90Len} time steps")
         if t90Len < 2:
-            print(f"WARNING: t90Len = {t90Len} < 3")
+            warnings.warn(f"t90Len = {t90Len} < 3.", UserWarning, stacklevel=2)
         t180Len = t90Len
 
         t90 = t90Len * timeStep  # snap to grid
@@ -331,8 +331,11 @@ class MagField(PhysicalObject):
 
         tauLen = int(np.round(tau / timeStep))
         if tauLen < 10 * t180Len:
-            print(f"WARNING: tauLen = {tauLen} < 10 * t180Len = {10 * t180Len}. Too short!")
-
+            warnings.warn(
+                f"tauLen = {tauLen} < 10 * t180Len = {10 * t180Len}. Too short!",
+                UserWarning,
+                stacklevel=2,
+            )
         Bx = np.zeros(timeStamp.shape) * unit.T
         By = np.zeros(timeStamp.shape) * unit.T
 
@@ -386,7 +389,7 @@ class MagField(PhysicalObject):
             Simulation time step (s).
         timeLen : int
             Total number of time steps (including the final boundary point).
-        gamma_HzToT : float
+        gamma : Quantity[unit.rad * unit.Hz / unit.T]
             Gyromagnetic ratio in rad·Hz/T (sign is used to set pulse sense).
         t90_s : float
             Duration of a 90° pulse (s); all pulses share this duration.
@@ -404,6 +407,7 @@ class MagField(PhysicalObject):
         verbose : bool
             Print per-pulse diagnostics.
         """
+
         N = len(tip_angles)
         if len(delays) != N:
             raise ValueError("delays_s and flip_angles_deg must have the same length")
@@ -627,7 +631,7 @@ class Simulations:
         self.all_params: list[SimuParams] = all_params
 
     def setup(self, verbose: bool = False):
-        logPrefix = f"[{self.__class__.__name__}.{self.setup.__name__}] "
+        logPrefix = f"[{self.__class__.__name__}.{self.setup.__name__}]"
         est_runtime = 0.0
         est_setFields_s = 0.0
         est_trjry_s = 0.0
@@ -688,8 +692,8 @@ class Simulations:
             est_runtime += t_setFields_s + t_trjry_s
             if verbose:
                 print(
-                    logPrefix
-                    + "Estimated step runtime = "
+                    logPrefix,
+                    "Estimated step runtime = "
                     + f"{(t_setFields_s + t_trjry_s) / 60:.2g} min",
                     flush=True,
                 )
@@ -771,13 +775,13 @@ class Simulations:
                 # for key, pq in params["key_info"].items():
                 #     print(key, "=", pq, flush=True)
                 print(
-                    logPrefix
-                    + f"time consumption = {timeConsumption:.6f} s = {timeConsumption/60:.1g} min",
+                    logPrefix,
+                    f"time consumption = {timeConsumption:.6f} s = {timeConsumption/60:.1g} min",
                     flush=True,
                 )
                 print(
-                    logPrefix
-                    + f"individual step time consumption = {timeConsumption/(simu.numSteps+1)/simu.excField.numFields:.3e} s",
+                    logPrefix,
+                    f"individual step time consumption = {timeConsumption/(simu.numSteps+1)/simu.excField.numFields:.3e} s",
                     flush=True,
                 )
             # ------------------------------------
@@ -1008,9 +1012,9 @@ class Simulation(PhysicalObject):
         self.station = station
         self.excField = excField
 
-        # angular gamma (rad·Hz/T) → strip rad via dimensionless_angles so value is in Hz/T
-        # gamma_p = 2.6752218708e8 * unit.rad * unit.Hz / unit.T
-        self.gamma_HzToT = self.sample.gamma.to_value(unit.rad * unit.Hz / unit.T)
+        self.gamma_HzToT = np.abs(
+            self.sample.gamma.to_value(unit.rad * unit.Hz / unit.T)
+        )
 
         # get the equilibrium magnetization M0
         self.M0eqb = self.sample.getM0eqb(B_pol=self.magnet.B0, verbose=verbose)
@@ -1019,8 +1023,8 @@ class Simulation(PhysicalObject):
         if self.sample.pol is not None:
             if init_M is not None:
                 print(
-                    logPrefix
-                    + "WARNING: init_M is provided, but sample polarization is set. The provided init_M will be ignored and overwritten by the value determined from the sample polarization.",
+                    logPrefix,
+                    "WARNING: init_M is provided, but sample polarization is set. The provided init_M will be ignored and overwritten by the value determined from the sample polarization.",
                     flush=True,
                 )
             # find the M0 by polarization
@@ -1040,18 +1044,19 @@ class Simulation(PhysicalObject):
         self.init_M_theta_rad = init_M_theta.to_value(unit.rad)
         self.init_M_phi_rad = init_M_phi.to_value(unit.rad)
 
-        self.B0z_T = magnet.B0.to_value(unit.T)
+        self.B0z_T = np.abs(self.magnet.B0).to_value(unit.T)
 
         # TODO：be more smart in setting rate and duration
         # set rotating frame frequency
-        if RCF_freq is None:
-            # gamma is rad·Hz/T; strip rad via dimensionless_angles to get Hz
-            self.RCF_freq = (self.sample.gamma / (2 * PI) * self.magnet.B0).to(unit.Hz)
+        if RCF_freq is None or type(RCF_freq) != Quantity:
+            self.RCF_freq = np.abs(self.sample.gamma / (2 * PI) * self.magnet.B0).to(
+                unit.MHz
+            )
         else:
-            self.RCF_freq = RCF_freq.to(unit.Hz)
+            self.RCF_freq = RCF_freq.to(unit.MHz)
         self.RCF_freq_Hz = self.RCF_freq.to_value(unit.Hz)
 
-        self.nuL_Hz = (
+        self.nu_L_Hz = (
             abs(self.gamma_HzToT * self.B0z_T / (2 * np.pi)) - self.RCF_freq_Hz
         )  # nuL_Hz is the Larmor frequency of the magnetization in the rotating frame
 
@@ -1061,21 +1066,22 @@ class Simulation(PhysicalObject):
         self.trjry = None
 
         # ---------------------------- set duration ----------------------------#
-        FWHM_Hz = (self.magnet.FWHM_B0 * sample.gamma / (2 * PI)).to_value(unit.Hz)
+        FWHM_freq: Quantity[unit.Hz] = np.abs(
+            self.magnet.FWHM_B0 * sample.gamma / (2 * PI)
+        )
         # find Tdelta
-        self.Tdelta_s = 1 / (np.pi * FWHM_Hz)
-        self.T2star_s = 1 / (1 / self.Tdelta_s + 1 / sample.T2.to_value(unit.s))
-
+        self.Tdelta = 1 / (np.pi * FWHM_freq)
+        self.T2star = (1.0 / (1.0 / self.Tdelta + 1 / self.sample.T2)).si
         if duration is None:
             if self.axion is not None:
                 self.duration_s = np.amin(
                     [
                         3.2e3 * self.axion.tau_a_est.to_value(unit.s),
-                        1.5e2 * self.T2star_s,
+                        1.5e2 * self.T2star.to_value(unit.s),
                     ]
                 )
             else:
-                self.duration_s = 2e2 * self.T2star_s
+                self.duration_s = 2e2 * self.T2star.to_value(unit.s)
             self.duration = self.duration_s * unit.s
         else:
             self.duration = duration
@@ -1103,15 +1109,14 @@ class Simulation(PhysicalObject):
         # ---------------------------------------------------------------------------- #
 
         # ---------------------------- simulation rate ----------------------------#
-        T2star_relaxation_rate_Hz = 1 / self.T2star_s
+        T2star_relaxation_rate = 1 / self.T2star
         if self.axion is not None:
             axion_decoherence_rate_Hz = 1 / self.axion.tau_a_est.to_value(unit.s)
         else:
             axion_decoherence_rate_Hz = 0.0
         nuL_vals_Hz = (
-            self.gamma_HzToT / (2 * np.pi) * magnet.B_spread.to_value(unit.T)
-            - self.RCF_freq_Hz
-        )
+            np.abs(self.sample.gamma) / (2 * PI) * magnet.B_spread - self.RCF_freq
+        ).to_value(unit.Hz)
         nuL_Hz_abs_max = np.amax(np.abs(nuL_vals_Hz))
         nu_Hz_range = np.amax(nuL_vals_Hz) - np.amin(nuL_vals_Hz)
         if rate is None:
@@ -1120,7 +1125,7 @@ class Simulation(PhysicalObject):
                     50.0 * nu_Hz_range,
                     50.0 * nuL_Hz_abs_max,
                     # 30.0 * nuL_Hz_abs_max * self.duration_s / (1e2 * self.T2star_s),
-                    100.0 * T2star_relaxation_rate_Hz,
+                    100.0 * T2star_relaxation_rate.to(unit.Hz),
                     100.0 * axion_decoherence_rate_Hz,
                 ]
             )
@@ -1134,32 +1139,42 @@ class Simulation(PhysicalObject):
         variation = (
             self.magnet.nFWHM
             * self.magnet.FWHM_B0
-            * self.sample.gamma
+            * np.abs(self.sample.gamma)
             / (2 * PI)
             * self.duration
         )
         if self.magnet.numPt < 2 * variation.to_value(unit.one):
-            print(
-                f"{self.__init__.__name__} WARNING: magnet_det.numPt may be too few. "
+            warnings.warn(
+                f"{self.__init__.__name__}: magnet_det.numPt may be too few.",
+                UserWarning,
+                stacklevel=2,
             )
 
         # simulation rate must be 20 times larger than maximum Larmor frequency
         # from experience, simulation rate should be 20 times greater than the max. of signal frequency in the rotating frame
         if self.rate_Hz < 20 * nuL_Hz_abs_max:
-            print(logPrefix,
-                f"WARNING: the simulation rate ({self.rate_Hz:g} Hz) might be too small compared to signal frequency ({nuL_Hz_abs_max:g} Hz) . "
+            warnings.warn(
+                f"{logPrefix}: the simulation rate ({self.rate_Hz:g} Hz) might be too small compared to signal frequency ({nuL_Hz_abs_max:g} Hz).",
+                UserWarning,
+                stacklevel=2,
             )
 
-        if self.T2_s > self.T1_s:
-            print(logPrefix,"WARNING: T2 is larger than T1")
+        if self.sample.T2 > self.sample.T1:
+            warnings.warn(
+                f"{logPrefix}: T2 is larger than T1.", UserWarning, stacklevel=2
+            )
 
-        if self.rate_Hz <= 10 * (1.0 / self.T2_s):
-            print(logPrefix,
-                f"WARNING: the simulation rate ({self.rate_Hz:g} Hz) might be too small compared to T2 relaxation rate ({1.0 / self.T2_s:g} Hz) . "
+        if self.rate <= 10 * (1.0 / self.sample.T2):
+            warnings.warn(
+                f"{logPrefix}: the simulation rate ({self.rate_Hz:g} Hz) might be too small compared to T2 relaxation rate ({1.0 / self.T2_s:g} Hz).",
+                UserWarning,
+                stacklevel=2,
             )
         if self.rate_Hz <= 1 / self.duration_s:
-            print(logPrefix,
-                f"WARNING: the simulation rate ({self.rate_Hz:g} Hz) might be too small so there are only {self.numSteps:d} step(s) in the duration of {self.duration_s:g} s. "
+            warnings.warn(
+                f"{logPrefix}: the simulation rate ({self.rate_Hz:g} Hz) might be too small so there are only {self.numSteps:d} step(s) in the duration of {self.duration_s:g} s.",
+                UserWarning,
+                stacklevel=2,
             )
         # ----- ----------------------------------------------------- -----#
 
@@ -1174,7 +1189,11 @@ class Simulation(PhysicalObject):
         self.timeLen: int = int(np.ceil(self.duration_s * self.rate_Hz))
         self.numSteps: int = self.timeLen - 1
         if self.numSteps > 1e8:
-            print(logPrefix, f"WARNING: Simulation.numSteps = {self.numSteps:.1e} > 1e8")
+            warnings.warn(
+                f"{logPrefix}: Simulation.numSteps = {self.numSteps:.1e} > 1e8.",
+                UserWarning,
+                stacklevel=2,
+            )
             # return
         # self.timeStamp_s = np.arange(start=0, stop=(self.timeLen) * self.timeStep_s, step=self.timeStep_s)
 
@@ -1220,6 +1239,22 @@ class Simulation(PhysicalObject):
             start=0, stop=(self.timeLen) * self.timeStep, step=self.timeStep
         )
 
+    def estimateRuntime(self, verbose: bool = False) -> Quantity[unit.s]:
+        logPrefix = f"[{self.__class__.__name__}.{self.estimateRuntime.__name__}]"
+        t_trjry = (
+            T_SIMUSTEP_S
+            * self.numSteps
+            * self.magnet.numPt
+            * self.excField.B_vec.shape[0]
+        ) * unit.s
+        if verbose:
+            print(
+                logPrefix,
+                "Estimated runtime = " + f"{t_trjry:g}",
+                flush=True,
+            )
+        return t_trjry
+
     def generateTrajectories(
         self, cleanup: bool = False, integrator="RK4", verbose: bool = False
     ):
@@ -1263,21 +1298,13 @@ class Simulation(PhysicalObject):
                 f"excField.B_vec has invalid shape {self.excField.B_vec.shape}, expected (numFields, numSteps, 3) or (numSteps, 3)"
             )
 
-        # if self.excField.dBdt_vec.ndim == 2 and self.excField.dBdt_vec.shape[1] == 3:
-        #     self.excField.dBdt_vec = self.excField.dBdt_vec[np.newaxis, :, :]
-        # elif self.excField.dBdt_vec.ndim != 3 or self.excField.dBdt_vec.shape[2] != 3:
-        #     raise ValueError(
-        #         f"excField.dBdt_vec has invalid shape {self.excField.dBdt_vec.shape}, expected (numFields, numSteps, 3) or (numSteps, 3)"
-        #     )
-        # ------------------------------------------------------------------------------------------------
-        check(self.magnet.B_spread.to_value(unit.T).shape)
         # Use the kinetic simulation function from blochsimulation to generate trajectories
         self.trjry, self.dMdt, self.d2Mdt2 = bs.generateTrajectories(
             self.excField.B_vec.to_value(unit.T),
             # self.excField.dBdt_vec.to_value(unit.T / unit.s),
             self.magnet.B_spread.to_value(unit.T),
             self.magnet.ratios,
-            self.sample.gamma.to_value(unit.rad * unit.Hz / unit.T),
+            np.abs(self.sample.gamma).to_value(unit.rad * unit.Hz / unit.T),
             self.timeStep.to_value(unit.s),
             self.sample.T1.to_value(unit.s),
             self.sample.T2.to_value(unit.s),
@@ -1616,10 +1643,10 @@ class Simulation(PhysicalObject):
         else:
             plotIntv = int(1.0 * self.rate_Hz / plotRate_Hz)
 
-        timeStamp_s = np.linspace(
-            start=0, stop=(self.timeLen) * self.timeStep, num=len(self.M_mean[:, 0])
+        timeStamp = np.linspace(
+            start=0, stop=(self.timeLen) * self.timeStep.si, num=len(self.M_mean[:, 0])
         )
-        fig = plt.figure(figsize=(15 * 0.8, 7 * 0.8), dpi=150)  #
+        fig = plt.figure(figsize=(17 / 2.54, 9 / 2.54), dpi=300)  #
         gs = gridspec.GridSpec(nrows=2, ncols=3)  #
         # fix the margins
         left = 0.1
@@ -1632,12 +1659,13 @@ class Simulation(PhysicalObject):
             left=left, top=top, right=right, bottom=bottom, wspace=wspace, hspace=hspace
         )
         B_t_ax = fig.add_subplot(gs[0, 0])
-        B_f_ax = fig.add_subplot(gs[1, 0])
+        # B_f_ax = fig.add_subplot(gs[1, 0])
         Mx_ax = fig.add_subplot(gs[0, 1], sharex=B_t_ax)
         My_ax = fig.add_subplot(gs[0, 2], sharex=Mx_ax, sharey=Mx_ax)
         Mxy_ax = fig.add_subplot(gs[1, 1], sharex=Mx_ax, sharey=Mx_ax)
         Mz_ax = fig.add_subplot(gs[1, 2], sharex=Mx_ax)
         M_axes = [Mx_ax, My_ax, Mz_ax, Mxy_ax]
+        all_axes = [B_t_ax, Mx_ax, My_ax, Mz_ax, Mxy_ax]
         lastIndx = -1
         B_ax_labels = ["x", "y", "z", "freq"]
         M_ax_labels = ["x", "y", "z", "xy"]
@@ -1673,52 +1701,170 @@ class Simulation(PhysicalObject):
             # lastIndx = min(len(timeStamp_s), len(B_mean[i])) # I do not suggest to use this one..
             lastIndx = len(B_mean[i])
             B_t_ax.errorbar(
-                x=timeStamp_s[0:lastIndx:plotIntv],
+                x=timeStamp[0:lastIndx:plotIntv],
                 y=B_mean[i][0:lastIndx:plotIntv],
                 yerr=B_std[i][0:lastIndx:plotIntv],
-                label="std $B_" + axis + "$",
+                label="$B_{" + axis + "}$",
                 color=colorSets[i, 1],
                 alpha=1,
             )
             B_t_ax.plot(
-                timeStamp_s[0:lastIndx:plotIntv],
+                timeStamp[0:lastIndx:plotIntv],
                 B_mean[i][0:lastIndx:plotIntv],
-                label="mean $B_" + axis + "$",
+                label="$B_{" + axis + "}$",
                 color=colorSets[i, 0],
                 alpha=1,
                 zorder=3,
             )
+        B_t_ax.set_ylabel(
+                    f"Excitation field ({B_mean[0][0].unit.to_string('unicode')})"
+                )
         # TODO plot frequency domain in B_f_ax
 
         for i, ax in enumerate(M_axes):
             ax.errorbar(
-                x=timeStamp_s[0:lastIndx:plotIntv],
+                x=timeStamp[0:lastIndx:plotIntv],
                 y=M_mean[i][0:lastIndx:plotIntv],
                 yerr=M_std[i][0:lastIndx:plotIntv],
-                label="std $M_" + M_ax_labels[i] + "$",
+                label="$M_{" + M_ax_labels[i] + "}$",
                 color=colorSets[i, 1],
                 alpha=1,
             )
             ax.plot(
-                timeStamp_s[0:lastIndx:plotIntv],
+                timeStamp[0:lastIndx:plotIntv],
                 M_mean[i][0:lastIndx:plotIntv],
-                label="mean $M_" + M_ax_labels[i] + "$",
+                label="$M_{" + M_ax_labels[i] + "}$",
                 color=colorSets[i, 0],
                 alpha=1,
                 zorder=3,
             )
             # ax.yaxis.set_major_formatter(FuncFormatter(sci_fmt))
 
-        for ax in M_axes:
-            ax.set_xlabel("Time (s)")
+        for ax in all_axes:
+            ax.set_xlabel(f"Time ({timeStamp.unit.to_string('unicode')})")
             ax.set_ylabel("")
             ax.grid()
             ax.legend(loc="upper right")
 
-        # Mz_ax.set_ylim(0, 1.1)
+        Mz_ax.set_ylim(bottom=Mxy_ax.get_ylim()(0))
 
-        # fig.suptitle(f"T2={self.T2_s:.1e}s; T1={self.T1_s:.1e}s")
-        # plt.tight_layout()
+        fig.suptitle(
+            f"Magnet {self.magnet.B0:g} {self.magnet.FWHM.to(ppm):g}"
+            + f"\nSample {self.sample.name} T1={self.sample.T1:g} T2={self.sample.T2.si:g} T2*={self.T2star.si:g}"
+        )
+        plt.tight_layout()
+        plt.show()
+        return M_axes
+
+    def displayTrjry(
+        self,
+        plotRate_Hz: float = None,  #
+        verbose: bool = False,
+    ):
+        if plotRate_Hz is None:
+            plotRate_Hz = self.rate_Hz
+
+        if plotRate_Hz > self.rate_Hz:
+            print(
+                "WARNING: samprate > self.simurate. samprate will be decreased to simurate"
+            )
+            plotRate_Hz = self.rate_Hz
+            plotIntv = 1
+        else:
+            plotIntv = int(1.0 * self.rate_Hz / plotRate_Hz)
+
+        timeStamp = np.linspace(
+            start=0, stop=(self.timeLen) * self.timeStep.si, num=len(self.M_mean[:, 0])
+        )
+        fig = plt.figure(figsize=(17 / 2.54, 9 / 2.54), dpi=300)  #
+        gs = gridspec.GridSpec(nrows=2, ncols=3)  #
+        # fix the margins
+        left = 0.1
+        bottom = 0.1
+        right = 0.985
+        top = 0.924
+        wspace = 0.313
+        hspace = 0.260
+        fig.subplots_adjust(
+            left=left, top=top, right=right, bottom=bottom, wspace=wspace, hspace=hspace
+        )
+        B_t_ax = fig.add_subplot(gs[0, 0])
+        # B_f_ax = fig.add_subplot(gs[1, 0])
+        Mx_ax = fig.add_subplot(gs[0, 1], sharex=B_t_ax)
+        My_ax = fig.add_subplot(gs[0, 2], sharex=Mx_ax, sharey=Mx_ax)
+        Mxy_ax = fig.add_subplot(gs[1, 1], sharex=Mx_ax, sharey=Mx_ax)
+        Mz_ax = fig.add_subplot(gs[1, 2], sharex=Mx_ax)
+        M_axes = [Mx_ax, My_ax, Mz_ax, Mxy_ax]
+        all_axes = [B_t_ax, Mx_ax, My_ax, Mz_ax, Mxy_ax]
+        lastIndx = -1
+        B_ax_labels = ["x", "y", "z", "freq"]
+        M_ax_labels = ["x", "y", "z", "xy"]
+        colorSets = np.array(
+            [
+                ["tab:orange", "tab:blue"],
+                ["tab:red", "tab:blue"],
+                ["tab:green", "tab:blue"],
+                ["tab:pink", "tab:blue"],
+            ]
+        )
+        # Sets = [["tab:orange", "tab:blue"],["tab:red", "tab:blue"],["tab:green", "tab:blue"],["tab:black", "tab:blue"]]
+        B_mean = [
+            self.excField.B_vec_mean[:, 0],
+            self.excField.B_vec_mean[:, 1],
+            self.excField.B_vec_mean[:, 2],
+        ]
+        B_std = [
+            self.excField.B_vec_std[:, 0],
+            self.excField.B_vec_std[:, 1],
+            self.excField.B_vec_std[:, 2],
+        ]
+        M_mean = [self.M_mean[:, 0], self.M_mean[:, 1], self.M_mean[:, 2], self.Mxy_mrs]
+        M_std = [self.M_std[:, 0], self.M_std[:, 1], self.M_std[:, 2], self.Mxy_srs]
+
+        # Force scientific notation on ticks, not as offset
+        formatter = ScalarFormatter(useMathText=True)
+        formatter.set_scientific(True)
+        formatter.set_powerlimits((-1, 1))  # control when to switch to scientific
+        for i, axis in enumerate(["x", "y", "z"]):
+            lastIndx = len(B_mean[i])
+            B_t_ax.plot(
+                timeStamp[0:lastIndx:plotIntv],
+                B_mean[i][0:lastIndx:plotIntv],
+                label="$B_{" + axis + "}$",
+                color=colorSets[i, 0],
+                alpha=1,
+                zorder=3,
+            )
+        B_t_ax.set_ylabel(
+            f"Excitation field ({B_mean[0][0].unit.to_string('unicode')})"
+        )
+
+        # TODO plot frequency domain in B_f_ax
+
+        for i, ax in enumerate(M_axes):
+            ax.plot(
+                timeStamp[0:lastIndx:plotIntv],
+                M_mean[i][0:lastIndx:plotIntv],
+                label="$M_{" + M_ax_labels[i] + "}$",
+                color=colorSets[i, 0],
+                alpha=1,
+                zorder=3,
+            )
+            # ax.yaxis.set_major_formatter(FuncFormatter(sci_fmt))
+
+        for ax in all_axes:
+            ax.set_xlabel(f"Time ({timeStamp.unit.to_string('unicode')})")
+            ax.set_ylabel("")
+            ax.grid()
+            ax.legend(loc="upper right")
+
+        Mz_ax.set_ylim(bottom=Mxy_ax.get_ylim()[0])
+
+        fig.suptitle(
+            f"Magnet {self.magnet.B0:g} {self.magnet.FWHM.to(ppm):g}"
+            + f"\nSample {self.sample.name} T1={self.sample.T1:g} T2={self.sample.T2.si:g} T2*={self.T2star.si:g}"
+        )
+        plt.tight_layout()
         plt.show()
         return M_axes
 

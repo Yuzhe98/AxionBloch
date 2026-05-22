@@ -28,64 +28,53 @@ Tdelta = 10 * unit.ms  # dephasing time set by field inhomogeneity
 # Sample
 # ──────────────────────────────────────────────────────────────────────────── #
 
-# sample = Sample(
-#     name="Liquid Xe-129",
-#     gamma=gamma_Xe129,  # negative for Xe-129
-#     massDensity=3.1 * unit.g / unit.cm**3,
-#     molarMass=131.29 * unit.g / unit.mol,
-#     numOfSpinsPerMolecule=1 * unit.one,
-#     T2=T2,
-#     T1=T1,
-#     vol=1 * unit.cm**3,
-#     mu=mu_Xe129,
-#     temp=300 * unit.K,
-#     verbose=False,
-# )
-# CH3CH2OH
 sample = Sample(
-    name="Ethanol",
-    gamma=gamma_p,
-    massDensity=0.78945 * unit.g / unit.cm**3,
-    molarMass=46.069 * unit.g / unit.mol,
-    numOfSpinsPerMolecule=6 * unit.one,
+    name="Liquid Xe-129",
+    gamma=gamma_Xe129,  # negative for Xe-129
+    massDensity=3.1 * unit.g / unit.cm**3,
+    molarMass=131.29 * unit.g / unit.mol,
+    numOfSpinsPerMolecule=1 * unit.one,
     T2=T2,
     T1=T1,
     vol=1 * unit.cm**3,
-    mu=mu_p,
-    temp=300 * unit.K,
+    mu=mu_Xe129,
+    temp=163 * unit.K,
     verbose=False,
 )
+# CH3CH2OH
+# sample = Sample(
+#     name="Ethanol",
+#     gamma=gamma_p,
+#     massDensity=0.78945 * unit.g / unit.cm**3,
+#     molarMass=46.069 * unit.g / unit.mol,
+#     numOfSpinsPerMolecule=6 * unit.one,
+#     T2=T2,
+#     T1=T1,
+#     vol=1 * unit.cm**3,
+#     mu=mu_p,
+#     temp=300 * unit.K,
+#     verbose=False,
+# )
 
 B0 = 14.0 * unit.T  # magnet field magnitude
 
 # Larmor frequency of Xe-129 at 14 T  (take |gamma| since gamma_Xe129 < 0)
-nu_L = (np.abs(sample.gamma) / (2 * PI) * B0).to(unit.Hz)  # ≈ 165.7 MHz
+nu_L = (np.abs(sample.gamma) / (2 * PI) * B0).to(unit.MHz)  # ≈ 165.8 MHz
+check(nu_L)
 
 signalFreqRot = 0.0 * unit.Hz  # signal offset in the rotating frame
 RCF_freq = nu_L - signalFreqRot  # rotating-frame carrier frequency
 
-
 # ──────────────────────────────────────────────────────────────────────────── #
 # Pulse sequence definition (all as Quantity)
 # ──────────────────────────────────────────────────────────────────────────── #
-Npulses = 120
+Npulses = 60
 
-#   pulse index:  0        1        2
-# tip_angles = [PI / 2, PI, PI]
 tip_angles = (18 / 123) * PI / 2 * np.ones(Npulses)
-# delays[i] = free-precession time from end of pulse i-1 to start of pulse i
-# delays = [0.0 * unit.s,  tau1,  tau1 + tau2]
-# #            ↑              ↑          ↑
-# #       before 90°     before 180°#1  before 180°#2 (after echo₁ + extra τ₂)
-# # for i in range(Npulses):
-# #     pass
-delays = np.arange(55, 55 * (Npulses + 1), 5) * unit.ms
-# delays = 10 * unit.ms * np.ones(Npulses)
 
-# phases = [0.0 * unit.rad, (PI / 2), (PI / 2)]
-# phases = [0.0, 0, 0] * unit.rad
-phases = 0 * unit.rad * np.ones(Npulses)
-# 90°(x) → 180°(y) → 180°(y)  — CPMG-style phase cycle
+delays = np.arange(55, 55 * (Npulses + 1), 5) * unit.ms
+
+phases = PI * np.ones(Npulses)
 
 
 tip_angles = tip_angles[0:Npulses]
@@ -94,7 +83,7 @@ phases = phases[0:Npulses]
 
 simuRate = 7 * unit.kHz
 duration = np.sum(delays) + 10.0 * unit.ms  # ≈ 17 s; covers both echoes
-check(duration)
+check(duration.si)
 # ──────────────────────────────────────────────────────────────────────────── #
 # Magnet
 # For Xe-129 (gamma < 0) the simulation requires B0 < 0 so that
@@ -133,8 +122,8 @@ simu = Simulation(
 )
 
 print(f"Larmor freq  = {nu_L:g}")
-print(f"T2*          = {simu.T2star_s:g}")
-print(f"Tdelta       = {simu.Tdelta_s:g}")
+print(f"T2*          = {simu.T2star:g}")
+print(f"Tdelta       = {simu.Tdelta:g}")
 print(f"numSteps     = {simu.numSteps}")
 print(f"timeStep     = {simu.timeStep:g}")
 
@@ -147,9 +136,10 @@ simu.excField.setNPulsesArbDelay(
     delays=delays,
     nu_rot=signalFreqRot,
     phases=phases,
-    verbose=True,
+    verbose=False,
 )
 
+simu.estimateRuntime( verbose=True)
 # check(simu.excField.B_vec.shape)
 
 # ──────────────────────────────────────────────────────────────────────────── #
@@ -157,12 +147,12 @@ simu.excField.setNPulsesArbDelay(
 # ──────────────────────────────────────────────────────────────────────────── #
 
 tic = time.perf_counter()
-simu.generateTrajectories(integrator="RK4")
+simu.generateTrajectories()
 toc = time.perf_counter()
 print(f"generateTrajectories time = {toc - tic:.3f} s")
 
 simu.keepMeanStd()
-simu.displayTrjries(verbose=True)
+simu.displayTrjry(verbose=True)
 
 # ──────────────────────────────────────────────────────────────────────────── #
 # Optionally save results

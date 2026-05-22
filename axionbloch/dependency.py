@@ -17,7 +17,7 @@ from astropy.constants import codata2018 as const
 from astropy.time import Time
 
 # pi with unit.radian
-PI = np.pi * unit.rad
+PI:Quantity[unit.rad] = np.pi * unit.rad
 
 # dimensionless scale units
 # parts per million
