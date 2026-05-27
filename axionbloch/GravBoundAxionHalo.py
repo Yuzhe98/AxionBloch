@@ -38,7 +38,9 @@ class GravBoundAxionHalo:
     # Map l to spectroscopic labels (s, p, d, f, ...)
     orbitalLabels = ["s", "p", "d", "f", "g", "h", "i", "k", "l", "m"]
     pot: Quantity
-
+    mass_enclosed: Quantity | None
+    g_aNN: Quantity | None
+    a_0: Quantity | None
     def __init__(
         self,
         name="Gravitationally Bound Axion Halo",
@@ -46,8 +48,9 @@ class GravBoundAxionHalo:
         N: int = int(2**12),
         extent: Quantity = 128.0 * unit.R_earth,
         getPot=None,
-        mass_enclosed: Quantity | None = None,
-        g_aNN: Quantity | None = None,
+        mass_enclosed= None,
+        g_aNN = None,
+        a_0 = None,
         verbose: bool = False,
     ):
         """
@@ -104,8 +107,9 @@ class GravBoundAxionHalo:
             * Phi_unit
         )  # convert r to meter for potential function
 
-        self.mass_enclosed: Quantity = mass_enclosed
-        self.g_aNN: Quantity = g_aNN
+        self.mass_enclosed = mass_enclosed
+        self.g_aNN = g_aNN
+        self.a_0 = a_0
 
         # prefactor for the kinetic energy finite-difference stencil: ℏ²/(2m dr²)
         self.T_magnitude: Quantity = (const.hbar**2) / (2 * self.ma) / self.dr**2
@@ -343,6 +347,7 @@ class GravBoundAxionHalo:
         stateNames: list[str],
         station: Station,
         truncRadius: Quantity | None = None,
+        showPlot: bool = True,
         verbose: bool = False,
     ):
         """Compute and plot the 3-D gradient of the total wavefunction at a station.
@@ -396,7 +401,6 @@ class GravBoundAxionHalo:
         dphi = phi[1] - phi[0]
 
         # 3-D spherical mesh of shape (Nr, Ntheta, Nphi)
-        max_n_r = len(self.states.keys())
         R_grid, Theta_grid, Phi_grid = np.meshgrid(r, theta, phi, indexing="ij")
         # grid.shape=(Nr, Ntheta, Nphi)
         # R_grid unit: [length]
@@ -507,6 +511,32 @@ class GravBoundAxionHalo:
         grad_phi_line = np.asarray(interp_phi(points)) * grad_phi.unit
         toc = time.time()
         print(logPrefix, f"gradient along station direction time: {toc-tic:.2e} s")
+        if showPlot:
+            self.plotGradients(
+                stateNames=stateNames,
+                station=station,
+                r=r,
+                R_r=state["R_r"][start_index:stop_index],  # radial wavefunction along theta=0, phi=0
+                r_line=r_line,
+                grad_r_line=grad_r_line,
+                grad_theta_line=grad_theta_line,
+                grad_phi_line=grad_phi_line,
+            )
+        if verbose:
+            earthRad_idx = np.argmin(np.abs(r_line - 1 * unit.earthRad))
+            print(logPrefix, "r_line index @ station =", earthRad_idx)
+            print(logPrefix, "grad_r @ station =", grad_r_line[earthRad_idx])
+            print(logPrefix, "grad_theta @ station =", grad_theta_line[earthRad_idx])
+            print(logPrefix, "grad_phi @ station =", grad_phi_line[earthRad_idx])
+        return r, state["R_r"][start_index:stop_index], r_line, grad_r_line, grad_theta_line, grad_phi_line
+
+    def plotGradients(
+        self,
+        stateNames: list[str],
+        station: Station,
+        r, R_r, r_line, grad_r_line, grad_theta_line, grad_phi_line
+    ):
+        """plotting function of :meth:`findGradients` separated for better modularity."""
 
         fig = plt.figure(figsize=(8.5 / 2.54, 8.5 / 2.54), dpi=300)
         grid = gridspec.GridSpec(
@@ -540,7 +570,7 @@ class GravBoundAxionHalo:
             state = self.states[name]
             axion_ax.plot(
                 r,
-                np.real(state["R_r"][start_index:stop_index]),
+                np.real(R_r),
                 label=name + " $\\mathrm{Re}[R(r)]$",
                 # np.abs(state["R_r"]) ** 2,
                 # label=name + " $R^{2}(r)$",
@@ -551,20 +581,13 @@ class GravBoundAxionHalo:
             )
             axion_ax.plot(
                 r,
-                np.imag(state["u_r"][start_index:stop_index]),
-                label="$\\mathrm{Im}[R(r) r]$",
+                np.imag(R_r),
+                label="$\\mathrm{Im}[R(r)]$",
                 linestyle="--",
                 color="tab:red",
                 zorder=4,
                 linewidth=2,
             )
-            # ax.plot(
-            #     r,
-            #     np.abs(state["u_r"]),
-            #     label="$|R(r) r|$",
-            #     color="k",
-            #     linewidth=4,
-            # )
 
         grad_r_ax.plot(
             r_line,
@@ -604,22 +627,32 @@ class GravBoundAxionHalo:
 
         grad_phi_ax.set_xlabel(f"r ({r.unit.to_string('unicode')})")
         ylabels = [
-            "$R_{nl}\\,($" + state["R_r"].unit.to_string("latex") + "$)$",
-            "$\\partial_r\\phi\\,($"
-            + grad_r_line.unit.to_string("latex")
-            + "$)$",
-            "$\\frac{1}{r}\\partial_\\theta \\phi\\,($"
-            + grad_theta_line.unit.to_string("latex")
-            + "$)$",
-            "$\\frac{1}{r\\sin\\theta}\\partial_\\varphi\\phi\\,($"
-            + grad_phi_line.unit.to_string("latex")
-            + "$)$",
+            # radial wavefunction
+            "$R_{nl}$\n"
+            + "$\\left("
+            + state["R_r"].unit.to_string("latex_inline")[1:-1]
+            + "\\right)$",
+            # r gradient
+            "$\\partial_r\\phi$\n"
+            + "$\\left("
+            + grad_r_line.unit.to_string("latex_inline")[1:-1]
+            + "\\right)$",
+            # theta gradient
+            "$\\frac{1}{r}\\partial_\\theta \\phi$\n"
+            + "$\\left("
+            + grad_theta_line.unit.to_string("latex_inline")[1:-1]
+            + "\\right)$",
+            # phi gradient
+            "$\\frac{1}{r\\sin\\theta}\\partial_\\varphi\\phi$\n"
+            + "$\\left("
+            + grad_phi_line.unit.to_string("latex_inline")[1:-1]
+            + "\\right)$",
         ]
         print(ylabels)
-        axion_ax.set_xlim(right=truncRadius.value)
+        # axion_ax.set_xlim(right=truncRadius.value)
         for i, ax in enumerate(axes):
             ax.axvline(
-                x=1,
+                x=(1 * unit.earthRad).to_value(r_line.unit),
                 color="red",
                 linestyle="dotted",
                 # linewidth=2,

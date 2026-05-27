@@ -369,6 +369,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         N: int = int(2**12),
         extent: Quantity = 128.0 * unit.R_earth,
         getPot=earth_grav_potential_earth_center,
+        a_0:Quantity|None = None,
         verbose: bool = False,
     ):
         logPrefix = f"[{self.__class__.__name__}.__init__]"
