@@ -24,10 +24,10 @@ void _add_3d_arrays_3loops(const double *A, const double *B, double *C, std::siz
 void _add_3d_arrays_parallel(const double *A, const double *B, double *C, std::size_t X,
                              std::size_t Y, std::size_t Z) {
 #pragma omp parallel for schedule(static)
-    for (std::size_t i = 0; i < X; i++) {
+    for (std::ptrdiff_t i = 0; i < (std::ptrdiff_t)X; i++) {
         for (std::size_t j = 0; j < Y; j++) {
             for (std::size_t k = 0; k < Z; k++) {
-                std::size_t idx = i * (Y * Z) + j * Z + k;
+                std::size_t idx = (std::size_t)i * (Y * Z) + j * Z + k;
                 C[idx] = A[idx] + B[idx];
             }
         }

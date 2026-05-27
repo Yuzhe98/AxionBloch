@@ -14,8 +14,10 @@ import astropy
 from astropy import units as unit
 from astropy.units import Quantity, CompositeUnit
 from astropy.constants import codata2018 as const
+from astropy.time import Time
 
-PI = np.pi * unit.rad
+# pi with unit.radian
+PI:Quantity[unit.rad] = np.pi * unit.rad
 
 # dimensionless scale units
 # parts per million

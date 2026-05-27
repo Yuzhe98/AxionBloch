@@ -147,7 +147,7 @@ if save_data:
         Mxy_srs=simu.Mxy_srs,
         # trjry=simu.trjry,
         T2_s=sample.T2.to_value(unit.s),
-        Tdelta_s=simu_all.pool[i].simu.Tdelta_s,
+        Tdelta_s=simu_all.pool[i].simu.Tdelta,
         T_1_s=sample.T1.to_value(unit.s),
         pol=sample.pol,
     )
