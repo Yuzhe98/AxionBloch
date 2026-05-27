@@ -8,6 +8,7 @@ bound-state wavefunctions and energies for each orbital quantum number *l*.
 subclass pre-configured with the Earth's gravitational potential.
 """
 
+from calendar import c
 import time
 
 from axionbloch.dependency import *
@@ -79,19 +80,16 @@ class GravBoundAxionHalo:
         self.name = name
         self.nu_a = nu_a
         # axion mass derived from Compton frequency: m = h * nu / c²
-        ma = self.nu_a * const.h / const.c**2
+        self.ma = self.nu_a * const.h / const.c**2
         if verbose:
             print(logPrefix, "axion Compton frequency =", self.nu_a)
             print(
                 logPrefix,
                 "axion mass =",
-                ma.to(unit.kg),
+                self.ma.to(unit.kg),
                 " =",
-                ma.to(unit.eV / const.c**2),
+                self.ma.to(unit.eV / const.c**2),
             )
-
-        # axion mass in atomic units
-        self.ma: Quantity = ma  # 1 MHz axion mass: 7e-45 kilogram
 
         self.N = N
         self.extent: Quantity = extent
@@ -134,6 +132,8 @@ class GravBoundAxionHalo:
         check(self.pot.mean())
         check(self.pot.std())
         check(self.T_magnitude)
+        check(self.ma.si)
+        check(self.a_0.si)
 
     def solve_TISE_3D_l(
         self,
@@ -532,7 +532,7 @@ class GravBoundAxionHalo:
 
     def plotGradients(
         self,
-        stateNames: list[str],
+        stateNames: str,
         station: Station,
         r, R_r, r_line, grad_r_line, grad_theta_line, grad_phi_line
     ):
@@ -664,6 +664,9 @@ class GravBoundAxionHalo:
 
         for ax in axes:
             ax.legend(loc="upper left", bbox_to_anchor=(1.0, 1.0))
+        fig.suptitle(
+            f"Gradient at {station.name}"
+        )
         plt.tight_layout()
         plt.show()
 

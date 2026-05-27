@@ -370,6 +370,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         extent: Quantity = 128.0 * unit.R_earth,
         getPot=earth_grav_potential_earth_center,
         a_0:Quantity|None = None,
+        rhoE_DM: Quantity = 1e16 * 0.3 * unit.GeV / unit.cm**3,
         verbose: bool = False,
     ):
         logPrefix = f"[{self.__class__.__name__}.__init__]"
@@ -379,12 +380,19 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
             N=N,
             extent=extent,
             getPot=getPot,
+            a_0=a_0,
             verbose=verbose,
         )
         # convert potential and kinetic energy magnitude to atto-eV for easier computation
         self.E_unit = unit.attoelectronvolt
         self.pot = self.pot.to(self.E_unit)
         self.T_magnitude = self.T_magnitude.to(self.E_unit)
+        if a_0 is not None:
+            self.a_0 = a_0
+        elif rhoE_DM is not None:
+            self.a_0 = (2 * const.hbar**3 * rhoE_DM / (self.ma**2 * const.c)) ** 0.5
+        else:
+            raise ValueError("Either a_0 or rhoE_DM must be provided.")
 
     def getBfield(
         self,

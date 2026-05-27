@@ -33,16 +33,16 @@ halo.solve_TISE_3D(
 r, R_r, r_line, grad_r_line, grad_theta_line, grad_phi_line = halo.findGradients(
     stateNames=["2p"], station=station, truncRadius=2 * unit.earthRad, verbose=True
 )
-halo.plotGradients(
-    stateNames=["2p"],
-    station=station,
-    r=r,
-    R_r=R_r,
-    r_line=r_line,
-    grad_r_line=halo.a_0 * grad_r_line,
-    grad_theta_line=halo.a_0 * grad_theta_line,
-    grad_phi_line=halo.a_0 * grad_phi_line,
-)
+# halo.plotGradients(
+#     stateNames=["2p"],
+#     station=station,
+#     r=r,
+#     R_r=R_r,
+#     r_line=r_line,
+#     grad_r_line=halo.a_0 * grad_r_line,
+#     grad_theta_line=halo.a_0 * grad_theta_line,
+#     grad_phi_line=halo.a_0 * grad_phi_line,
+# )
 
 logPrefix = os.path.abspath(__file__)
 
