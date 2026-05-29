@@ -7,6 +7,7 @@ from scipy.interpolate import interp1d
 
 from astropy import units as unit
 from astropy.constants import codata2018 as const
+from astropy.coordinates import EarthLocation
 from astropy.units import Quantity
 
 from axionbloch.utils import check
@@ -397,6 +398,215 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         else:
             raise ValueError("Either a_0 or rhoE_DM must be provided.")
         self.totalMassEnclosed = totalMassEnclosed
+
+    # ------------------------------------------------------------------
+    # Gradient at arbitrary direction / time
+    # ------------------------------------------------------------------
+
+    def findGradientsAtDirection(
+        self,
+        location: EarthLocation,
+        stateNames: list[str] | None = None,
+        truncRadius: Quantity | None = None,
+        showPlot: bool = False,
+        verbose: bool = False,
+    ) -> tuple:
+        """Compute the wavefunction gradient along an arbitrary direction.
+
+        A convenience wrapper around :meth:`findGradients` that accepts an
+        :class:`~astropy.coordinates.EarthLocation` directly, without requiring
+        a pre-defined :class:`~axionbloch.Station.Station`.
+
+        Parameters
+        ----------
+        location : EarthLocation
+            Geodetic latitude, longitude, and elevation of the direction.
+            For example: ``EarthLocation(lat=0*u.deg, lon=0*u.deg, height=0*u.m)``
+            points toward the equator on the prime meridian.
+        stateNames : list of str, optional
+            Eigenstates to superimpose (e.g. ``['2p']``).  Defaults to the
+            lowest-energy solved state.
+        truncRadius : Quantity, optional
+            Radial cutoff for the interpolation grid.
+        showPlot : bool
+            Plot the wavefunction and gradient profiles.
+        verbose : bool
+            Print timing and diagnostic information.
+
+        Returns
+        -------
+        r, R_r, r_line, grad_r, grad_theta, grad_phi
+            Same six arrays as :meth:`findGradients`.
+
+        Examples
+        --------
+        >>> from astropy.coordinates import EarthLocation
+        >>> from astropy import units as u
+        >>> # Direction toward the equator on the prime meridian
+        >>> r, R_r, r_line, gr, gt, gp = halo.findGradientsAtDirection(
+        ...     location=EarthLocation(lat=0*u.deg, lon=0*u.deg, height=0*u.m),
+        ...     stateNames=['2p'],
+        ...     truncRadius=2 * u.R_earth,
+        ... )
+        """
+        return self.findGradients(
+            stateNames=stateNames,
+            location=location,
+            truncRadius=truncRadius,
+            showPlot=showPlot,
+            verbose=verbose,
+        )
+
+    def findGradientsWithMilkyWay(
+        self,
+        mw,
+        stateNames: list[str] | None = None,
+        truncRadius: Quantity | None = None,
+        showPlot: bool = False,
+        verbose: bool = False,
+    ) -> dict:
+        """Compute the gradient at a station with time-dependent galactic context.
+
+        Uses the station embedded in the :class:`~axionbloch.MilkyWay.MilkyWay`
+        instance for the geographic direction, then enriches the result with
+        galactic kinematics derived from that same object:
+
+        - Lab velocity :math:`\\mathbf{v}_\\mathrm{lab}` (magnitude and direction).
+        - Wind angle between :math:`\\mathbf{v}_\\mathrm{lab}` and the
+          station's sensitive axis.
+        - Gradient in Cartesian ITRS coordinates (useful for projecting onto
+          a non-vertical :math:`\\mathbf{B}_0`).
+        - Projection of the gradient onto the sensitive axis (radial direction).
+
+        Parameters
+        ----------
+        mw : :class:`~axionbloch.MilkyWay.MilkyWay`
+            Must have :attr:`~axionbloch.MilkyWay.MilkyWay.station` set.
+        stateNames : list of str, optional
+            Eigenstates to include (e.g. ``['2p']``).
+        truncRadius : Quantity, optional
+            Radial cutoff.
+        showPlot : bool
+            Plot the wavefunction and gradient profiles.
+        verbose : bool
+            Print diagnostics.
+
+        Returns
+        -------
+        dict with keys
+            ``r``, ``R_r``, ``r_line`` — radial grid and wavefunction.
+
+            ``grad_r``, ``grad_theta``, ``grad_phi`` — spherical gradient
+            components along the full r_line.
+
+            ``grad_r_surface``, ``grad_theta_surface``, ``grad_phi_surface`` —
+            values at Earth's surface (:math:`r = R_\\oplus`).
+
+            ``grad_cartesian_itrs`` — Cartesian gradient vector in ITRS
+            (x = prime meridian, z = north pole) at Earth's surface.
+
+            ``nvec_gcrs`` — station's unit normal in GCRS (equatorial inertial),
+            changes with time as Earth rotates.
+
+            ``v_lab``, ``v_lab_magnitude`` — lab velocity in galactic frame.
+
+            ``wind_angle`` — angle between v_lab and the sensitive axis [rad].
+
+        Examples
+        --------
+        >>> from astropy.time import Time
+        >>> from axionbloch.MilkyWay import MilkyWay
+        >>> from axionbloch.Station import Baltimore
+        >>> mw = MilkyWay(time=Time('2024-06-21T14:00:00'), station=Baltimore)
+        >>> result = halo.findGradientsWithMilkyWay(
+        ...     mw, stateNames=['2p'], truncRadius=2 * unit.R_earth
+        ... )
+        >>> print(result['wind_angle'].to('deg'))
+        >>> print(result['grad_r_surface'])
+        """
+        if mw.station is None:
+            raise ValueError(
+                "MilkyWay.station must be set before calling findGradientsWithMilkyWay."
+            )
+
+        station = mw.station
+
+        # ---- Gradient in geographic spherical coordinates ----
+        r, R_r, r_line, grad_r, grad_theta, grad_phi = self.findGradients(
+            stateNames=stateNames,
+            station=station,
+            truncRadius=truncRadius,
+            showPlot=showPlot,
+            verbose=verbose,
+        )
+
+        # ---- Gradient values at Earth's surface ----
+        earth_idx = int(np.argmin(np.abs(r_line - 1.0 * unit.R_earth)))
+        gr_s = grad_r[earth_idx]
+        gt_s = grad_theta[earth_idx]
+        gp_s = grad_phi[earth_idx]
+
+        # ---- Convert to Cartesian ITRS ----
+        # Spherical unit vectors at (theta_s, phi_s) in ITRS
+        theta_s = float(station.theta.to_value(unit.rad))
+        phi_s   = float(station.phi.to_value(unit.rad))
+        sin_t, cos_t = np.sin(theta_s), np.cos(theta_s)
+        sin_p, cos_p = np.sin(phi_s),   np.cos(phi_s)
+
+        r_hat     = np.array([ sin_t * cos_p,  sin_t * sin_p,  cos_t ])
+        theta_hat = np.array([ cos_t * cos_p,  cos_t * sin_p, -sin_t ])
+        phi_hat   = np.array([-sin_p,           cos_p,          0.0   ])
+
+        # grad_theta / grad_phi carry an extra 'rad' denominator because θ,φ
+        # are in radians.  Since rad is dimensionless, convert to the same unit
+        # as grad_r via dimensionless_angles() before combining.
+        base_grad_unit = gr_s.unit
+        gt_s_compat = gt_s.to(base_grad_unit, equivalencies=unit.dimensionless_angles())
+        gp_s_compat = gp_s.to(base_grad_unit, equivalencies=unit.dimensionless_angles())
+
+        grad_cartesian_itrs = (
+            gr_s * r_hat + gt_s_compat * theta_hat + gp_s_compat * phi_hat
+        )
+
+        # ---- Galactic context from MilkyWay ----
+        nvec_gcrs  = mw.get_nvec_gcrs()
+        v_lab      = mw.get_v_lab()
+        v_lab_mag  = mw.get_v_lab_magnitude()
+        wind_angle = mw.get_wind_angle()
+
+        if verbose:
+            print(f"[findGradientsWithMilkyWay] station       = {station.name}")
+            print(f"[findGradientsWithMilkyWay] time          = {mw.time.iso}")
+            print(f"[findGradientsWithMilkyWay] |v_lab|       = {v_lab_mag:.3f}")
+            print(f"[findGradientsWithMilkyWay] wind_angle    = {wind_angle.to(unit.deg):.2f}")
+            print(f"[findGradientsWithMilkyWay] grad_r surf.  = {gr_s}")
+            print(f"[findGradientsWithMilkyWay] grad_th surf. = {gt_s}")
+            print(f"[findGradientsWithMilkyWay] grad_ph surf. = {gp_s}")
+            print(f"[findGradientsWithMilkyWay] grad Cartesian (ITRS) = {grad_cartesian_itrs}")
+
+        return {
+            # radial grid and wavefunction
+            "r": r,
+            "R_r": R_r,
+            "r_line": r_line,
+            # spherical gradient profiles
+            "grad_r": grad_r,
+            "grad_theta": grad_theta,
+            "grad_phi": grad_phi,
+            # gradient at Earth's surface
+            "grad_r_surface": gr_s,
+            "grad_theta_surface": gt_s,
+            "grad_phi_surface": gp_s,
+            "grad_cartesian_itrs": grad_cartesian_itrs,
+            # galactic context
+            "nvec_gcrs": nvec_gcrs,
+            "v_lab": v_lab,
+            "v_lab_magnitude": v_lab_mag,
+            "wind_angle": wind_angle,
+            # metadata
+            "station": station,
+            "time": mw.time,
+        }
 
     def getBfield(
         self,

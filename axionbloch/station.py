@@ -5,6 +5,8 @@ exposes the corresponding unit vector and distance from the Earth's centre.
 Three pre-built instances are provided: :data:`Mainz`, :data:`Baltimore`, and
 :data:`Sanya`.
 """
+from astropy.coordinates import EarthLocation
+
 from axionbloch.dependency import np, unit, Quantity
 from axionbloch.constants import earth_radius
 
@@ -114,6 +116,11 @@ class Station:
         )
         self.elevation = elevation
         self.R = self.elevation + earth_radius  # distance from Earth center to station
+
+        # signed geographic coordinates for astropy
+        _lat = self.latitude if NSsemisphere == "N" else -self.latitude
+        _lon = self.longitude if EWsemisphere == "E" else -self.longitude
+        self.location = EarthLocation(lat=_lat, lon=_lon, height=elevation)
 
 
 Mainz = Station(

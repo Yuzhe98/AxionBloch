@@ -20,6 +20,8 @@ from scipy.linalg import eigh
 from scipy.special import sph_harm_y
 from scipy.interpolate import RegularGridInterpolator
 
+from astropy.coordinates import EarthLocation
+
 from axionbloch.Station import Station
 from axionbloch.utils import high_contrast_extended as colors, check
 
@@ -346,32 +348,60 @@ class GravBoundAxionHalo:
     def findGradients(
         self,
         stateNames: list[str],
-        station: Station,
+        station: Station | None = None,
+        location: EarthLocation | None = None,
         truncRadius: Quantity | None = None,
         showPlot: bool = True,
         verbose: bool = False,
     ):
-        """Compute and plot the 3-D gradient of the total wavefunction at a station.
+        """Compute and plot the 3-D gradient of the total wavefunction at a direction.
 
         Superimposes the requested eigenstates (with equal weight), computes the
         spherical-coordinate gradient (∂_r, ∂_θ/r, ∂_φ/(r sinθ)), interpolates
-        each component onto a radial line pointing toward ``station``, and plots
-        all four quantities (wavefunction + three gradient components) on a
-        shared radial axis.
+        each component onto a radial line pointing toward the requested direction,
+        and plots all four quantities (wavefunction + three gradient components).
+
+        The direction can be specified either by a :class:`~axionbloch.Station.Station`
+        object **or** an :class:`~astropy.coordinates.EarthLocation`.
 
         Parameters
         ----------
         stateNames : list of str
             Labels of eigenstates to include (e.g. ``['1s', '2p']``).
             Defaults to the lowest-energy state.
-        station : Station
-            Observer location providing polar angle ``theta`` and azimuthal
-            angle ``phi`` used to project the gradient.
+        station : Station, optional
+            Geographic location; its ``location`` (lat / lon / elevation) is
+            used as the direction.  Mutually exclusive with ``location``.
+        location : EarthLocation, optional
+            Astropy ``EarthLocation`` specifying geodetic latitude, longitude,
+            and height above the reference ellipsoid.  Mutually exclusive with
+            ``station``.
         truncRadius : Quantity
             Truncation radius for reducing computation.
         """
 
         logPrefix = f"[{self.__class__.__name__}.{self.findGradients.__name__}]"
+
+        # --- Resolve direction from station or EarthLocation ---
+        if station is not None:
+            _loc = station.location
+            _label = station.name
+        elif location is not None:
+            _loc = location
+            _label = (
+                f"lat={_loc.lat.to_value(unit.deg):.2f}°, "
+                f"lon={_loc.lon.to_value(unit.deg):.2f}°, "
+                f"h={_loc.height.to(unit.m).value:.0f} m"
+            )
+        else:
+            raise ValueError(
+                "Provide either a Station or an EarthLocation."
+            )
+
+        # geodetic lat/lon → spherical colatitude (theta) and azimuth (phi)
+        _theta_rad = (90 * unit.deg - _loc.lat).to_value(unit.rad)
+        _phi_rad   = _loc.lon.to_value(unit.rad)
+
         # avoid r=0 singularity
         start_index = self.N // 2 + 5
         # stop at a desired radius to make computation more efficient
@@ -395,14 +425,14 @@ class GravBoundAxionHalo:
         self.sortByEigenE()
 
         Nr, Ntheta, Nphi = len(r), 100, 100
-        theta = np.linspace(0, PI, Ntheta)
-        phi = np.linspace(0, 2 * PI, Nphi)
+        theta_1Dgrid = np.linspace(0, PI, Ntheta)
+        phi_1Dgrid = np.linspace(0, 2 * PI, Nphi)
         dr = r[1] - r[0]
-        dtheta = theta[1] - theta[0]
-        dphi = phi[1] - phi[0]
+        dtheta = theta_1Dgrid[1] - theta_1Dgrid[0]
+        dphi = phi_1Dgrid[1] - phi_1Dgrid[0]
 
         # 3-D spherical mesh of shape (Nr, Ntheta, Nphi)
-        R_grid, Theta_grid, Phi_grid = np.meshgrid(r, theta, phi, indexing="ij")
+        R_grid, Theta_grid, Phi_grid = np.meshgrid(r, theta_1Dgrid, phi_1Dgrid, indexing="ij")
         # grid.shape=(Nr, Ntheta, Nphi)
         # R_grid unit: [length]
         # Theta_grid / Phi_grid unit: radian
@@ -465,28 +495,28 @@ class GravBoundAxionHalo:
             # grad_theta.shape = (Nr, Ntheta, Nphi) grad_theta.unit = 1 / (rad(3/2) earthRad(5/2))
             # grad_phi.shape = (Nr, Ntheta, Nphi) grad_phi.unit = 1 / (rad(3/2) earthRad(5/2))
 
-        # station direction in radians
-        theta_station_rad = station.theta.to_value(unit.rad)  # polar angle
-        phi_station_rad = station.phi.to_value(unit.rad)  # azimuthal angle
+        # direction in radians (resolved above)
+        theta_station_rad = _theta_rad
+        phi_station_rad   = _phi_rad
 
         # R_grid.shape = (Nr, Ntheta, Nphi)
         # grad_r.shape = same
 
         tic = time.time()
         interp_r = RegularGridInterpolator(
-            (r.value, theta.value, phi.value),
+            (r.value, theta_1Dgrid.value, phi_1Dgrid.value),
             grad_r.value,
             bounds_error=False,
             fill_value=None,
         )
         interp_theta = RegularGridInterpolator(
-            (r.value, theta.value, phi.value),
+            (r.value, theta_1Dgrid.value, phi_1Dgrid.value),
             grad_theta.value,
             bounds_error=False,
             fill_value=None,
         )
         interp_phi = RegularGridInterpolator(
-            (r.value, theta.value, phi.value),
+            (r.value, theta_1Dgrid.value, phi_1Dgrid.value),
             grad_phi.value,
             bounds_error=False,
             fill_value=None,
@@ -499,12 +529,9 @@ class GravBoundAxionHalo:
         Nr_plot = 2**10
         r_line = np.linspace(r[0], truncRadius, Nr_plot)
 
-        # points = [[r, theta_station, phi_station], ...]
+        # points = [[r, theta_direction, phi_direction], ...]
         points = np.array(
-            [
-                [r_pt, station.theta.to_value(unit.rad), station.phi.to_value(unit.rad)]
-                for r_pt in r_line.value
-            ]
+            [[r_pt, _theta_rad, _phi_rad] for r_pt in r_line.value]
         )
 
         tic = time.time()
@@ -518,10 +545,9 @@ class GravBoundAxionHalo:
             self.plotGradients(
                 stateNames=stateNames,
                 station=station,
+                label=_label,
                 r=r,
-                R_r=state["R_r"][
-                    start_index:stop_index
-                ],  # radial wavefunction along theta=0, phi=0
+                R_r=state["R_r"][start_index:stop_index],
                 r_line=r_line,
                 grad_r_line=grad_r_line,
                 grad_theta_line=grad_theta_line,
@@ -545,15 +571,24 @@ class GravBoundAxionHalo:
     def plotGradients(
         self,
         stateNames: str,
-        station: Station,
         r,
         R_r,
         r_line,
         grad_r_line,
         grad_theta_line,
         grad_phi_line,
+        station: Station | None = None,
+        label: str | None = None,
     ):
-        """plotting function of :meth:`findGradients` separated for better modularity."""
+        """Plotting helper for :meth:`findGradients`.
+
+        Parameters
+        ----------
+        station : Station, optional
+            If provided, ``station.name`` is used as the plot title.
+        label : str, optional
+            Fallback title when ``station`` is ``None``.
+        """
 
         fig = plt.figure(figsize=(8.5 / 2.54, 8.5 / 2.54), dpi=300)
         grid = gridspec.GridSpec(
@@ -681,7 +716,8 @@ class GravBoundAxionHalo:
 
         for ax in axes:
             ax.legend(loc="upper left", bbox_to_anchor=(1.0, 1.0))
-        fig.suptitle(f"Gradient at {station.name}")
+        _title = station.name if station is not None else (label or "")
+        fig.suptitle(f"Gradient at {_title}")
         plt.tight_layout()
         plt.show()
 
