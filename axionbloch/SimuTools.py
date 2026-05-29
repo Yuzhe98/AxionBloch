@@ -1746,7 +1746,7 @@ class Simulation(PhysicalObject):
             ax.grid()
             ax.legend(loc="upper right")
 
-        Mz_ax.set_ylim(bottom=Mxy_ax.get_ylim()(0))
+        Mz_ax.set_ylim(bottom=Mxy_ax.get_ylim()[0])
 
         fig.suptitle(
             f"Magnet {self.magnet.B0:g} {self.magnet.FWHM.to(ppm):g}"

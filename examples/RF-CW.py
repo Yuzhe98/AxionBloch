@@ -14,12 +14,12 @@ from axionbloch.utils import check
 
 
 RCF_Freq = 1 * unit.MHz
-signalFreqRot = 1 * unit.Hz
-T1 = 1e10 * unit.s
+signalFreqRot = 0 * unit.Hz
+T1 = 5 * unit.s
 
 # short Tdelta, long T2
-Tdelta = 1.0 * unit.s
-T2 = 10.0 * unit.s
+Tdelta = 10 * unit.ms
+T2 = 1.0 * unit.s
 
 # # short T2, long Tdelta
 # Tdelta = 10.0 * unit.s
@@ -33,8 +33,8 @@ T2 = 10.0 * unit.s
 # Tdelta = 10.0 * unit.s
 # T2 = 10.0 * unit.s
 
-simuRate = 500 * unit.Hz
-duration = 20 * unit.s
+simuRate = 1000 * unit.Hz
+duration = 50 * unit.s
 
 # CH3CH2OH sample
 sample = Sample(
@@ -59,7 +59,7 @@ magnet = Magnet(
     name="detection magnet",
     B0=(RCF_Freq - signalFreqRot) / (sample.gamma / (2 * PI)),
     FWHM=FWHM,
-    nFWHM=20.0,
+    nFWHM=5.0,
 )
 magnet.setHomogeneity(numPt=500)
 print(f"numPt for magnet homogeneity = {magnet.numPt}")
@@ -82,7 +82,7 @@ simu = Simulation(
 simu.excField.setXYPulse(
     timeStep=simu.timeStep,
     timeLen=simu.timeLen,
-    B1=1.0e-11 * unit.T,
+    B1=0.005 * unit.Hz / (sample.gamma / (2 * PI)),  # B1 field amplitude in Tesla, converted from Rabi frequency in Hz
     nu_rot=signalFreqRot,
 )
 

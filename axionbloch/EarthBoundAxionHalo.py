@@ -369,8 +369,10 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         N: int = int(2**12),
         extent: Quantity = 128.0 * unit.R_earth,
         getPot=earth_grav_potential_earth_center,
-        a_0:Quantity|None = None,
+        a_0: Quantity | None = None,
         rhoE_DM: Quantity = 1e16 * 0.3 * unit.GeV / unit.cm**3,
+        totalMassEnclosed: Quantity | None = 4e-9 * unit.M_earth,
+        g_aNN: Quantity = 1e-9 * unit.GeV**-1,
         verbose: bool = False,
     ):
         logPrefix = f"[{self.__class__.__name__}.__init__]"
@@ -381,6 +383,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
             extent=extent,
             getPot=getPot,
             a_0=a_0,
+            g_aNN=g_aNN,
             verbose=verbose,
         )
         # convert potential and kinetic energy magnitude to atto-eV for easier computation
@@ -390,9 +393,10 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         if a_0 is not None:
             self.a_0 = a_0
         elif rhoE_DM is not None:
-            self.a_0 = (2 * const.hbar**3 * rhoE_DM / (self.ma**2 * const.c)) ** 0.5
+            self.a_0 = (2 * const.hbar**3 * rhoE_DM / (self.m_a**2 * const.c)) ** 0.5
         else:
             raise ValueError("Either a_0 or rhoE_DM must be provided.")
+        self.totalMassEnclosed = totalMassEnclosed
 
     def getBfield(
         self,

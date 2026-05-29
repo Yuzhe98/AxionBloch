@@ -42,6 +42,7 @@ class GravBoundAxionHalo:
     mass_enclosed: Quantity | None
     g_aNN: Quantity | None
     a_0: Quantity | None
+
     def __init__(
         self,
         name="Gravitationally Bound Axion Halo",
@@ -49,9 +50,9 @@ class GravBoundAxionHalo:
         N: int = int(2**12),
         extent: Quantity = 128.0 * unit.R_earth,
         getPot=None,
-        mass_enclosed= None,
-        g_aNN = None,
-        a_0 = None,
+        mass_enclosed=None,
+        g_aNN=None,
+        a_0=None,
         verbose: bool = False,
     ):
         """
@@ -80,15 +81,15 @@ class GravBoundAxionHalo:
         self.name = name
         self.nu_a = nu_a
         # axion mass derived from Compton frequency: m = h * nu / c²
-        self.ma = self.nu_a * const.h / const.c**2
+        self.m_a = self.nu_a * const.h / const.c**2
         if verbose:
             print(logPrefix, "axion Compton frequency =", self.nu_a)
             print(
                 logPrefix,
                 "axion mass =",
-                self.ma.to(unit.kg),
+                self.m_a.to(unit.kg),
                 " =",
-                self.ma.to(unit.eV / const.c**2),
+                self.m_a.to(unit.eV / const.c**2),
             )
 
         self.N = N
@@ -100,7 +101,7 @@ class GravBoundAxionHalo:
         # TODO: Try also to use the infinity as the reference point
         # gravitational potential V = m_a * Phi(r), evaluated on the radial grid
         self.pot: Quantity = (
-            self.ma
+            self.m_a
             * np.asarray(Phi_func((self.r / r_unit).to_value(unit.one)))
             * Phi_unit
         )  # convert r to meter for potential function
@@ -110,7 +111,7 @@ class GravBoundAxionHalo:
         self.a_0 = a_0
 
         # prefactor for the kinetic energy finite-difference stencil: ℏ²/(2m dr²)
-        self.T_magnitude: Quantity = (const.hbar**2) / (2 * self.ma) / self.dr**2
+        self.T_magnitude: Quantity = (const.hbar**2) / (2 * self.m_a) / self.dr**2
 
         self.states: dict = {}
         self.l_vals = []
@@ -132,7 +133,7 @@ class GravBoundAxionHalo:
         check(self.pot.mean())
         check(self.pot.std())
         check(self.T_magnitude)
-        check(self.ma.si)
+        check(self.m_a.si)
         check(self.a_0.si)
 
     def solve_TISE_3D_l(
@@ -167,7 +168,7 @@ class GravBoundAxionHalo:
         # I believe if we set V and T units correctly, everthing should be fine then.
         # Effective potential including centrifugal term l(l+1)ℏ²/(2m r²)
         Veff = Quantity(
-            self.pot + l * (l + 1) * const.hbar**2 / (2 * self.ma * self.r**2)
+            self.pot + l * (l + 1) * const.hbar**2 / (2 * self.m_a * self.r**2)
         )
         Veff = Veff.to(self.pot.unit)
 
@@ -219,7 +220,7 @@ class GravBoundAxionHalo:
 
             # Normalise so that 4π ∫ |u(r)|² dr = 1
             integral = np.sqrt(
-                1.0 
+                1.0
                 * np.trapezoid(
                     np.abs(u_r[start_index:]) ** 2,
                     self.r[start_index:],
@@ -246,7 +247,7 @@ class GravBoundAxionHalo:
             du2_dr2[1:-1] = (u_r[2:] - 2 * u_r[1:-1] + u_r[:-2]) / (
                 self.r[1] - self.r[0]
             ) ** 2
-            T_expect = -(const.hbar**2 / (2 * self.ma)) * np.trapezoid(
+            T_expect = -(const.hbar**2 / (2 * self.m_a)) * np.trapezoid(
                 np.conj(u_r[start_index:]) * du2_dr2[start_index:], self.r[start_index:]
             )
             # Reduced wavefunction normalised by discrete L2 norm (used for plotting only)
@@ -406,6 +407,7 @@ class GravBoundAxionHalo:
         # R_grid unit: [length]
         # Theta_grid / Phi_grid unit: radian
 
+        # if stateNames is not specified, default to the lowest-energy state (first in the sorted list) for gradient calculation
         if stateNames is None or len(stateNames) == 0:
             stateNames = [state["name"] for state in self.states.values()][:1]
 
@@ -510,13 +512,16 @@ class GravBoundAxionHalo:
         grad_theta_line = np.asarray(interp_theta(points)) * grad_theta.unit
         grad_phi_line = np.asarray(interp_phi(points)) * grad_phi.unit
         toc = time.time()
-        print(logPrefix, f"gradient along station direction time: {toc-tic:.2e} s")
+        if verbose:
+            print(logPrefix, f"gradient along station direction time: {toc-tic:.2e} s")
         if showPlot:
             self.plotGradients(
                 stateNames=stateNames,
                 station=station,
                 r=r,
-                R_r=state["R_r"][start_index:stop_index],  # radial wavefunction along theta=0, phi=0
+                R_r=state["R_r"][
+                    start_index:stop_index
+                ],  # radial wavefunction along theta=0, phi=0
                 r_line=r_line,
                 grad_r_line=grad_r_line,
                 grad_theta_line=grad_theta_line,
@@ -528,13 +533,25 @@ class GravBoundAxionHalo:
             print(logPrefix, "grad_r @ station =", grad_r_line[earthRad_idx])
             print(logPrefix, "grad_theta @ station =", grad_theta_line[earthRad_idx])
             print(logPrefix, "grad_phi @ station =", grad_phi_line[earthRad_idx])
-        return r, state["R_r"][start_index:stop_index], r_line, grad_r_line, grad_theta_line, grad_phi_line
+        return (
+            r,
+            state["R_r"][start_index:stop_index],
+            r_line,
+            grad_r_line,
+            grad_theta_line,
+            grad_phi_line,
+        )
 
     def plotGradients(
         self,
         stateNames: str,
         station: Station,
-        r, R_r, r_line, grad_r_line, grad_theta_line, grad_phi_line
+        r,
+        R_r,
+        r_line,
+        grad_r_line,
+        grad_theta_line,
+        grad_phi_line,
     ):
         """plotting function of :meth:`findGradients` separated for better modularity."""
 
@@ -664,9 +681,7 @@ class GravBoundAxionHalo:
 
         for ax in axes:
             ax.legend(loc="upper left", bbox_to_anchor=(1.0, 1.0))
-        fig.suptitle(
-            f"Gradient at {station.name}"
-        )
+        fig.suptitle(f"Gradient at {station.name}")
         plt.tight_layout()
         plt.show()
 

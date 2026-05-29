@@ -125,7 +125,15 @@ Mainz = Station(
     elevation=100.0 * unit.m,
     verbose=False,
 )
-
+Geneva = Station(
+    name="Geneva",
+    NSsemisphere="N",
+    EWsemisphere="E",
+    latitude=46.2044 * unit.deg,
+    longitude=6.1432 * unit.deg,
+    elevation=375.0 * unit.m,
+    verbose=False,
+)
 Baltimore = Station(
     name="Baltimore",
     NSsemisphere="N",  # 'N' or 'S'
@@ -135,6 +143,27 @@ Baltimore = Station(
     elevation=35.0 * unit.m,
     verbose=False,
 )
+Tokyo = Station(
+    name="Tokyo",
+    NSsemisphere="N",
+    EWsemisphere="E",
+    latitude=35.6762 * unit.deg,
+    longitude=139.6503 * unit.deg,
+    elevation=44.0 * unit.m,
+    verbose=False,
+)
+
+
+Mumbai = Station(
+    name="Mumbai",
+    NSsemisphere="N",
+    EWsemisphere="E",
+    latitude=19.0760 * unit.deg,
+    longitude=72.8777 * unit.deg,
+    elevation=14.0 * unit.m,
+    verbose=False,
+)
+
 
 Sanya = Station(
     name="Sanya",
@@ -143,6 +172,39 @@ Sanya = Station(
     latitude=18.2546815 * unit.deg,
     longitude=109.5076269 * unit.deg,
     elevation=168.0 * unit.m,
+    verbose=False,
+)
+
+# TODO check if the locations are correctly converted to spherical coordinates
+
+Sydney = Station(
+    name="Sydney",
+    NSsemisphere="S",
+    EWsemisphere="E",
+    latitude=33.8688 * unit.deg,
+    longitude=151.2093 * unit.deg,
+    elevation=39.0 * unit.m,
+    verbose=False,
+)
+
+CapeTown = Station(
+    name="CapeTown",
+    NSsemisphere="S",
+    EWsemisphere="E",
+    latitude=33.9249 * unit.deg,
+    longitude=18.4241 * unit.deg,
+    elevation=42.0 * unit.m,
+    verbose=False,
+)
+
+
+BuenosAires = Station(
+    name="BuenosAires",
+    NSsemisphere="S",
+    EWsemisphere="W",
+    latitude=34.6037 * unit.deg,
+    longitude=58.3816 * unit.deg,
+    elevation=25.0 * unit.m,
     verbose=False,
 )
 
