@@ -76,8 +76,18 @@ def gate(x: float | np.ndarray, start: float, stop: float) -> np.ndarray:
 
 
 class MagField(PhysicalObject):
-    """
-    DC / AC (pseudo)magnetic fields
+    """Time-domain (pseudo)magnetic field builder for Bloch-equation simulations.
+
+    Constructs the effective magnetic-field array that is passed to the C++
+    RK4 solver.  Supported field types include:
+
+    - Continuous XY excitation pulses (CW NMR)
+    - Calibrated 90° and 180° hard pulses (pulsed NMR)
+    - CPMG refocusing pulse trains (spin-echo sequences)
+    - Stochastic axion pseudomagnetic fields (Milky Way SHM or fine-grained streams)
+
+    After calling one of the ``set*`` methods the field is stored in
+    :attr:`B_vec`, a NumPy array of shape ``(timeLen-1, 3)`` with units of T.
     """
 
     def __init__(
@@ -618,7 +628,27 @@ class MagField(PhysicalObject):
 
 
 class Simulations:
-    # Axion NMR simulations
+    """Collection manager for one or more Bloch-equation simulation runs.
+
+    Accepts a list of :class:`~axionbloch.SimuTypes.SimuParams` dictionaries,
+    instantiates a :class:`Simulation` for each, and executes them
+    sequentially.  Results are stored in :attr:`pool` as a list of
+    :class:`~axionbloch.SimuTypes.SimuEntry` objects.
+
+    Attributes
+    ----------
+    pool : list of SimuEntry
+        Completed simulation entries (populated after :meth:`run`).
+    all_params : list of SimuParams
+        Parameter dictionaries passed at construction.
+
+    Examples
+    --------
+    >>> simulations = Simulations(all_params=[params])
+    >>> simulations.run(verbose=True)
+    >>> simulations.saveToPkl(dir="results/")
+    """
+
     def __init__(
         self,
         name: str = "NMR simulationS",
@@ -945,7 +975,26 @@ class Simulations:
 
 
 class Simulation(PhysicalObject):
-    # NMR simulation in the rotating frame
+    """Single Bloch-equation simulation run in the rotating coordinate frame (RCF).
+
+    Wraps the C++ ``blochsimulation`` extension.  Generates stochastic axion
+    pseudomagnetic fields via :meth:`~axionbloch.SimuTools.MagField.setAxionFields`,
+    loops over ``numFields`` field realisations and ``Magnet.numPt`` spin
+    packets, integrates the Bloch equations with RK4, and stores the
+    resulting magnetisation trajectories in :attr:`trjries`.
+
+    Key attributes
+    --------------
+    rate : Quantity [Hz]
+        Simulation (output) sampling rate.
+    duration : Quantity [s]
+        Total simulation duration.
+    numSteps : int
+        Number of RK4 integration steps (= rate × duration).
+    trjries : ndarray, shape (numFields, numSteps, 3)
+        Magnetisation trajectories for each field realisation.
+    """
+
     def __init__(
         self,
         name: str | None = "NMR simulation",

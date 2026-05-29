@@ -1,6 +1,10 @@
-##################################################
-# for NMR data processing
-##################################################
+"""NMR signal processing and data analysis.
+
+The central class is :class:`Signal`, which loads measured or simulated
+dual-channel NMR time-series data, provides spectral analysis (FFT, PSD,
+lock-in-amplifier filtering), and exposes curve-fitting routines for common
+NMR lineshapes (Lorentzian, Gaussian, exponentially decaying cosine).
+"""
 
 import os
 
@@ -138,6 +142,24 @@ FunctionParas = {
 # Signal class containing 2-channel data, data-processing methods and processed data
 # @dataclass
 class Signal:
+    """Dual-channel NMR signal container and analysis toolkit.
+
+    Loads time-series data from HDF5 files (or a list of files for
+    concatenated acquisitions), computes power spectral densities and
+    lock-in-amplifier filtered spectra, and fits common NMR lineshapes.
+
+    Parameters
+    ----------
+    name : str
+        Human-readable label for the signal object.
+    file : str, optional
+        Absolute path to a single HDF5 data file.
+    filelist : list of str, optional
+        Ordered list of HDF5 file paths for a multi-file acquisition.
+    verbose : bool
+        Print diagnostic information during loading.
+    """
+
     def __init__(
         self,
         name="Dual Channel Signal",

@@ -34,6 +34,42 @@ from axionbloch.Apparatus import Magnet  # magnet
 # This defines the **structure of a parameter dictionary** passed to a simulation.
 # TypedDict allows static type checking for keys and value types.
 class SimuParams(TypedDict):
+    """Typed dictionary describing all parameters for a single simulation run.
+
+    Pass an instance of this dict to :class:`~axionbloch.SimuTools.Simulations`
+    as one element of ``all_params``.
+
+    Keys
+    ----
+    key_info : dict
+        Arbitrary metadata (e.g. ``{"nu_a": axion.nu_a}``), printed during
+        verbose runs and stored alongside results.
+    axion : MilkyWayAxionHalo
+        Axion field model object.
+    sample : Sample
+        NMR sample object.
+    magnet : Magnet
+        Static bias-field object.
+    excField : MagField
+        Excitation / pseudomagnetic field object.
+    B_a_rms : Quantity, optional
+        RMS axion-induced pseudomagnetic field amplitude (T).
+    numFields : int
+        Number of independent stochastic field realisations.
+    rand_seed : int
+        Random seed for reproducible field realisations.
+    init_M : Quantity
+        Initial magnetisation magnitude (dimensionless, normalised by M0).
+    init_M_theta : Quantity [rad]
+        Initial polar angle of the magnetisation vector.
+    init_M_phi : Quantity [rad]
+        Initial azimuthal angle of the magnetisation vector.
+    rate : Quantity [Hz]
+        Output sampling rate of the simulation.
+    duration : Quantity [s]
+        Total duration of the simulation.
+    """
+
     key_info: object | None = {}  # key information for the simulation
     axion: MilkyWayAxionHalo  # axion field object
     sample: Sample  # NMR sample
@@ -56,5 +92,17 @@ class SimuParams(TypedDict):
 # used to initialize it. Useful for keeping track of multiple runs.
 @dataclass
 class SimuEntry:
+    """Pair of a completed :class:`~axionbloch.SimuTools.Simulation` and its parameters.
+
+    Stored in :attr:`~axionbloch.SimuTools.Simulations.pool` after a run.
+
+    Attributes
+    ----------
+    simu : Simulation
+        The executed simulation instance with result trajectories.
+    params : SimuParams
+        The parameter dictionary used to configure and run ``simu``.
+    """
+
     simu: Simulation  # The actual simulation instance (C++/Python backend)
     params: SimuParams  # Parameters used for this simulation
