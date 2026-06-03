@@ -18,7 +18,7 @@
 # from astropy import units as unit
 # from astropy.units import Quantity, CompositeUnit
 # from astropy.constants import codata2018 as const
-from axionbloch.dependency import *
+from ..dependency import *
 
 # -----------------------------------------------------
 
@@ -45,7 +45,9 @@ from scipy.signal import ShortTimeFFT, savgol_filter
 
 # importing and processing hdf5 files
 import h5py
-import textwrap
+
+# monitor run time
+import time
 
 from functools import partial
 
@@ -62,7 +64,7 @@ import pickle
 
 from dataclasses import dataclass
 
-from axionbloch.kits.utils import (
+from .utils import (
     check,
     getDateAndTime,
     record_runtime_YorN,
@@ -83,17 +85,15 @@ from axionbloch.kits.utils import (
     estimateExpCosiSin,
     dualExpCos,
     estimatedualExpCos,
-    LIA_FFT_legacy,
-    LIA_FFT,
     stdPSD,
     stdLIAPSD,
     DTRC_filter,
+    LIA_FFT,
     PolyEven,
     plotaxisfmt_ppm2MHz,
     plotaxisfmt_Hz2ppm,
     plotaxisfmt_MHz2ppm,
     MovAvgByStep,
-    checkDrift,
     clear_lines,
 )
 
@@ -1419,7 +1419,7 @@ class Signal(NMRio):
         fig.suptitle(titletext, wrap=True)
         plt.tight_layout()
         # plt.grid()
-        plt.show()
+        #plt.show()
 
         return 0
 
@@ -7147,6 +7147,12 @@ class Signal(NMRio):
         mask = (self.freqs >= freq_center - halfwidth) & (self.freqs <= freq_center + halfwidth)
         return np.trapezoid(self.PSD[:, mask], self.freqs[mask], axis=1)
 
+    def getFSIntegrals(self, freq_center: Quantity, halfwidth: Quantity):
+        """Integrate over [freq_center-halfwidth, freq_center+halfwidth] of the FS and return the integral. Note that cls.PSD is a 2-D arry with shape (Npulses, acqPts). the returned array has shape (Npulses)
+        """
+        #  freq_center= cls.freqs.to(.unit)
+        mask = (self.freqs >= freq_center - halfwidth) & (self.freqs <= freq_center + halfwidth)
+        return np.trapezoid(self.FS[:, mask], self.freqs[mask], axis=1)
 
     def getFS(
         self,
@@ -7189,10 +7195,11 @@ class Signal(NMRio):
 
         self.PSD: Quantity = np.abs(self.FS) ** 2
 
-        if showPlot:
-            self.plotFS(showPlot=showPlot)
+        #if showPlot==True:
+            #self.plotFS(showPlot=showPlot)
 
     def plotFS(self, xUnit=None, yUnit=None, savePlot=False, showPlot=False):
+        print("i am the function plotFS from DataAnalysis.py")
         self.freqs = self.freqs.to(unit.Hz)
         fig = plt.figure(figsize=(1 * 8.5 / 2.54, 6.5 / 2.54), dpi=300)  #
         gs = gridspec.GridSpec(nrows=2, ncols=2)
@@ -7287,8 +7294,9 @@ class Signal(NMRio):
         # fig.tight_layout()
         if savePlot:
             plt.savefig()  # TODO complete this
-        if showPlot:
-            plt.show()
+        #if showPlot==True:
+            #plt.show()
+        plt.close("all")
 
     @classmethod
     def _plotPulseTrain_(
@@ -7304,6 +7312,77 @@ class Signal(NMRio):
         ax.set_xlabel(f"Time ({x.unit.to_string('unicode')})")
         ax.set_ylabel(f"Signal ({yUnit})")
         ax.grid()
+
+    def plotTS(self,
+               showPlot=True,
+        verbose=False,
+        watermark:str|None=None,):
+        cm = 1 / 2.54
+        figsize = (
+            (1. * 10. * cm),
+            (6.5 * cm),
+        )
+        fig = plt.figure(figsize=figsize, dpi=300)
+        
+        # Initialize the grid structure for subplots
+        gs = gridspec.GridSpec(
+            nrows=2, ncols=1, width_ratios=[1], height_ratios=[1, 1]
+        ) 
+        left=0.13
+        bottom=0.173
+        right=0.973
+        top=0.94
+        wspace=0.472
+        hspace=0.516
+        fig.subplots_adjust(left=left, top=top, right=right,
+                            bottom=bottom, wspace=wspace, hspace=hspace)
+        dataX_ax = fig.add_subplot(gs[0, 0])
+        dataY_ax = fig.add_subplot(gs[1, 0], sharex=dataX_ax)
+        # spec_ax = fig.add_subplot(gs[:, 1])
+        # if not hasattr(self, "acqDur"):
+        #     self.acqDur = self.TS_raw.shape[0] / self.samp_rate
+        timeStamp = np.linspace(0, (self.TS_raw.shape[0] / self.sampRate).to(unit.s), num=self.TS_raw.shape[0])
+
+        # plot raw time series
+        self._plotTS_(
+            ax=dataX_ax, x=timeStamp, y=self.TS_raw.real, color="tab:green", label="raw"
+        )
+        self._plotTS_(
+            ax=dataY_ax, x=timeStamp, y=self.TS_raw.imag, color="tab:brown", label="raw"
+        )
+
+        # self._plotTS_(
+        #     ax=dataX_ax, x=timeStamp, y=(self.TS.real * self.window_arr).reshape(-1), color="tab:orange", label="windowed"
+        # )
+        # self._plotTS_(
+        #     ax=dataY_ax, x=timeStamp, y=(self.TS.imag * self.window_arr).reshape(-1), color="blue", label="windowed"
+        # )
+
+        # TODO add window here
+        # plot PSD
+        # self._plotPSD_(
+        #     ax=spec_ax, x=self.freqs, y=self.PSD.mean(axis=0), color="tab:blue"
+        # )
+
+        titletext = ""
+        if self.fileList is None or self.fileList ==[]:
+            if self.filePath is None or type(self.filePath) != str:
+                pass
+            else:
+                titletext = self.filePath
+        else:
+            for singlefile in self.fileList:
+                titletext += "\n" + singlefile  # include the data file name(s) in the title
+        
+        fig.suptitle(textwrap.fill(titletext, width=80), fontsize=4)
+        
+        dataX_ax.legend()
+        dataY_ax.legend()
+
+        fig.tight_layout()
+        self.addWaterMark(watermark=watermark)
+        if showPlot:
+            plt.show()
 
     @classmethod
     def _plotFSreal_(cls, ax: Axes):

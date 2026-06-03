@@ -38,7 +38,7 @@ from axionbloch.utils import (
     PhysicalObject,
     check,
     save_phys_quantity,
-    giveDateAndTime,
+    getDateAndTime,
     sci_fmt,
 )
 
@@ -852,7 +852,7 @@ class Simulations:
         """ """
         if dir[-1] != "\\":
             dir += "\\"
-        ymd_hms = giveDateAndTime()
+        ymd_hms = getDateAndTime()
 
         for time_str, pool_item in self.pool.items():
             data_file_name = dir + ymd_hms
@@ -898,9 +898,9 @@ class Simulations:
 
         if fname is None:
             if self.name is not None:
-                fname = self.name + "_" + giveDateAndTime()
+                fname = self.name + "_" + getDateAndTime()
             else:
-                fname = "simulations_" + giveDateAndTime()
+                fname = "simulations_" + getDateAndTime()
 
         os.makedirs(dir, exist_ok=True)
         path = os.path.join(dir, f"{fname}.pkl")
@@ -1011,6 +1011,7 @@ class Simulation(PhysicalObject):
         duration: Quantity | None = None,  # simulation duration
         verbose: bool = False,
     ):
+        # TODO: separate init and setup
         """
         initialize NMR simulation
         The simulation uses rotating coordinate frame (RCF).
@@ -1051,8 +1052,8 @@ class Simulation(PhysicalObject):
 
         self.name = name
 
-        if None in [sample, magnet, excField]:
-            raise ValueError("sample, magnet and excField must not be None")
+        # if None in [sample, magnet, excField]:
+        #     raise ValueError("sample, magnet and excField must not be None")
 
         # Instances
         self.sample = sample
@@ -1061,9 +1062,9 @@ class Simulation(PhysicalObject):
         self.station = station
         self.excField = excField
 
-        self.gamma_HzToT = np.abs(
-            self.sample.gamma.to_value(unit.rad * unit.Hz / unit.T)
-        )
+        # self.gamma_HzToT = np.abs(
+        #     self.sample.gamma.to_value(unit.rad * unit.Hz / unit.T)
+        # )
 
         # get the equilibrium magnetization M0
         self.M0eqb = self.sample.getM0eqb(B_pol=self.magnet.B0, verbose=verbose)
@@ -1106,7 +1107,7 @@ class Simulation(PhysicalObject):
         self.RCF_freq_Hz = self.RCF_freq.to_value(unit.Hz)
 
         self.nu_L_Hz = (
-            abs(self.gamma_HzToT * self.B0z_T / (2 * np.pi)) - self.RCF_freq_Hz
+            abs(self.sample.gamma.value * self.B0z_T / (2 * np.pi)) - self.RCF_freq_Hz
         )  # nuL_Hz is the Larmor frequency of the magnetization in the rotating frame
 
         self.T2_s = sample.T2.to_value(unit.s)
@@ -1251,11 +1252,11 @@ class Simulation(PhysicalObject):
 
         # compute the maximum of (absolute) Larmor frequencies
         nuL_Hz_max = (
-            self.gamma_HzToT / (2 * np.pi) * self.magnet.B_spread.max()
+            self.sample.gamma.value() / (2 * np.pi) * self.magnet.B_spread.max()
             - self.RCF_freq_Hz
         )
         nuL_Hz_min = (
-            self.gamma_HzToT / (2 * np.pi) * self.magnet.B_spread.min()
+            self.sample.gamma.value() / (2 * np.pi) * self.magnet.B_spread.min()
             - self.RCF_freq_Hz
         )
         nuL_Hz_abs_max = max(abs(nuL_Hz_max), abs(nuL_Hz_min))
@@ -1284,8 +1285,8 @@ class Simulation(PhysicalObject):
         return rate_Hz * unit.Hz
 
     def getTimeStamp(self):
-        return np.arange(
-            start=0, stop=(self.timeLen) * self.timeStep, step=self.timeStep
+        return np.linspace(
+            start=0, stop=(self.timeLen) * self.timeStep, num=self.timeLen
         )
 
     def estimateRuntime(self, verbose: bool = False) -> Quantity[unit.s]:
@@ -1766,8 +1767,8 @@ class Simulation(PhysicalObject):
                 zorder=3,
             )
         B_t_ax.set_ylabel(
-                    f"Excitation field ({B_mean[0][0].unit.to_string('unicode')})"
-                )
+            f"Excitation field ({B_mean[0][0].unit.to_string('unicode')})"
+        )
         # TODO plot frequency domain in B_f_ax
 
         for i, ax in enumerate(M_axes):

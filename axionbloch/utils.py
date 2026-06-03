@@ -11,13 +11,16 @@ Contents
 """
 
 import inspect  # for check()
+import os
 import re  # for check()
 import time
 import sys
 import warnings
 
-from axionbloch.dependency import *
+import pickle
 
+
+from axionbloch.dependency import *
 from matplotlib.patches import FancyArrowPatch
 
 from mpl_toolkits.mplot3d import proj3d
@@ -28,7 +31,7 @@ from typing import Sequence
 import h5py
 
 
-def giveDateAndTime() -> str:
+def getDateAndTime() -> str:
     """Return the current date and time as a compact string ``'YYYYMMDD_HHMMSS'``."""
     timestr = time.strftime("%Y%m%d_%H%M%S")
     # timestr = 'session_'+timestr
@@ -2805,7 +2808,66 @@ class PhysicalObject:
                     value = value.item()
 
                 setattr(self, attr_name, value)
+    
+    
+    def saveToPkl(
+        self,
+        fileDir: str = "",
+        fileName: str | None = None,
+        overwrite: bool = False,
+        verbose: bool = False,
+    ):
+        """
+        Save this instance to a pickle file.
+        """
+        logPrefix = f"[{self.__class__.__name__}.{self.saveToPkl.__name__}]"
+        if fileDir is None:
+            raise ValueError("fileDir must not be None")
 
+        if fileName is None:
+            name = getattr(self, "name", None)
+            base = name if name is not None else self.__class__.__name__.lower()
+            fileName = base + "_" + getDateAndTime()
+        if fileName.endswith(".pkl"):
+            fileName = fileName[:-4]
+        
+        os.makedirs(fileDir, exist_ok=True)
+        path = os.path.join(fileDir, f"{fileName}.pkl")
+
+        while os.path.exists(path) and not overwrite:
+            print(f"File already exists: {path}")
+            new = input(
+                "Enter a new filename (without .pkl) or press Enter to overwrite: "
+            ).strip()
+            if new == "":
+                break
+            fileName = new
+            path = os.path.join(fileDir, f"{fileName}.pkl")
+
+        with open(path, "wb") as f:
+            pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+        if verbose:
+            print(f"Saved object to {path}")
+
+    def loadFromPkl(self, path: str, verbose: bool = False):
+        """
+        Load an instance of this class from a pickle file.
+        """
+        logPrefix = f"[{self.__name__}.{self.loadFromPkl.__name__}]"
+        if not os.path.isfile(path):
+            raise FileNotFoundError(f"Pickle file not found: {path}")
+
+        with open(path, "rb") as f:
+            obj = pickle.load(f)
+
+        if not isinstance(obj, self):
+            raise TypeError(f"Pickle contains {(obj)}, expected {self}")
+
+        if verbose:
+            print(f"Loaded object from {path}")
+
+        return obj
 
 def save_phys_quantity(
     group: h5py.Group,

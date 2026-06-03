@@ -17,7 +17,7 @@ from astropy.constants import codata2018 as const
 from astropy.time import Time
 
 # pi with unit.radian
-PI:Quantity[unit.rad] = np.pi * unit.rad
+PI = np.pi * unit.rad
 
 # dimensionless scale units
 # parts per million
@@ -46,6 +46,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec  # for creating subplots
 import matplotlib.ticker as mticker
 from matplotlib.axes import Axes
+import textwrap
 
 # plot style
 plt.rc("font", size=6)  # font size for all figures
