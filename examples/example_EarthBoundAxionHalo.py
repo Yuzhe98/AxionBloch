@@ -30,8 +30,10 @@ halo.solve_TISE_3D(
 # print(halo.getStateNames())
 # print(halo.getStateEnergies())
 
-r, R_r, r_line, grad_r_line, grad_theta_line, grad_phi_line = halo.findGradients(
-    stateNames=["2p"], station=station, truncRadius=2 * unit.earthRad, verbose=True
+r, R_r, r_line, grad_r_line, grad_theta_line, grad_phi_line = (
+    halo.findGradientsAtDirection(
+        stateNames=["2p"], station=station, truncRadius=2 * unit.earthRad, verbose=True
+    )
 )
 halo.plotGradients(
     stateNames=["2p"],

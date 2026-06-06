@@ -8,7 +8,7 @@ Key frames used
 Galactocentric
     Inertial frame centred on the galactic centre (GC).  The x-axis points
     from GC toward the Sun; z points toward the galactic north pole; y is
-    determined by the right-hand rule. 
+    determined by the right-hand rule.
     This is the rest frame of the dark-matter halo.
 
 ICRS
@@ -26,6 +26,8 @@ import math
 
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
+from matplotlib.patches import Ellipse
+from mpl_toolkits.mplot3d import art3d
 import numpy as np
 from astropy import units as unit
 from astropy.coordinates import (
@@ -39,6 +41,37 @@ from astropy.time import Time
 from astropy.units import Quantity
 
 from axionbloch.Station import Station
+
+
+def _draw_3d_arrow(ax, start, end, color="tomato", shaft_lw=2.0,
+                   head_length=0.30, head_radius=0.10, n_faces=24, zorder=10):
+    """Draw a rotation-correct 3D arrow as a line shaft + Poly3DCollection cone."""
+    start, end = np.asarray(start, float), np.asarray(end, float)
+    d = end - start
+    d_norm = np.linalg.norm(d)
+    if d_norm == 0:
+        return
+    d_hat = d / d_norm
+
+    shaft_tip = end - d_hat * head_length
+    ax.plot(
+        [start[0], shaft_tip[0]], [start[1], shaft_tip[1]], [start[2], shaft_tip[2]],
+        color=color, lw=shaft_lw, zorder=zorder, solid_capstyle="round",
+    )
+
+    # two orthonormal vectors perpendicular to d_hat
+    ref = np.array([1., 0., 0.]) if abs(d_hat[0]) < 0.9 else np.array([0., 1., 0.])
+    e1 = np.cross(d_hat, ref); e1 /= np.linalg.norm(e1)
+    e2 = np.cross(d_hat, e1)
+
+    theta = np.linspace(0, 2 * np.pi, n_faces + 1)
+    base = np.array([shaft_tip + head_radius * (np.cos(t) * e1 + np.sin(t) * e2)
+                     for t in theta])
+    tris = [[base[i], base[i + 1], end] for i in range(n_faces)]
+    cone = art3d.Poly3DCollection(tris, zorder=zorder)
+    cone.set_facecolor(color)
+    cone.set_edgecolor(color)
+    ax.add_collection3d(cone)
 
 
 class MilkyWay:
@@ -114,7 +147,7 @@ class MilkyWay:
         """
         if self._earth_galcen is None:
             pos, vel = get_body_barycentric_posvel("earth", self.time)
-            c = SkyCoord(
+            coord = SkyCoord(
                 x=pos.x,
                 y=pos.y,
                 z=pos.z,
@@ -125,7 +158,7 @@ class MilkyWay:
                 representation_type="cartesian",
                 differential_type="cartesian",
             )
-            self._earth_galcen = c.transform_to(self.galcen_frame)
+            self._earth_galcen = coord.transform_to(self.galcen_frame)
         return self._earth_galcen
 
     def get_earth_position(self) -> Quantity:
@@ -387,13 +420,16 @@ class MilkyWay:
         if self.station is None:
             raise ValueError("station must be set to compute nvec_gcrs")
         from astropy.coordinates import GCRS
+
         loc = self._make_earth_location()
         gcrs = loc.get_itrs(obstime=self.time).transform_to(GCRS(obstime=self.time))
-        r = np.array([
-            gcrs.cartesian.x.to(unit.m).value,
-            gcrs.cartesian.y.to(unit.m).value,
-            gcrs.cartesian.z.to(unit.m).value,
-        ])
+        r = np.array(
+            [
+                gcrs.cartesian.x.to(unit.m).value,
+                gcrs.cartesian.y.to(unit.m).value,
+                gcrs.cartesian.z.to(unit.m).value,
+            ]
+        )
         return r / np.linalg.norm(r)
 
     # ------------------------------------------------------------------
@@ -449,9 +485,9 @@ class MilkyWay:
 
         def _icrs_hat(l_deg, b_deg):
             sc = _SC(l=l_deg * unit.deg, b=b_deg * unit.deg, frame="galactic").icrs
-            return np.array([sc.cartesian.x.value,
-                             sc.cartesian.y.value,
-                             sc.cartesian.z.value])
+            return np.array(
+                [sc.cartesian.x.value, sc.cartesian.y.value, sc.cartesian.z.value]
+            )
 
         # Rotation matrix: each column is a galactocentric basis vector in ICRS
         R = np.column_stack([_icrs_hat(180, 0), _icrs_hat(90, 0), _icrs_hat(0, 90)])
@@ -509,8 +545,10 @@ class MilkyWay:
     def summary(self):
         """Print a human-readable summary of galactic kinematic quantities."""
         print(f"Epoch          : {self.time.iso}")
-        print(f"Galcen frame   : distance={self.galcen_frame.galcen_distance}, "
-              f"v_sun={self.galcen_frame.galcen_v_sun}")
+        print(
+            f"Galcen frame   : distance={self.galcen_frame.galcen_distance}, "
+            f"v_sun={self.galcen_frame.galcen_v_sun}"
+        )
         print()
 
         pos = self.get_earth_position()
@@ -578,11 +616,14 @@ class MilkyWay:
         self._plot_solar_system(ax_ss)
 
         title = f"Galactic Kinematics  ·  {self.time.iso[:10]}"
-        if self.station is not None:
-            title += f"  ·  {self.station.name}"
+        # if self.station is not None:
+        #     title += f"  ·  {self.station.name}"
         fig.suptitle(title, color="white", fontsize=11, fontweight="bold", y=0.98)
 
-        plt.tight_layout(rect=[0, 0, 1, 0.96])
+        plt.tight_layout(rect=[0.01, 0.01, 0.96, 0.96])
+        fig.subplots_adjust(wspace=0.15)
+        # plt.tight_layout(rect=[0, 0, 1, 0.96])
+
         if show:
             plt.show()
         return fig
@@ -597,62 +638,121 @@ class MilkyWay:
         phi_bg = rng.uniform(0, 2 * np.pi, size=n_bg)
         z_bg = rng.normal(0, 0.12, size=n_bg)
         ax.scatter(
-            r_bg * np.cos(phi_bg), r_bg * np.sin(phi_bg), z_bg,
-            c="white", s=0.4, alpha=0.25, linewidths=0, zorder=1,
+            r_bg * np.cos(phi_bg),
+            r_bg * np.sin(phi_bg),
+            z_bg,
+            c="white",
+            s=0.4,
+            alpha=0.25,
+            linewidths=0,
+            zorder=1,
         )
 
         # ---- four logarithmic spiral arms: r(θ) = r0 · exp(b·θ) ----
         b, r0 = 0.22, 2.6  # pitch angle, starting radius (kpc)
         theta_arm = np.linspace(0, 3.8 * np.pi, 400)
-        colors = ["#5eaeff", "#ffda73", "#ff8060", "#80ffaa"]
-        names  = ["Norma", "Sct–Cen", "Sagittarius", "Perseus"]
-        for i, (color, name) in enumerate(zip(colors, names)):
+        # colors = ["#5eaeff", "#ffda73", "#ff8060", "#80ffaa"]
+        # names = ["Norma", "Sct–Cen", "Sagittarius", "Perseus"]
+        # for i, (color, name) in enumerate(zip(colors, names)):
+        for i in range(4):
             offset = i * np.pi / 2
             r_a = r0 * np.exp(b * theta_arm)
             mask = r_a < 16.0
             r_p, t_p = r_a[mask], theta_arm[mask] + offset
-            z_jitter = rng.normal(0, 0.05, size=r_p.size)
-            ax.plot(
-                r_p * np.cos(t_p), r_p * np.sin(t_p), z_jitter,
-                color=color, lw=1.4, alpha=0.75, zorder=3, label=name,
+            # scatter stars along each arm with transverse and vertical spread
+            spread = rng.normal(0, 0.18, size=r_p.size)
+            x_s = r_p * np.cos(t_p) - spread * np.sin(t_p)
+            y_s = r_p * np.sin(t_p) + spread * np.cos(t_p)
+            z_s = rng.normal(0, 0.06, size=r_p.size)
+            sizes = rng.exponential(scale=3.5, size=r_p.size)
+            ax.scatter(
+                x_s,
+                y_s,
+                z_s,
+                s=sizes,
+                alpha=0.65,
+                linewidths=0,
+                zorder=3,
+                c="deepskyblue",
+                # c=color, label=name,
             )
 
         # ---- galactic centre ----
-        ax.scatter([0], [0], [0], c="yellow", s=260, marker="*", zorder=8, label="GC")
+        gc_ellipse = Ellipse(
+            xy=(0, 0),
+            width=4.8,
+            height=1.6,
+            facecolor="#fffacd",
+            alpha=0.85,
+            zorder=8,
+        )
+        ax.add_patch(gc_ellipse)
+        art3d.pathpatch_2d_to_3d(gc_ellipse, z=0, zdir="z")
+        ax.plot(
+            [], [], color="#fffacd", marker="o", ms=8, ls="none", alpha=0.8, label="Galaxy center"
+        )
 
         # ---- Sun's circular orbit ----
         r_sun = self.get_galactocentric_radius().to(unit.kpc).value
         phi_c = np.linspace(0, 2 * np.pi, 300)
         ax.plot(
-            r_sun * np.cos(phi_c), r_sun * np.sin(phi_c), np.zeros(300),
-            color="white", lw=0.8, ls="--", alpha=0.30, zorder=2,
+            r_sun * np.cos(phi_c),
+            r_sun * np.sin(phi_c),
+            np.zeros(300),
+            color="orange",
+            lw=0.8,
+            ls="--",
+            alpha=0.60,
+            zorder=12,
         )
 
         # ---- Sun ----
-        sp = self.get_earth_position().to(unit.kpc).value  # ≈ Sun at galactic scale
+        sun_pos, _ = self.get_sun_galactocentric()
+        sp = sun_pos.to(unit.kpc).value
         ax.scatter(
-            [sp[0]], [sp[1]], [sp[2]],
-            c="yellow", s=160, zorder=10,
-            edgecolors="orange", linewidths=0.8, label="Sun",
+            [sp[0]],
+            [sp[1]],
+            [sp[2]],
+            c="yellow",
+            s=100,
+            zorder=12,
+            edgecolors="orange",
+            linewidths=0.8,
+            label="Sun",
         )
 
-        # ---- v_lab arrow ----
-        v = self.get_v_lab()
-        v_hat = (v / np.sqrt(np.sum(v ** 2))).to(unit.one).value
-        alen = 1.8  # kpc (schematic)
-        ax.quiver(
-            sp[0], sp[1], sp[2],
-            v_hat[0] * alen, v_hat[1] * alen, v_hat[2] * alen,
-            color="tomato", linewidth=1.8, arrow_length_ratio=0.25, zorder=10,
-            label=f"v_lab  ({self.get_v_lab_magnitude().value:.0f} km/s)",
+        # # ---- v_lab arrow ----
+        # v = self.get_v_lab()
+        # v_hat = (v / np.sqrt(np.sum(v**2))).to(unit.one).value
+        # alen = 1.8  # kpc (schematic)
+        # tip = sp + v_hat * alen
+        # _draw_3d_arrow(ax, sp, tip, color="tomato", shaft_lw=2.0,
+        #                head_length=0.30, head_radius=0.10, zorder=10)
+        # ax.plot(
+        #     [],
+        #     [],
+        #     color="tomato",
+        #     lw=1.8,
+        #     label=f"v_lab  ({self.get_v_lab_magnitude().value:.0f} km/s)",
+        # )
+
+        ax.text2D(
+            0.03,
+            0.03,
+            "★ Not to scale",
+            transform=ax.transAxes,
+            color="gray",
+            fontsize=7,
         )
 
         # ---- style ----
-        ax.set_xlim(-15, 15); ax.set_ylim(-15, 15); ax.set_zlim(-2.5, 2.5)
+        ax.set_xlim(-15, 15)
+        ax.set_ylim(-15, 15)
+        ax.set_zlim(-2.5, 2.5)
         ax.set_xlabel("x (kpc)", color="white", fontsize=8, labelpad=1)
         ax.set_ylabel("y (kpc)", color="white", fontsize=8, labelpad=1)
         ax.set_zlabel("z (kpc)", color="white", fontsize=8, labelpad=1)
-        ax.set_title("Milky Way  (schematic)", color="white", fontsize=9, pad=6)
+        ax.set_title("Milky Way", color="white", fontsize=9, pad=6)
         ax.set_facecolor("#0d0d0d")
         for pane in [ax.xaxis.pane, ax.yaxis.pane, ax.zaxis.pane]:
             pane.fill = False
@@ -660,8 +760,14 @@ class MilkyWay:
         ax.tick_params(colors="gray", labelsize=7)
         ax.view_init(elev=28, azim=200)
         ax.legend(
-            loc="upper right", fontsize=7, labelcolor="white",
-            facecolor="#1a1a1a", edgecolor="#404040", framealpha=0.7,
+            loc="upper right",
+            fontsize=7,
+            labelcolor="white",
+            facecolor="#1a1a1a",
+            edgecolor="#404040",
+            framealpha=0.7,
+            markerscale=0.5,
+            scatterpoints=1,
         )
 
     def _plot_solar_system(self, ax) -> None:
@@ -677,36 +783,64 @@ class MilkyWay:
         r_g = np.linspace(0, 1.45, 8)
         RG, PG = np.meshgrid(r_g, phi_g)
         ax.plot_surface(
-            RG * np.cos(PG), RG * np.sin(PG), np.zeros_like(RG),
-            alpha=0.04, color="cyan", linewidth=0, antialiased=False,
+            RG * np.cos(PG),
+            RG * np.sin(PG),
+            np.zeros_like(RG),
+            alpha=0.1,
+            color="cyan",
+            linewidth=0,
+            antialiased=False,
         )
 
         # ---- Earth's orbit ----
         phi_o = np.linspace(0, 2 * np.pi, 300)
         ax.plot(
-            r_orb * np.cos(phi_o), r_orb * np.sin(phi_o), np.zeros(300),
-            color="deepskyblue", lw=1.2, ls="--", alpha=0.55, label="Earth orbit",
+            r_orb * np.cos(phi_o),
+            r_orb * np.sin(phi_o),
+            np.zeros(300),
+            color="deepskyblue",
+            lw=1.2,
+            ls="--",
+            alpha=0.55,
+            label="Earth orbit",
         )
 
         # ---- Sun–Earth direction line ----
-        ax.plot([0, ex], [0, ey], [0, ez], color="white", lw=0.5, ls=":", alpha=0.35)
+        ax.plot([0, ex], [0, ey], [0, ez], color="cyan", lw=1.2, ls=":", alpha=1)
 
         # ---- orbital velocity arrow (perpendicular to radius) ----
         v_orb = np.array([-np.sin(lam_e), np.cos(lam_e), 0.0])
-        ax.quiver(
-            ex, ey, ez,
-            v_orb[0] * 0.22, v_orb[1] * 0.22, 0.0,
-            color="deepskyblue", linewidth=1.5, arrow_length_ratio=0.35, zorder=9,
-            label="Orbital velocity",
-        )
+        v_orb_end = np.array([ex, ey, ez]) + v_orb * 0.22
+        _draw_3d_arrow(ax, [ex, ey, ez], v_orb_end,
+                       color="deepskyblue", shaft_lw=1.5,
+                       head_length=0.06, head_radius=0.025, zorder=9)
+        ax.plot([], [], color="deepskyblue", lw=1.5, label="Orbital velocity")
 
         # ---- Sun ----
-        ax.scatter([0], [0], [0], c="yellow", s=400, zorder=10,
-                   edgecolors="orange", linewidths=0.8, label="Sun")
+        ax.scatter(
+            [0],
+            [0],
+            [0],
+            c="yellow",
+            s=400,
+            zorder=10,
+            edgecolors="orange",
+            linewidths=0.8,
+            label="Sun",
+        )
 
         # ---- Earth ----
-        ax.scatter([ex], [ey], [ez], c="#3399ff", s=130, zorder=10,
-                   edgecolors="cyan", linewidths=0.8, label="Earth")
+        ax.scatter(
+            [ex],
+            [ey],
+            [ez],
+            c="#3399ff",
+            s=130,
+            zorder=10,
+            edgecolors="cyan",
+            linewidths=0.8,
+            label="Earth",
+        )
 
         # ---- rotation axis (N and S pole arrows) ----
         eps = math.radians(23.44)
@@ -714,18 +848,32 @@ class MilkyWay:
         # (celestial N pole is at ecliptic longitude 90°, latitude 90°-ε)
         ax_n = np.array([0.0, math.sin(eps), math.cos(eps)])
         alen = 0.42  # AU (schematic)
-        ax.quiver(ex, ey, ez,
-                   ax_n[0] * alen,  ax_n[1] * alen,  ax_n[2] * alen,
-                   color="tomato", linewidth=2.2, arrow_length_ratio=0.18, zorder=11,
-                   label=f"Rotation axis  (ε = {math.degrees(eps):.1f}°)")
-        ax.quiver(ex, ey, ez,
-                   -ax_n[0] * alen, -ax_n[1] * alen, -ax_n[2] * alen,
-                   color="tomato", linewidth=2.2, arrow_length_ratio=0.18, zorder=11)
+        earth = np.array([ex, ey, ez])
+        _draw_3d_arrow(ax, earth, earth + ax_n * alen,
+                       color="tomato", shaft_lw=2.2,
+                       head_length=0.07, head_radius=0.028, zorder=11)
+        _draw_3d_arrow(ax, earth, earth - ax_n * alen,
+                       color="tomato", shaft_lw=2.2,
+                       head_length=0.07, head_radius=0.028, zorder=11)
+        ax.plot([], [], color="tomato", lw=2.2,
+                label=f"Rotation axis  (ε = {math.degrees(eps):.1f}°)")
         # N / S labels
-        ax.text(ex + ax_n[0] * (alen + 0.06), ey + ax_n[1] * (alen + 0.06),
-                ez + ax_n[2] * (alen + 0.06), "N", color="tomato", fontsize=8)
-        ax.text(ex - ax_n[0] * (alen + 0.06), ey - ax_n[1] * (alen + 0.06),
-                ez - ax_n[2] * (alen + 0.06), "S", color="tomato", fontsize=8)
+        ax.text(
+            ex + ax_n[0] * (alen + 0.06),
+            ey + ax_n[1] * (alen + 0.06),
+            ez + ax_n[2] * (alen + 0.06),
+            "N",
+            color="tomato",
+            fontsize=8,
+        )
+        ax.text(
+            ex - ax_n[0] * (alen + 0.1),
+            ey - ax_n[1] * (alen + 0.1),
+            ez - ax_n[2] * (alen + 0.1),
+            "S",
+            color="tomato",
+            fontsize=8,
+        )
 
         # ---- Earth's equatorial circle ----
         e1 = np.array([1.0, 0.0, 0.0])
@@ -733,53 +881,72 @@ class MilkyWay:
         e1 /= np.linalg.norm(e1)
         e2 = np.cross(ax_n, e1)
         phi_eq = np.linspace(0, 2 * np.pi, 80)
-        r_eq = 0.09  # AU (schematic)
+        r_eq = 0.2  # AU (schematic)
         ax.plot(
             ex + r_eq * (np.cos(phi_eq) * e1[0] + np.sin(phi_eq) * e2[0]),
             ey + r_eq * (np.cos(phi_eq) * e1[1] + np.sin(phi_eq) * e2[1]),
             ez + r_eq * (np.cos(phi_eq) * e1[2] + np.sin(phi_eq) * e2[2]),
-            color="lightgreen", lw=1.0, alpha=0.70, label="Equator",
+            color="lightgreen",
+            lw=1.0,
+            alpha=0.70,
+            label="Equator",
         )
 
         # ---- station sensitive axis ----
         if self.station is not None:
             n_gcrs = self.get_nvec_gcrs()
             # rotate GCRS equatorial → ecliptic (tilt z-axis by ε around x-axis)
-            rot = np.array([
-                [1,  0,              0           ],
-                [0,  math.cos(eps), math.sin(eps)],
-                [0, -math.sin(eps), math.cos(eps)],
-            ])
+            rot = np.array(
+                [
+                    [1, 0, 0],
+                    [0, math.cos(eps), math.sin(eps)],
+                    [0, -math.sin(eps), math.cos(eps)],
+                ]
+            )
             n_ecl = rot @ n_gcrs
             sa = 0.30
-            ax.quiver(
-                ex, ey, ez,
-                n_ecl[0] * sa, n_ecl[1] * sa, n_ecl[2] * sa,
-                color="red", linewidth=1.8, arrow_length_ratio=0.28, zorder=12,
-                label=f"{self.station.name} (sens. axis)",
-            )
+            _draw_3d_arrow(ax, earth, earth + n_ecl * sa,
+                           color="w", shaft_lw=1.8,
+                           head_length=0.07, head_radius=0.028, zorder=12)
+            ax.plot([], [], color="w", lw=1.8,
+                    label=f"{self.station.name}")
 
         # ---- date label ----
-        month = self.time.to_datetime().strftime("%b %d")
-        ax.text(ex * 1.12, ey * 1.12, 0.08, month, color="cyan", fontsize=8)
-        ax.text2D(0.03, 0.03, "★ Not to scale", transform=ax.transAxes,
-                  color="gray", fontsize=7)
+        # month = self.time.to_datetime().strftime("%b %d")
+        # ax.text(ex * 1.12, ey * 1.12, 0.08, month, color="cyan", fontsize=8, zorder=12)
+        ax.text2D(
+            0.02,
+            0.02,
+            "★ Not to scale",
+            transform=ax.transAxes,
+            color="gray",
+            fontsize=7,
+        )
 
         # ---- style ----
-        ax.set_xlim(-1.6, 1.6); ax.set_ylim(-1.6, 1.6); ax.set_zlim(-0.65, 0.65)
-        ax.set_xlabel("x (AU)", color="white", fontsize=8, labelpad=1)
-        ax.set_ylabel("y (AU)", color="white", fontsize=8, labelpad=1)
-        ax.set_zlabel("z (AU)", color="white", fontsize=8, labelpad=1)
-        ax.set_title("Solar System  (not to scale)", color="white", fontsize=9, pad=6)
+        ax.set_xlim(-1.6, 1.6)
+        ax.set_ylim(-1.6, 1.6)
+        ax.set_zlim(-0.65, 0.65)
+        ax.set_xlabel("x (Astro. Unit)", color="white", fontsize=8, labelpad=1)
+        ax.set_ylabel("y (Astro. Unit)", color="white", fontsize=8, labelpad=1)
+        ax.set_zlabel("z (Astro. Unit)", color="white", fontsize=8, labelpad=1)
+        ax.set_title("Solar System", color="white", fontsize=9, pad=6)
         ax.set_facecolor("#0d0d0d")
         for pane in [ax.xaxis.pane, ax.yaxis.pane, ax.zaxis.pane]:
             pane.fill = False
             pane.set_edgecolor("#404040")
         ax.tick_params(colors="gray", labelsize=7)
-        ax.view_init(elev=25, azim=50)
+        # ax.view_init(elev=25, azim=50)
+        ax.view_init(elev=28, azim=50)
         ax.legend(
-            loc="upper right", fontsize=7, labelcolor="white",
-            facecolor="#1a1a1a", edgecolor="#404040", framealpha=0.7,
+            loc="upper right",
+            fontsize=7,
+            labelcolor="white",
+            facecolor="#1a1a1a",
+            edgecolor="#404040",
+            framealpha=0.7,
+            markerscale=0.5,
+            scatterpoints=1,
         )
 
     # ------------------------------------------------------------------

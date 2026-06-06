@@ -345,11 +345,12 @@ class GravBoundAxionHalo:
         logPrefix = f"[{self.__class__.__name__}.{self.getStateEnergies.__name__}]"
         return [state["eigenE_eV"] for state in self.states.values()]
 
-    def findGradients(
+    def findGradientsAtDirection(
         self,
         stateNames: list[str],
         station: Station | None = None,
-        location: EarthLocation | None = None,
+        meas_time: Time | None = None,
+        # location: EarthLocation | None = None,
         truncRadius: Quantity | None = None,
         showPlot: bool = True,
         verbose: bool = False,
@@ -380,27 +381,23 @@ class GravBoundAxionHalo:
             Truncation radius for reducing computation.
         """
 
-        logPrefix = f"[{self.__class__.__name__}.{self.findGradients.__name__}]"
+        logPrefix = (
+            f"[{self.__class__.__name__}.{self.findGradientsAtDirection.__name__}]"
+        )
 
         # --- Resolve direction from station or EarthLocation ---
-        if station is not None:
-            _loc = station.location
-            _label = station.name
-        elif location is not None:
-            _loc = location
-            _label = (
-                f"lat={_loc.lat.to_value(unit.deg):.2f}°, "
-                f"lon={_loc.lon.to_value(unit.deg):.2f}°, "
-                f"h={_loc.height.to(unit.m).value:.0f} m"
-            )
-        else:
-            raise ValueError(
-                "Provide either a Station or an EarthLocation."
-            )
+        assert station is not None, logPrefix + " Please provide a Station."
 
+        if meas_time is None:
+            print(
+                logPrefix, "Warning: time not provided. Using Time.now() as the input. "
+            )
+            meas_time = Time.now()
         # geodetic lat/lon → spherical colatitude (theta) and azimuth (phi)
-        _theta_rad = (90 * unit.deg - _loc.lat).to_value(unit.rad)
-        _phi_rad   = _loc.lon.to_value(unit.rad)
+        r_station, _theta, _phi = station.in_solarZ_frame(meas_time=meas_time)
+        _theta_rad, _phi_rad = _theta.to_value(unit.rad), _phi.to_value(unit.rad)
+        #  = (90 * unit.deg - _loc.lat).to_value(unit.rad)
+        #  = _loc.lon.to_value(unit.rad)
 
         # avoid r=0 singularity
         start_index = self.N // 2 + 5
@@ -421,7 +418,6 @@ class GravBoundAxionHalo:
 
         # update r and Nr
         r = self.r[start_index:stop_index]
-        Nr = len(r)
         self.sortByEigenE()
 
         Nr, Ntheta, Nphi = len(r), 100, 100
@@ -432,7 +428,9 @@ class GravBoundAxionHalo:
         dphi = phi_1Dgrid[1] - phi_1Dgrid[0]
 
         # 3-D spherical mesh of shape (Nr, Ntheta, Nphi)
-        R_grid, Theta_grid, Phi_grid = np.meshgrid(r, theta_1Dgrid, phi_1Dgrid, indexing="ij")
+        R_grid, Theta_grid, Phi_grid = np.meshgrid(
+            r, theta_1Dgrid, phi_1Dgrid, indexing="ij"
+        )
         # grid.shape=(Nr, Ntheta, Nphi)
         # R_grid unit: [length]
         # Theta_grid / Phi_grid unit: radian
@@ -497,7 +495,7 @@ class GravBoundAxionHalo:
 
         # direction in radians (resolved above)
         theta_station_rad = _theta_rad
-        phi_station_rad   = _phi_rad
+        phi_station_rad = _phi_rad
 
         # R_grid.shape = (Nr, Ntheta, Nphi)
         # grad_r.shape = same
@@ -530,9 +528,7 @@ class GravBoundAxionHalo:
         r_line = np.linspace(r[0], truncRadius, Nr_plot)
 
         # points = [[r, theta_direction, phi_direction], ...]
-        points = np.array(
-            [[r_pt, _theta_rad, _phi_rad] for r_pt in r_line.value]
-        )
+        points = np.array([[r_pt, _theta_rad, _phi_rad] for r_pt in r_line.value])
 
         tic = time.time()
         grad_r_line = np.asarray(interp_r(points)) * grad_r.unit
@@ -545,7 +541,7 @@ class GravBoundAxionHalo:
             self.plotGradients(
                 stateNames=stateNames,
                 station=station,
-                label=_label,
+                label=station.name,
                 r=r,
                 R_r=state["R_r"][start_index:stop_index],
                 r_line=r_line,
@@ -720,6 +716,74 @@ class GravBoundAxionHalo:
         fig.suptitle(f"Gradient at {_title}")
         plt.tight_layout()
         plt.show()
+
+    def findGradientsOverTime(
+        self,
+        stateNames: list[str],
+        station: Station,
+        meas_times,
+        truncRadius: Quantity | None = None,
+        verbose: bool = False,
+    ) -> dict:
+        """Gradient components at a station evaluated over a list of epochs.
+
+        Calls :meth:`findGradientsAtDirection` for each time and collects the
+        three gradient values at Earth's surface (r = 1 R_earth).
+
+        Parameters
+        ----------
+        stateNames : list of str
+            Eigenstate labels to superimpose.
+        station : :class:`~axionbloch.Station.Station`
+            Geographic location.
+        times : iterable of :class:`astropy.time.Time`
+            Epochs at which to evaluate the gradients.
+        truncRadius : Quantity, optional
+            Radial truncation passed through to :meth:`findGradientsAtDirection`.
+        verbose : bool
+            Print per-step progress.
+
+        Returns
+        -------
+        dict with keys:
+
+        * ``'times'``      — input time list
+        * ``'grad_r'``     — Quantity array, shape ``(N_times,)``
+        * ``'grad_theta'`` — Quantity array, shape ``(N_times,)``
+        * ``'grad_phi'``   — Quantity array, shape ``(N_times,)``
+        """
+        logPrefix = f"[{self.__class__.__name__}.{self.findGradientsOverTime.__name__}]"
+
+        grad_r_vals, grad_theta_vals, grad_phi_vals = [], [], []
+
+        for i, meas_time in enumerate(meas_times):
+            if verbose:
+                print(logPrefix, f"step {i}/{len(meas_times)}  t={meas_time.iso}")
+            _, _, r_line, grad_r_line, grad_theta_line, grad_phi_line = (
+                self.findGradientsAtDirection(
+                    stateNames=stateNames,
+                    station=station,
+                    meas_time=meas_time,
+                    truncRadius=truncRadius,
+                    showPlot=False,
+                    verbose=False,
+                )
+            )
+            idx = np.argmin(np.abs(r_line - station.R))
+            grad_r_vals.append(grad_r_line[idx])
+            grad_theta_vals.append(grad_theta_line[idx])
+            grad_phi_vals.append(grad_phi_line[idx])
+        # if verbose:
+        #     print(logPrefix, f"grid + interpolators built in {_time.time()-tic:.2f} s")
+
+        return {
+            "times": meas_times,
+            "grad_r": np.array([v.value for v in grad_r_vals]) * grad_r_vals[0].unit,
+            "grad_theta": np.array([v.value for v in grad_theta_vals])
+            * grad_theta_vals[0].unit,
+            "grad_phi": np.array([v.value for v in grad_phi_vals])
+            * grad_phi_vals[0].unit,
+        }
 
     def plotEigenstate(
         self,
@@ -915,6 +979,110 @@ class GravBoundAxionHalo:
         axes[-1].legend(bbox_to_anchor=(1.05, 1), loc="upper left")
         # plt.tight_layout()
         plt.show()
+
+    def plotEigenStates(
+        self,
+        numStates: int = 8,
+        startState: int = 0,
+        truncRadius: Quantity | None = None,
+        xlim=(-0.3, 5.3),
+        ylim=None,
+        showPlot=True,
+    ):
+        """Plot a vertical stack of reduced radial wavefunctions.
+
+        Eigenstates are plotted from lowest energy (bottom) to highest (top),
+        sharing a common y-scale so amplitudes can be compared visually.
+
+        Parameters
+        ----------
+        numStates : int
+            How many consecutive states (starting from ``startState``) to show.
+        startState : int
+            Index into the energy-sorted state list at which to begin.
+        xlim : tuple or None
+            x-axis limits in units of Earth radii.
+        ylim : tuple or None
+            Shared y-axis limits.  Auto-computed from peak amplitude if None.
+        """
+        logPrefix = f"[{self.__class__.__name__}.{self._plotEigenStates.__name__}]"
+        self.sortByEigenE()
+
+        startIdx = self.N // 2 + 1  # avoid r=0 singularity
+        if truncRadius is None or type(truncRadius) != Quantity:
+            stopIdx = -1
+        elif truncRadius.unit.is_equivalent(self.r.unit):
+            stopIdx = startIdx + np.argmin(np.abs(self.r[startIdx:] - truncRadius))
+        else:
+            raise TypeError(
+                logPrefix + " truncRadius unit is not equivalent to length. "
+            )
+
+        plt.rcParams["font.serif"] = ["Times New Roman"]
+        plt.rcParams["font.family"] = "Times New Roman"
+        fig = plt.figure(figsize=(8.5 / 2.54, 5.5 / 2.54), dpi=300)
+        ax = fig.add_subplot(111)
+        fig.subplots_adjust(left=0.22, bottom=0.14, right=0.67, top=0.95)
+        self._plotEigenStates(
+            ax=ax,
+            startIdx=startIdx,
+            stopIdx=stopIdx,
+            numStates=numStates,
+            startState=startState,
+        )
+        plt.tight_layout()
+
+        if showPlot:
+            plt.show()
+
+    def _plotEigenStates(self, ax: Axes, startIdx, stopIdx, numStates, startState):
+        """Plot a vertical stack of reduced radial wavefunctions.
+
+        Eigenstates are plotted from lowest energy (bottom) to highest (top),
+        sharing a common y-scale so amplitudes can be compared visually.
+
+        Parameters
+        ----------
+        numStates : int
+            How many consecutive states (starting from ``startState``) to show.
+        startState : int
+            Index into the energy-sorted state list at which to begin.
+        xlim : tuple or None
+            x-axis limits in units of Earth radii.
+        ylim : tuple or None
+            Shared y-axis limits.  Auto-computed from peak amplitude if None.
+        """
+
+        for key, eigenstate in list(self.states.items())[
+            startState : startState + numStates
+        ]:
+            n_r, l_val = eigenstate["n_r_l"]
+            name = eigenstate["name"]
+            r_plot = self.r[startIdx:stopIdx]
+            u_r = eigenstate["u_r"][startIdx:stopIdx]
+            ax.plot(r_plot, u_r.real, linestyle="-", label=f"{name}")
+
+        # if ylim is None:
+        #     sel = list(self.states.items())[startState : startState + numStates]
+        #     all_values = np.concatenate(
+        #         [es["u_r"][start_index:stop_index] for _, es in sel]
+        #     )
+        #     peak = 1.2 * np.amax(np.abs(all_values))
+        #     ylim = (-peak, peak)
+
+        # if xlim is not None:
+        #     ax.set_xlim(xlim)
+
+        xUnit = self.r.unit.to_string("latex_inline")[1:-1]
+        yUnit = eigenstate["u_r"].unit.to_string("latex_inline")[1:-1]
+        ax.set_xlabel(f"$r\\,({xUnit})$")
+        ax.set_ylabel(
+            f"$r R_{{nl}}$\n$\\left({yUnit}\\right)$",
+            rotation=0,
+            loc="center",
+            labelpad=15,
+        )
+        ax.legend(loc="upper left", bbox_to_anchor=(1.0, 1.0))
 
     def plotEigenEnergiesInPot(
         self,

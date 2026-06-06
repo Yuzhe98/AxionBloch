@@ -58,12 +58,14 @@ halo.solve_TISE_3D(
 
 # gradient obtain by Equation \ref{{eq:a0_Psi_real}} in the Yuzhe's thesis
 N_a = halo.totalMassEnclosed / halo.m_a
-gradient_factor = const.c * halo.g_aNN * (2 * N_a * const.hbar**3 * const.c / halo.m_a) ** 0.5
+gradient_factor = (
+    const.c * halo.g_aNN * (2 * N_a * const.hbar**3 * const.c / halo.m_a) ** 0.5
+)
 gradients_dict = {}
 for stateName in states_to_check:
     for station in stations:
         r, R_r, r_line, grad_r_line, grad_theta_line, grad_phi_line = (
-            halo.findGradients(
+            halo.findGradientsAtDirection(
                 stateNames=[stateName],
                 station=station,
                 truncRadius=2 * unit.earthRad,
@@ -80,7 +82,8 @@ for stateName in states_to_check:
                 unit.Hz, equivalencies=unit.dimensionless_angles()
             ),
             "grad_phi": (gradient_factor * grad_phi_line[earthRad_idx]).to(
-                unit.Hz, equivalencies=unit.dimensionless_angles()  # TODO: check this. does it affect the magnitude?
+                unit.Hz,
+                equivalencies=unit.dimensionless_angles(),  # TODO: check this. does it affect the magnitude?
             ),
         }
 

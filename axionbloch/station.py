@@ -2,12 +2,11 @@
 
 A :class:`Station` stores the location of an experimental site on Earth and
 exposes the corresponding unit vector and distance from the Earth's centre.
-Three pre-built instances are provided: :data:`Mainz`, :data:`Baltimore`, and
-:data:`Sanya`.
 """
-from astropy.coordinates import EarthLocation
 
 from axionbloch.dependency import np, unit, Quantity
+from astropy.coordinates import get_body_barycentric_posvel, GCRS
+from astropy.coordinates import EarthLocation
 from axionbloch.constants import earth_radius
 
 
@@ -121,6 +120,102 @@ class Station:
         _lat = self.latitude if NSsemisphere == "N" else -self.latitude
         _lon = self.longitude if EWsemisphere == "E" else -self.longitude
         self.location = EarthLocation(lat=_lat, lon=_lon, height=elevation)
+
+    def in_solarZ_frame(self, meas_time, output: str = "spherical"):
+        """Station position expressed in the Sun–Earth-velocity frame.
+
+        Builds a right-handed orthonormal frame at the given epoch:
+
+        * **ẑ** — Earth → Sun direction.
+        * **x̂** — Earth's heliocentric velocity, orthogonalised against ẑ.
+        * **ŷ = ẑ × x̂** — completes the right-hand triad.
+
+        The station's geocentric Cartesian position (GCRS) is projected onto
+        this triad.
+
+        Parameters
+        ----------
+        time : :class:`astropy.time.Time`
+            Observation epoch.
+        output : str
+            ``'cartesian'`` → ``(x, y, z)`` each a Quantity [m].
+            ``'spherical'`` → ``(r, theta, phi)`` where *theta* ∈ [0, π] is
+            the polar angle from ẑ and *phi* ∈ (−π, π] is the azimuthal
+            angle from x̂.
+
+        Returns
+        -------
+        tuple of Quantity
+        """
+
+        earth_pos, earth_vel = get_body_barycentric_posvel("earth", meas_time)
+        sun_pos, _ = get_body_barycentric_posvel("sun", meas_time)
+
+        # ẑ: Earth → Sun
+        earth_to_sun = (sun_pos.xyz - earth_pos.xyz).to(unit.m).value
+        z_hat = earth_to_sun / np.linalg.norm(earth_to_sun)
+
+        # x̂: Earth heliocentric velocity, orthogonalised against ẑ
+        v = earth_vel.xyz.to(unit.m / unit.s).value
+        v_perp = v - np.dot(v, z_hat) * z_hat
+        x_hat = v_perp / np.linalg.norm(v_perp)
+
+        # ŷ = ẑ × x̂
+        y_hat = np.cross(z_hat, x_hat)
+
+        # rotation matrix whose columns are x̂, ŷ, ẑ in ICRS
+        R = np.column_stack([x_hat, y_hat, z_hat])
+
+        # station geocentric position in GCRS (inertial, aligned with ICRS)
+        gcrs = self.location.get_itrs(obstime=meas_time).transform_to(
+            GCRS(obstime=meas_time)
+        )
+        r_gcrs = np.array(
+            [
+                gcrs.cartesian.x.to(unit.m).value,
+                gcrs.cartesian.y.to(unit.m).value,
+                gcrs.cartesian.z.to(unit.m).value,
+            ]
+        )
+
+        # project: solar-frame coords = R^T @ r_gcrs
+        xyz = (R.T @ r_gcrs) * unit.m
+
+        if output == "cartesian":
+            return xyz[0], xyz[1], xyz[2]
+
+        r = np.sqrt(np.sum(xyz**2))
+        theta = (
+            np.arccos(np.clip((xyz[2] / r).to_value(unit.one), -1.0, 1.0)) * unit.rad
+        )
+        phi = np.arctan2(xyz[1].value, xyz[0].value) * unit.rad
+        return r, theta, phi
+
+    @staticmethod
+    def direction_to_spherical(direction) -> tuple[Quantity, Quantity]:
+        """Spherical coordinates (theta, phi) of a Cartesian direction in the Earth frame.
+
+        Uses the same convention as :class:`Station`:
+        theta = 0 at north pole, phi = 0 on prime meridian increasing eastward.
+
+        Parameters
+        ----------
+        direction : array-like, shape (3,)
+            Direction vector ``(x, y, z)`` in ECEF Cartesian coordinates.
+            Need not be normalised.
+
+        Returns
+        -------
+        theta : Quantity [rad]
+            Polar angle from north pole in ``[0, π]``.
+        phi : Quantity [rad]
+            Azimuthal angle in ``(-π, π]``.
+        """
+        d = np.asarray(direction, dtype=float)
+        d = d / np.linalg.norm(d)
+        theta = np.arccos(np.clip(d[2], -1.0, 1.0)) * unit.rad
+        phi = np.arctan2(d[1], d[0]) * unit.rad
+        return theta, phi
 
 
 Mainz = Station(

@@ -1,16 +1,11 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
+from axionbloch.dependency import *
+from astropy.coordinates import EarthLocation
 from scipy.signal import correlate as correlate
 
 from scipy.interpolate import interp1d
 
-from astropy import units as unit
-from astropy.constants import codata2018 as const
-from astropy.coordinates import EarthLocation
-from astropy.units import Quantity
-
 from axionbloch.utils import check
+from axionbloch.Station import Station
 from axionbloch.GravBoundAxionHalo import GravBoundAxionHalo
 
 
@@ -403,11 +398,11 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
     # Gradient at arbitrary direction / time
     # ------------------------------------------------------------------
 
-    def findGradientsAtDirection(
+    def findGradientsAtEarthSurface(
         self,
-        location: EarthLocation,
+        station: Station,
         stateNames: list[str] | None = None,
-        truncRadius: Quantity | None = None,
+        truncRadius: Quantity | None = 3 * unit.earthRad,
         showPlot: bool = False,
         verbose: bool = False,
     ) -> tuple:
@@ -449,9 +444,9 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         ...     truncRadius=2 * u.R_earth,
         ... )
         """
-        return self.findGradients(
+        return self.findGradientsAtDirection(
             stateNames=stateNames,
-            location=location,
+            station=station,
             truncRadius=truncRadius,
             showPlot=showPlot,
             verbose=verbose,
@@ -532,7 +527,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         station = mw.station
 
         # ---- Gradient in geographic spherical coordinates ----
-        r, R_r, r_line, grad_r, grad_theta, grad_phi = self.findGradients(
+        r, R_r, r_line, grad_r, grad_theta, grad_phi = self.findGradientsAtDirection(
             stateNames=stateNames,
             station=station,
             truncRadius=truncRadius,
@@ -549,13 +544,13 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         # ---- Convert to Cartesian ITRS ----
         # Spherical unit vectors at (theta_s, phi_s) in ITRS
         theta_s = float(station.theta.to_value(unit.rad))
-        phi_s   = float(station.phi.to_value(unit.rad))
+        phi_s = float(station.phi.to_value(unit.rad))
         sin_t, cos_t = np.sin(theta_s), np.cos(theta_s)
-        sin_p, cos_p = np.sin(phi_s),   np.cos(phi_s)
+        sin_p, cos_p = np.sin(phi_s), np.cos(phi_s)
 
-        r_hat     = np.array([ sin_t * cos_p,  sin_t * sin_p,  cos_t ])
-        theta_hat = np.array([ cos_t * cos_p,  cos_t * sin_p, -sin_t ])
-        phi_hat   = np.array([-sin_p,           cos_p,          0.0   ])
+        r_hat = np.array([sin_t * cos_p, sin_t * sin_p, cos_t])
+        theta_hat = np.array([cos_t * cos_p, cos_t * sin_p, -sin_t])
+        phi_hat = np.array([-sin_p, cos_p, 0.0])
 
         # grad_theta / grad_phi carry an extra 'rad' denominator because θ,φ
         # are in radians.  Since rad is dimensionless, convert to the same unit
@@ -569,20 +564,24 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         )
 
         # ---- Galactic context from MilkyWay ----
-        nvec_gcrs  = mw.get_nvec_gcrs()
-        v_lab      = mw.get_v_lab()
-        v_lab_mag  = mw.get_v_lab_magnitude()
+        nvec_gcrs = mw.get_nvec_gcrs()
+        v_lab = mw.get_v_lab()
+        v_lab_mag = mw.get_v_lab_magnitude()
         wind_angle = mw.get_wind_angle()
 
         if verbose:
             print(f"[findGradientsWithMilkyWay] station       = {station.name}")
             print(f"[findGradientsWithMilkyWay] time          = {mw.time.iso}")
             print(f"[findGradientsWithMilkyWay] |v_lab|       = {v_lab_mag:.3f}")
-            print(f"[findGradientsWithMilkyWay] wind_angle    = {wind_angle.to(unit.deg):.2f}")
+            print(
+                f"[findGradientsWithMilkyWay] wind_angle    = {wind_angle.to(unit.deg):.2f}"
+            )
             print(f"[findGradientsWithMilkyWay] grad_r surf.  = {gr_s}")
             print(f"[findGradientsWithMilkyWay] grad_th surf. = {gt_s}")
             print(f"[findGradientsWithMilkyWay] grad_ph surf. = {gp_s}")
-            print(f"[findGradientsWithMilkyWay] grad Cartesian (ITRS) = {grad_cartesian_itrs}")
+            print(
+                f"[findGradientsWithMilkyWay] grad Cartesian (ITRS) = {grad_cartesian_itrs}"
+            )
 
         return {
             # radial grid and wavefunction
@@ -757,6 +756,74 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         if tau > self.duration_s:
             print("WARNING: tau > self.duration_s")
         return tau
+
+    def plotEigenStates(
+        self,
+        numStates: int = 8,
+        startState: int = 0,
+        truncRadius: Quantity | None = 3 * unit.earthRad,
+        xlim=(-0.3, 5.3),
+        ylim=None,
+        showPlot=True,
+        savefig=False,
+    ):
+        """Plot a vertical stack of reduced radial wavefunctions.
+
+        Eigenstates are plotted from lowest energy (bottom) to highest (top),
+        sharing a common y-scale so amplitudes can be compared visually.
+
+        Parameters
+        ----------
+        numStates : int
+            How many consecutive states (starting from ``startState``) to show.
+        startState : int
+            Index into the energy-sorted state list at which to begin.
+        xlim : tuple or None
+            x-axis limits in units of Earth radii.
+        ylim : tuple or None
+            Shared y-axis limits.  Auto-computed from peak amplitude if None.
+        """
+        logPrefix = f"[{self.__class__.__name__}.{self._plotEigenStates.__name__}]"
+        self.sortByEigenE()
+
+        startIdx = self.N // 2 + 1  # avoid r=0 singularity
+        if truncRadius is None or type(truncRadius) != Quantity:
+            stopIdx = -1
+        elif truncRadius.unit.is_equivalent(self.r.unit):
+            stopIdx = startIdx + np.argmin(np.abs(self.r[startIdx:] - truncRadius))
+        else:
+            raise TypeError(
+                logPrefix + " truncRadius unit is not equivalent to length. "
+            )
+
+        plt.rcParams["font.serif"] = ["Times New Roman"]
+        plt.rcParams["font.family"] = "Times New Roman"
+        fig = plt.figure(figsize=(8.5 / 2.54, 8.5 * 9 / 16 / 2.54), dpi=300)
+        ax = fig.add_subplot(111)
+        # fig.subplots_adjust(left=0.22, bottom=0.14, right=0.67, top=0.95)
+        ax.axvline(
+            x=(1 * unit.earthRad).to_value(self.r.unit),
+            color="red",
+            linestyle="dotted",
+            alpha=0.8,
+            label="Earth radius",
+        )
+        self._plotEigenStates(
+            ax=ax,
+            startIdx=startIdx,
+            stopIdx=stopIdx,
+            numStates=numStates,
+            startState=startState,
+        )
+        # ax.legend(loc="upper left", bbox_to_anchor=(1.0, 1.0))
+
+        plt.tight_layout()
+
+        if savefig:
+            plt.savefig("Earth eigenstates.pdf")
+
+        if showPlot:
+            plt.show()
 
 
 # rate_Hz = 3e-2
