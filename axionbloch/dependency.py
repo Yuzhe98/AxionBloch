@@ -52,7 +52,7 @@ import textwrap
 plt.rc("font", size=6)  # font size for all figures
 # plt.rcParams['font.family'] = 'serif'
 # plt.rcParams['font.serif'] = ['Times New Roman']
-# plt.rcParams["font.family"] = "Times New Roman"
+plt.rcParams["font.family"] = "Times New Roman"
 # plt.rcParams['mathtext.fontset'] = 'dejavuserif'
 
 # Make math text match Times New Roman
