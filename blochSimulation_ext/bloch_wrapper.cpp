@@ -114,11 +114,10 @@ py::array_t<double> burkert_potential_vector(py::array_t<double> r_vals, double 
     return pot;
 }
 
-py::tuple generateTrajectories(py::array_t<double> B_vec,
-                               py::array_t<double> B_vals_T, py::array_t<double> ratios,
-                               double gamma, double timeStep, double T1, double T2,
-                               double RCF_freq_Hz, double Mx0, double My0, double Mz0, double M0eqb,
-                               const std::string &integrator = "RK4") {
+py::tuple generateTrajectories(py::array_t<double> B_vec, py::array_t<double> B_vals_T,
+                               py::array_t<double> ratios, double gamma, double timeStep, double T1,
+                               double T2, double RCF_freq_Hz, double Mx0, double My0, double Mz0,
+                               double M0eqb, const std::string &integrator = "RK4") {
     // check input dims
     if (B_vec.ndim() != 3)
         throw std::runtime_error("B_vec must be 3D");
@@ -175,7 +174,8 @@ py::tuple generateTrajectories(py::array_t<double> B_vec,
             // ouputs
             ptrj, pdM, pd2M);
     } else {
-        throw std::runtime_error("Unknown integrator '" + integrator + "'. Use \"RK4\" or \"taylor\".");
+        throw std::runtime_error("Unknown integrator '" + integrator +
+                                 "'. Use \"RK4\" or \"taylor\".");
     }
 
     return py::make_tuple(trjry, dMdt, d2Mdt2);

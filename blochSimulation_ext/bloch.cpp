@@ -84,7 +84,7 @@ void _generateTrajectories_TE(
     const double RCF_freq_Hz, const double Mx0, const double My0, const double Mz0,
     const double M0eqb,
     // output
-    double *M_t, // shape (numFields, numTimeSteps+1, 3) -> 1D
+    double *M_t,   // shape (numFields, numTimeSteps+1, 3) -> 1D
     double *dMdt,  // shape (numFields, numTimeSteps, 3) -> 1D
     double *d2Mdt2 // shape (numFields, numTimeSteps, 3) -> 1D
 ) {
@@ -181,7 +181,7 @@ void _generateTrajectories_TE(
 
 /**
  * using Runge–Kutta 4 (RK4) method for solving the Bloch equations
- * 
+ *
  */
 void _generateTrajectories(
     // input
@@ -189,17 +189,17 @@ void _generateTrajectories(
     const double *B_vec,    // shape (numFields, numTimeSteps, 3) -> 1D
     const double *B_vals_T, // shape (numSpinPkts)
     const double *ratios,   // shape (numSpinPkts)
-    const double gamma, const double timeStep, const double T1,
-    const double T2, const double RCF_freq_Hz, const double Mx0, const double My0, const double Mz0,
+    const double gamma, const double timeStep, const double T1, const double T2,
+    const double RCF_freq_Hz, const double Mx0, const double My0, const double Mz0,
     const double M0eqb,
     // output
     double *M_t,   // shape (numFields, numTimeSteps+1, 3) -> 1D
-    double *dMdt,    // shape (numFields, numTimeSteps, 3) -> 1D
-    double *d2Mdt2   // shape (numFields, numTimeSteps, 3) -> 1D
+    double *dMdt,  // shape (numFields, numTimeSteps, 3) -> 1D
+    double *d2Mdt2 // shape (numFields, numTimeSteps, 3) -> 1D
 ) {
     double dt = timeStep;
     double dtHalf = 0.5 * dt; // half timestep
-    double dt_6 = dt / 6.0; // for final RK4 update
+    double dt_6 = dt / 6.0;   // for final RK4 update
 
     const int FT3 = numFields * numTimeSteps * 3;
 
