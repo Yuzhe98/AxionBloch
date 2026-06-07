@@ -112,12 +112,14 @@ class Magnet:
             Print diagnostic information.
         """
         logPrefix = f"[{self.__class__.__name__}.{self.setHomogeneity.__name__}]"
-        # update self.numPt if
+        # update self.numPt if it is None
         if numPt is not None:
             self.numPt = max(1, int(numPt))
         elif self.numPt is None:
             self.numPt = 1
-
+        if verbose:
+            print(logPrefix, f"numPt = {numPt}")
+            print(logPrefix, f"self.numPt = {self.numPt}")
         # homogeneous field
         if self.numPt == 1 or self.FWHM_B0 == 0.0 or self.nFWHM == 0:
             self.B_spread = np.ones(1) * self.B0
@@ -131,13 +133,16 @@ class Magnet:
                 area=1,
                 offset=0,
             )
-
+            if verbose:
+                print(logPrefix, f"self.numPt = {self.numPt}")
             # uniform sampling over [-1, 1]
             uni_samp = np.linspace(start=-1, stop=1, num=self.numPt, endpoint=True)
             # transform uniform sampling to the desired distribution
             self.B_spread = (
                 self.nFWHM * np.sign(uni_samp) * np.abs(uni_samp) ** 2
             ) * self.FWHM_B0 + self.B0
+            if verbose:
+                print(logPrefix, f"B_spread.shape = {self.B_spread.shape}")
             # plot histogram of the sampled B values
             if showPlot:
                 fig = plt.figure(
@@ -166,11 +171,19 @@ class Magnet:
             edges[0] = self.B_spread[0]
             edges[-1] = self.B_spread[-1]
 
+            if verbose:
+                print(f"{logPrefix} B_spread: {len(self.B_spread)} points  "
+                      f"range=[{self.B_spread.min():.6g}, {self.B_spread.max():.6g}]")
+
             self.ratios = np.zeros(self.B_spread.shape)
             for i in range(len(self.B_spread)):
                 a, b = edges[i], edges[i + 1]
                 x = np.linspace(a, b, 32)
                 self.ratios[i] = np.trapezoid(pdf(x), x)
+
+            if verbose:
+                print(f"{logPrefix} ratios computed  sum={self.ratios.sum():.6g}  "
+                      f"min={self.ratios.min():.4g}  max={self.ratios.max():.4g}")
 
             if showPlot:
                 fig = plt.figure(
@@ -189,3 +202,5 @@ class Magnet:
 
             # normalize ratios to sum to 1
             self.ratios /= np.sum(self.ratios)
+            if verbose:
+                print(f"{logPrefix} ratios normalised  sum={self.ratios.sum():.6g}")

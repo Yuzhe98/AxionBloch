@@ -2411,7 +2411,7 @@ def sanCheck(var, tag: str = None):
     print("")
 
 
-def axion_lineshape(v_0_ms, v_lab_ms, nu_a_Hz, nu, case="non-grad", alpha=0.0):
+def axion_lineshape_Gramolin(v_0_ms, v_lab_ms, nu_a_Hz, nu, case="non-grad", alpha=0.0):
     """
     Calculate analytical lineshapes.
     Be careful! nu should not be too far from nu_a (compared to the axion linewidth).

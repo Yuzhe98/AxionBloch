@@ -49,6 +49,17 @@ t90 = 0.5 * np.pi * unit.radian / (gamma_p * B)
 print("90 degree pulse duration converted to microseconds:", t90.to(unit.microsecond))
 # 58.71648792722992 us
 
+# max min
+print("\nmax oramin:")
+rate0 = 1 * unit.Hz
+rate1 = 1 * unit.MHz
+rate2 = -3 * unit.kHz
+# array = np.asanyarray([rate0, rate1, rate2])
+max_rate = max([rate0, rate1, rate2])  # → 1.0 MHz
+min_rate = min([rate0, rate1, rate2])  # → -3.0 kHz
+print("max_rate =", max_rate)
+print("min_rate =", min_rate)
+
 # ------------- numpy operations ------------- #
 print("\n# ------------- numpy operations ------------- #")
 # sine of an array of angles
@@ -150,7 +161,7 @@ print("duration 1:", dur_1)
 print("np.isclose(dur_0, dur_1):", np.isclose(dur_0, dur_1))
 
 # np.tanh with Quantity
-print("\n numpy sinh cosh tanh with Quantity:")
+print("\nnumpy sinh cosh tanh with Quantity:")
 beta = 0.5 * np.pi * unit.one * unit.radian
 beta_float = 0.5 * np.pi
 # print("np.tanh(beta)", np.tanh(beta))
@@ -173,3 +184,9 @@ B_space = np.random.random(100) * unit.T
 hist, bin_edges = np.histogram(B_space)
 print("histogram counts:", hist)
 print("histogram bin edges:", bin_edges)
+
+# ceil
+print("\nnp.ceil:")
+rate = 1.01 * unit.Hz
+duration = 1.01 * unit.s
+print("np.ceil(rate * duration).to(unit.one) =", np.ceil(rate * duration).to(unit.one))
