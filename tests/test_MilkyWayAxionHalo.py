@@ -175,9 +175,8 @@ def test_MilkyWayAxionHalo_initialization():
 
 def test_getRabiFreq():
     """getRabiFreq returns a finite quantity with units of Hz."""
-    rabi_freq = MilkyWayAxionHalo.getRabiFreq(
-        g_aNN=1e-9 * unit.GeV ** (-1), verbose=PRINT_RESULTS
-    )
+    axion = MilkyWayAxionHalo(nu_a=1 * unit.MHz, g_aNN=1e-9 * unit.GeV ** (-1))
+    rabi_freq = axion.getRabiFreq(verbose=PRINT_RESULTS)
     assert rabi_freq.unit.is_equivalent(
         unit.Hz
     ), f"Expected Rabi frequency to have units of Hz, but got {rabi_freq.unit}"
@@ -392,14 +391,14 @@ def test_Simulation(sample: Sample, magnet_kwargs: dict):
     )
 
     # B0 is always determined by the sample's gamma and the axion frequency
-    B0 = (axion.nu_a_eff / (sample.gamma / (2 * np.pi))).to(unit.T)
+    B0 = (axion.nu_a_eff / (sample.gamma / (2 * np.pi * unit.rad))).to(unit.T)
     magnet = Magnet(
         B0=B0,
         direction=[0, 0, 1],
         **magnet_kwargs,
     )
 
-    B_a_rms = (axion.getRabiFreq() / (sample.gamma / (2 * np.pi))).to(unit.T)
+    B_a_rms = (axion.getRabiFreq() / (sample.gamma / (2 * np.pi * unit.rad))).to(unit.T)
 
     params: SimuParams = {
         "key_info": {"nu_a": axion.nu_a},
