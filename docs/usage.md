@@ -7,18 +7,18 @@ modelling, and numerical integration.
 
 | Class | Role |
 |-------|------|
-| `Sample` | NMR sample — gyromagnetic ratio, relaxation times, volume, polarisation |
+| `Sample` | NMR sample — gyromagnetic ratio, relaxation times, volume, polarization |
 | `Magnet` | Static bias field — strength, direction, field inhomogeneity (FWHM) |
 | `MagField` | Effective magnetic field — combines bias, excitation, and axion pseudomagnetic fields |
 | `MilkyWayAxionHalo` | Milky Way SHM axion-wind model |
 | `GravBoundAxionHalo` / `EarthBoundAxionHalo` | Gravitationally bound halo (TISE solver) |
 | `FineGrainedAxionStream` | Single fine-grained axion stream |
 | `Simulation` | Single simulation run |
-| `Simulations` | Collection of simulation runs; parallelised execution and I/O |
+| `Simulations` | Collection of simulation runs; parallelized execution and I/O |
 
 Numerical integration (RK4) is performed in a C++ backend (`blochSimulation`)
 exposed to Python via **pybind11**, which makes large ensembles of stochastic
-field realisations computationally practical.
+field realizations computationally practical.
 
 ## Milky Way axion NMR simulation
 
@@ -47,7 +47,7 @@ sample = Sample(
     vol=1 * unit.cm**3,
     mu=mu_Xe129,
     temp=163 * unit.K,
-    pol=0.5 * unit.one,            # initial hyperpolarisation
+    pol=0.5 * unit.one,            # initial hyperpolarization
 )
 
 # --- 2. Axion field (Milky Way SHM) ---
@@ -73,7 +73,7 @@ params: SimuParams = {
     "magnet": magnet,
     "excField": MagField(),
     "B_a_rms": B_a_rms,
-    "numFields": 1000,          # stochastic field realisations
+    "numFields": 1000,          # stochastic field realizations
     "rand_seed": 10,
     "init_M": 1 * unit.one,
     "init_M_theta": 0 * unit.rad,

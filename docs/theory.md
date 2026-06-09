@@ -159,7 +159,7 @@ for three coupling geometries:
 | ``grad_par`` | Gradient coupling, sensitive axis ∥ {math}`\mathbf{v}_\mathrm{lab}` |
 | ``grad_perp`` | Gradient coupling, sensitive axis ⊥ {math}`\mathbf{v}_\mathrm{lab}` |
 
-All lineshapes are one-sided (zero below {math}`\nu_a`) and normalised so
+All lineshapes are one-sided (zero below {math}`\nu_a`) and normalized so
 that {math}`\int S(\nu)\,d\nu = 1`.
 
 ## Gravitationally bound axion halo
@@ -186,7 +186,7 @@ V_\mathrm{eff}(r) = m_a\,\Phi(r) + \frac{\hbar^2 l(l+1)}{2m_a r^2}.
 
 The package discretises the Hamiltonian on a uniform 1-D radial grid with
 {math}`N` points spanning {math}`\pm L/2` using a three-point
-finite-difference stencil and diagonalises the resulting dense matrix with
+finite-difference stencil and diagonalizes the resulting dense matrix with
 `scipy.linalg.eigh`.  Eigenstates are labelled by the spectroscopic convention
 {math}`n = n_r + l + 1` (1s, 2s, 2p, 3s, …).
 
