@@ -28,12 +28,13 @@ class Magnet:
         Fractional weight of each spin packet (sums to 1).
     """
 
-    name:str
+    name: str
     B0: Quantity | None = None
     direction: list | None = None
     FWHM: Quantity | None = None
     numPt: float = 1
     nFWHM: float = 10.0
+
     def __init__(
         self,
         name="magnet",
@@ -64,7 +65,7 @@ class Magnet:
         verbose : bool
             Print diagnostic information.
         """
-        logPrefix = f"[{self.__class__.__name__}.__init__]"
+        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
         self.name = name
         assert nFWHM >= 0
         self.nFWHM = nFWHM
@@ -76,9 +77,7 @@ class Magnet:
         self.FWHM = FWHM
         self.B0_nW = self.nFWHM * self.FWHM * self.B0
         self.numPt = numPt
-        # self.B0_T = self.B0.to_value(unit.T)
         self.FWHM_B0 = (self.B0 * self.FWHM).to(unit.T)
-        # self.B0_nW_T = self.B0_nW.to_value(unit.T)
         self.B_spread = np.ones(1) * self.B0
         self.ratios = np.ones(1)
         self.setHomogeneity(verbose=verbose)
@@ -143,10 +142,14 @@ class Magnet:
             ) * self.FWHM_B0 + self.B0
             if verbose:
                 print(logPrefix, f"B_spread.shape = {self.B_spread.shape}")
-            # plot histogram of the sampled B values
+                print(
+                    f"{logPrefix} B_spread: {len(self.B_spread)} points  "
+                    f"range=[{self.B_spread.min():g}, {self.B_spread.max():g}]"
+                )
+
             if showPlot:
                 fig = plt.figure(
-                    figsize=(8.5 / 2.56, 6.5 / 2.56), dpi=300
+                    figsize=(8.5 / 2.54, 6.5 / 2.54), dpi=300
                 )  # initialize a figure
                 gs = gridspec.GridSpec(
                     nrows=1, ncols=1
@@ -158,7 +161,7 @@ class Magnet:
                     hist,
                     label="", marker="o", color='goldenrod', markeredgecolor='darkgoldenrod'
                 )
-                ax.set_xlabel("Magnetic field - B0 (FWHM)")
+                ax.set_xlabel("Magnetic field - $B_0$ (FWHM)")
                 ax.set_ylabel("Number of sampling points")
                 ax.set_title("Histogram of number of sampling \nover magnetic field spread")
                 plt.tight_layout()
@@ -187,7 +190,7 @@ class Magnet:
 
             if showPlot:
                 fig = plt.figure(
-                    figsize=(8.5 / 2.56, 6.5 / 2.56), dpi=300
+                    figsize=(8.5 / 2.54, 6.5 / 2.54), dpi=300
                 )
                 gs = gridspec.GridSpec(
                     nrows=1, ncols=1
@@ -203,4 +206,4 @@ class Magnet:
             # normalize ratios to sum to 1
             self.ratios /= np.sum(self.ratios)
             if verbose:
-                print(f"{logPrefix} ratios normalised  sum={self.ratios.sum():.6g}")
+                print(logPrefix, f" ratios normalized sum={self.ratios.sum():g}")
