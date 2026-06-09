@@ -26,7 +26,7 @@ axionbloch supports the following axion field configurations:
 
 The package is also useful for general NMR simulations: pulse sequences,
 free decay, spin echoes, and CW excitation can all be configured and
-visualised, making axionbloch suitable for educational purposes as well.
+visualized, making axionbloch suitable for educational purposes as well.
 
 The package is documented here and available at
 [github.com/Yuzhe98/AxionBloch](https://github.com/Yuzhe98/AxionBloch).

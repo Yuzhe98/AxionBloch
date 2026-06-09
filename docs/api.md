@@ -21,9 +21,7 @@ automatically from source docstrings.
 | {class}`~axionbloch.SimuTools.MagField` | `SimuTools` | (Pseudo)magnetic field builder |
 | {class}`~axionbloch.SimuTools.Simulations` | `SimuTools` | Multi-run simulation manager |
 | {class}`~axionbloch.SimuTools.Simulation` | `SimuTools` | Single Bloch-equation simulation |
-| {class}`~axionbloch.DataAnalysis.Signal` | `DataAnalysis` | NMR signal processing |
 | {class}`~axionbloch.FineGrainedAxionStream.FineGrainedAxionStream` | `FineGrainedAxionStream` | Single axion stream |
-| {class}`~axionbloch.constants.AtomicUnits` | `constants` | Atomic-unit conversion factors |
 
 ---
 
@@ -56,8 +54,8 @@ Provides the general TISE solver
 gravitationally bound to a compact body.  The solver:
 
 - Builds a 1-D radial finite-difference Hamiltonian {math}`H = T + V_\mathrm{eff}`.
-- Diagonalises it with `scipy.linalg.eigh` for each angular-momentum channel *l*.
-- Stores eigen-energies and normalised reduced radial wavefunctions {math}`u_{n_r l}(r)`.
+- Diagonalizes it with `scipy.linalg.eigh` for each angular-momentum channel *l*.
+- Stores eigen-energies and normalized reduced radial wavefunctions {math}`u_{n_r l}(r)`.
 - Computes the 3-D gradient of the total wavefunction at an experimental station
   via {func}`~axionbloch.GravBoundAxionHalo.GravBoundAxionHalo.findGradients`.
 
@@ -123,15 +121,15 @@ properties needed for a simulation:
 - Gyromagnetic ratio {math}`\gamma`, magnetic dipole moment {math}`\mu`.
 - Mass density, molar mass, spin count per molecule → spin number density.
 - Relaxation times {math}`T_1`, {math}`T_2`.
-- Volume, temperature, and initial polarisation.
+- Volume, temperature, and initial polarization.
 
 Key methods:
 
 | Method | Description |
 |--------|-------------|
-| `getThermalPol` | Exact thermal polarisation at a given field and temperature |
-| `getM0` | Magnetisation {math}`M_0` from a given polarisation |
-| `getM0eqb` | Equilibrium magnetisation at a given field and temperature |
+| `getThermalPol` | Exact thermal polarization at a given field and temperature |
+| `getM0` | Magnetisation {math}`M_0` from a given polarization |
+| `getM0eqb` | Equilibrium magnetization at a given field and temperature |
 
 ```{automodule} axionbloch.Sample
 :members:
@@ -211,22 +209,6 @@ persist results.
 
 ---
 
-## axionbloch.DataAnalysis
-
-NMR signal processing, centred on
-{class}`~axionbloch.DataAnalysis.Signal`.  Loads dual-channel time-series
-data from HDF5 files, computes power spectral densities and lock-in-amplifier
-filtered spectra, and fits common NMR lineshapes (Lorentzian, Gaussian,
-exponentially decaying cosine).
-
-```{automodule} axionbloch.DataAnalysis
-:members:
-:undoc-members:
-:show-inheritance:
-```
-
----
-
 ## axionbloch.FineGrainedAxionStream
 
 Models a single coherent axion stream with a fixed laboratory velocity and a
@@ -257,7 +239,6 @@ supported.
 | `gamma_Xe129` | ¹²⁹Xe gyromagnetic ratio (rad Hz T⁻¹) |
 | `mu_Xe129` | ¹²⁹Xe magnetic dipole moment |
 | `earth_radius` | Earth radius (m) |
-| `AtomicUnits` | Conversion factors from SI to Hartree atomic units |
 
 ```{automodule} axionbloch.constants
 :members:
