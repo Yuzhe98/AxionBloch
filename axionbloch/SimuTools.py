@@ -1918,7 +1918,7 @@ class Simulation(PhysicalObject):
             ax.grid()
             ax.legend(loc="upper right")
 
-        B_t_ax.set_ylabel(f"$B$ ({B_mean.unit.to_string('unicode')})")
+        B_t_ax.set_ylabel(f"$B$ ({B_mean[0].unit.to_string('unicode')})")
         for ax in M_axes:
             ax.set_ylabel("$M / M_{\\mathrm{eqb}}$")
 

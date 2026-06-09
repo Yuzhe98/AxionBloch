@@ -24,8 +24,22 @@ license-files = ["LICENSE"]
 requires-python = ">=3.9"
 
 dependencies = [
-    # see docs/requirements.txt
+    "numpy",
+    "matplotlib",
+    "astropy",
+    "scipy",
+    "h5py",
 ]
 
 [tool.setuptools]
 zip-safe = false
+
+[tool.cibuildwheel]
+build = "cp39-* cp310-* cp311-* cp312-* cp313-*"
+skip = "*-musllinux_*"
+
+[tool.cibuildwheel.linux]
+before-all = "yum install -y libgomp || apt-get install -y libgomp1 || true"
+
+[tool.cibuildwheel.macos]
+archs = ["x86_64", "arm64"]

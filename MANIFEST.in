@@ -1,0 +1,2 @@
+include blochSimulation_ext/*.h
+include blochSimulation_ext/*.cpp
