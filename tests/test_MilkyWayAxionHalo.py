@@ -11,7 +11,7 @@ PRINT_RESULTS=1
 SEED
     Integer random seed (default 42).
 NUM_FIELD
-    Number of stochastic field realisations (default 1000).
+    Number of stochastic field realizations (default 1000).
 
 Useful run commands::
 
@@ -98,7 +98,7 @@ magnets = []
 
 
 def test_MilkyWayAxionHalo_initialization():
-    """MilkyWayAxionHalo initialises with nu_a or m_a alone, and raises when neither is given.
+    """MilkyWayAxionHalo initializes with nu_a or m_a alone, and raises when neither is given.
 
     Verified cases:
     1. ``nu_a`` only — minimum valid input.
@@ -186,7 +186,7 @@ def test_getRabiFreq():
 
 
 def test_check_norm_with_quantities():
-    """check_norm is silent for a unit-normalised Quantity array and warns when integral ≠ 1."""
+    """check_norm is silent for a unit-normalized Quantity array and warns when integral ≠ 1."""
     x = np.array([0.0, 1.0, 2.0]) * unit.Hz
     y = np.array([0.0, 1.0, 0.0]) / unit.Hz
 
