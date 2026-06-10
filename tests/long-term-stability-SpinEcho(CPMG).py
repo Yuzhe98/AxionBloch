@@ -14,11 +14,11 @@ from axionbloch.constants import gamma_p, mu_p
 
 RCF_Freq_Hz = 1e6
 
-T1_s = 1e8
+T1 = 1e8 * unit.s
 
 # short Tdelta
 Tdelta_s = 0.1
-T2_s = 5.0
+T2 = 5.0 * unit.s
 
 # CH3CH2OH
 sample = Sample(
@@ -27,8 +27,8 @@ sample = Sample(
     massDensity=0.78945 * unit.g / unit.cm**3,
     molarMass=46.069 * unit.g / unit.mol,
     numOfSpinsPerMolecule=6 * unit.one,
-    T2=T2_s * unit.s,
-    T1=T1_s * unit.s,
+    T2=T2,
+    T1=T1,
     vol=1 * unit.cm**3,
     mu=mu_p,  # magnetic dipole moment
     verbose=False,

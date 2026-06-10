@@ -50,8 +50,8 @@ print("90 degree pulse duration converted to microseconds:", t90.to(unit.microse
 # 58.71648792722992 us
 
 # max min
-print("\nmax oramin:")
-rate0 = 1 * unit.Hz
+print("\nmax or min:")
+rate0 = 2 * unit.Hz
 rate1 = 1 * unit.MHz
 rate2 = -3 * unit.kHz
 # array = np.asanyarray([rate0, rate1, rate2])
