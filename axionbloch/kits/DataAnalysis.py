@@ -22,10 +22,7 @@ from ..dependency import *
 
 # -----------------------------------------------------
 
-import sys
 import os
-import gc
-import glob
 
 # curve fitting (including calculating uncertainties)
 from scipy.optimize import curve_fit
