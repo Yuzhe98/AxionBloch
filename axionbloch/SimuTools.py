@@ -8,7 +8,7 @@ MagField
 
 Simulation
     Wrapper around the compiled ``blochsimulation`` extension that runs the
-    Bloch equations and stores the resulting magnetisation trajectory.
+    Bloch equations and stores the resulting magnetization trajectory.
 
 Module-level constants
 ----------------------
@@ -39,10 +39,8 @@ from axionbloch.utils import (
     check,
     save_phys_quantity,
     getDateAndTime,
-    sci_fmt,
 )
 
-# from axionbloch.DataAnalysis import Signal
 from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet
 from axionbloch.SimuTypes import SimuParams, SimuEntry
@@ -94,93 +92,9 @@ class MagField(PhysicalObject):
         self,
         name="B field",
     ):
+        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
         super().__init__()
         self.name = name
-
-    def setXYPulse_old(
-        self,
-        timeStamp: np.ndarray,
-        B1: float,  # amplitude of the excitation pulse in (T)
-        nu_rot: float,
-        init_phase: float,
-        duty_func,
-        verbose: bool = False,
-    ):
-        """
-        generate a pulse in the rotating frame
-        """
-        warnings.warn(
-            "setXYPulse_old is deprecated and will be removed in a future version. Use setXYPulse instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        # direction_norm = direction / np.dot(direction, direction)
-
-        # excitation along x-axis
-        Bx_envelope = (
-            1.0
-            / 2
-            * B1
-            * duty_func(timeStamp)
-            # * np.dot(np.array([1, 0, 0]), direction_norm)
-        )
-        # check(Bx_envelope[0:10])
-        Bx_envelope = np.multiply(
-            Bx_envelope, np.cos(2 * np.pi * nu_rot * timeStamp + init_phase)
-        )
-        Bx = np.outer(Bx_envelope, np.array([1, 0, 0]))
-
-        # excitation along y-axis
-        By_envelope = (
-            1.0
-            / 2
-            * B1
-            * duty_func(timeStamp)
-            # * np.dot(np.array([0, 1, 0]), direction_norm)
-        )
-        # check(By_envelope)
-        By_envelope = np.multiply(
-            By_envelope, np.sin(2 * np.pi * nu_rot * timeStamp + init_phase)
-        )
-        By = np.outer(By_envelope, np.array([0, 1, 0]))
-
-        # 1st order time-derivate of the excitation along x-axis
-        dBxdt_envelope = (
-            1.0
-            / 2
-            * B1
-            * duty_func(timeStamp)
-            # * np.dot(np.array([1, 0, 0]), direction_norm)
-        )
-        dBxdt_envelope = np.multiply(
-            dBxdt_envelope,
-            -2 * np.pi * nu_rot * np.sin(2 * np.pi * nu_rot * timeStamp + init_phase),
-        )
-        dBxdt = np.outer(dBxdt_envelope, np.array([1, 0, 0]))
-
-        # 1st order time-derivate of the excitation along y-axis
-        dBydt_envelope = (
-            1.0
-            / 2
-            * B1
-            * duty_func(timeStamp)
-            # * np.dot(np.array([0, 1, 0]), direction_norm)
-        )
-        dBydt_envelope = np.multiply(
-            dBydt_envelope,
-            2 * np.pi * nu_rot * np.cos(2 * np.pi * nu_rot * timeStamp + init_phase),
-        )
-        dBydt = np.outer(dBydt_envelope, np.array([0, 1, 0]))
-
-        self.B_vec = Bx + By
-        # self.dBdt_vec = dBxdt + dBydt
-        # sanCheck(Bx, tag="Bx")
-        # sanCheck(self.B_vec, tag="self.B_vec")
-        # self.dBdt_vec = np.outer(dBxdt + dBydt, direction)
-        # self.nu = nu_rot
-        # def envelope(timeStamp):
-        #     return duty_func(timeStamp) * B1 * np.sin(2 * np.pi * nu_e * timeStamp + init_phase)
-        # return
 
     def setXYPulse(
         self,
@@ -191,7 +105,7 @@ class MagField(PhysicalObject):
         init_phase: Quantity = 0.0 * unit.rad,
         verbose: bool = False,
     ):
-        """Generate a continuous XY excitation pulse in the rotating frame.
+        """Generate XY excitation pulse in the rotating frame.
 
         Fills the entire time window with a constant-envelope circularly-
         polarised pulse at frequency ``nu_rot`` and amplitude ``B1``.
@@ -211,6 +125,7 @@ class MagField(PhysicalObject):
         verbose : bool
             Unused; reserved for future diagnostic output.
         """
+        logPrefix = f"[{self.__class__.__name__}.{self.setXYPulse.__name__}]"
         timeStamp = timeStep * np.arange(timeLen - 1)
         envelope = np.zeros(timeStamp.shape) * unit.T
         envelope[:] = 0.5 * B1
@@ -257,6 +172,7 @@ class MagField(PhysicalObject):
             Unused; reserved for future diagnostic output.
         """
 
+        logPrefix = f"[{self.__class__.__name__}.{self.set90DegPulse.__name__}]"
         startDelayLen = 0  # this should stay 0. It does not help in anything
         timeStamp_s = timeStep * np.arange(timeLen - 1)
         t90Len = int(np.round(t90 / timeStep))
@@ -326,6 +242,7 @@ class MagField(PhysicalObject):
         verbose : bool
             Print diagnostic information (e.g. ``t90Len``).
         """
+        logPrefix = f"[{self.__class__.__name__}.{self.setCPMGPulseTrain.__name__}]"
         timeStamp = timeStep * np.arange(timeLen - 1)
         t90Len = int(np.round(t90 / timeStep))
         if verbose:
@@ -341,8 +258,8 @@ class MagField(PhysicalObject):
 
         tauLen = int(np.round(tau / timeStep))
         if tauLen < 10 * t180Len:
-            warnings.warn(
-                f"tauLen = {tauLen} < 10 * t180Len = {10 * t180Len}. Too short!",
+            warnings.warn(logPrefix + 
+                f" tauLen = {tauLen} < 10 * t180Len = {10 * t180Len}. Too short!",
                 UserWarning,
                 stacklevel=2,
             )
@@ -387,9 +304,9 @@ class MagField(PhysicalObject):
         All pulses share the same duration ``t90_s`` (snapped to the time
         grid) but each has an independently chosen flip angle and phase.
         The amplitude of pulse *i* is scaled so that
-        ``gamma * 0.5 * B_i * t90_s = flip_angles_deg[i] * pi/180``.
+        ``gamma * 0.5 * B_i * t90_s = tip_angles[i] * pi/180``.
 
-        Timing convention: ``delays_s[i]`` is the free-precession interval
+        Timing convention: ``delay[i]`` is the free-precession interval
         between the *end* of pulse *i-1* (or the simulation start for i=0)
         and the *start* of pulse *i*.
 
@@ -403,12 +320,12 @@ class MagField(PhysicalObject):
             Gyromagnetic ratio in rad·Hz/T (sign is used to set pulse sense).
         t90_s : float
             Duration of a 90° pulse (s); all pulses share this duration.
-        flip_angles_deg : list of float
+        tip_angles : list of float
             Flip angle of each pulse in degrees (e.g. ``[90, 180, 180]``).
-        delays_s : list of float
-            Free-precession time before each pulse (s). ``delays_s[0]`` is
+        delay : list of float
+            Free-precession time before each pulse (s). ``delay[0]`` is
             the initial delay before pulse 0 (usually 0). Must satisfy
-            ``len(delays_s) == len(flip_angles_deg)``.
+            ``len(delay) == len(tip_angles)``.
         nu_rot_Hz : float
             Carrier frequency in the rotating frame (Hz).
         phases_rad : list of float or None
@@ -422,11 +339,11 @@ class MagField(PhysicalObject):
 
         N = len(tip_angles)
         if len(delays) != N:
-            raise ValueError(logPrefix + " delays_s and flip_angles_deg must have the same length")
+            raise ValueError(logPrefix + " delay and tip_angles must have the same length")
         if phases is None:
             phases = [0.0 * unit.rad] * N
         if len(phases) != N:
-            raise ValueError(logPrefix + " phases_rad and flip_angles_deg must have the same length")
+            raise ValueError(logPrefix + " phases_rad and tip_angles must have the same length")
 
         pulseLen = int(np.round(pulseDur / timeStep))
         if pulseLen < 2:
@@ -470,8 +387,7 @@ class MagField(PhysicalObject):
                     f"phase={np.degrees(phase_i):.1f}°, B_i={B_i:.4e} T"
                 )
             
-            current_idx += int(np.round(delays[i] / timeStep))    
-
+            current_idx += int(np.round(delays[i] / timeStep))
             current_idx += pulseLen
 
         self.B_vec = np.zeros((1, numSteps, 3)) * unit.T
@@ -497,6 +413,7 @@ class MagField(PhysicalObject):
         """
         generate a pseudo-magnetic field (ALP field gradient)
         """
+        logPrefix = f"[{self.__class__.__name__}.{self.setAxionFields.__name__}]"
         self.numFields = numFields
         numSteps = timeLen - 1
 
@@ -522,15 +439,12 @@ class MagField(PhysicalObject):
             )
 
             freq = np.fft.fftfreq(numSteps, timeStep_s)  # shape = (numSteps)
-            check(ampSpectra.unit)
-            check(ax_AS.unit)
-            check(freq.unit)
 
             if makePlot:
                 fig = plt.figure(figsize=(6.0, 4.0), dpi=150)  # initialize a figure
                 gs = gridspec.GridSpec(
                     nrows=1, ncols=1
-                )  # create grid for multiple figures
+                )
                 axPSD = fig.add_subplot(gs[0, 0])
 
                 axPSD.scatter(
@@ -576,9 +490,9 @@ class MagField(PhysicalObject):
             dBdt_FD: np.ndarray = 1j * 2 * np.pi * freq * ax_AS_pos_neg
 
             dBdt: np.ndarray = np.asarray(sp_ifft(dBdt_FD.value, axis=1)) * dBdt_FD.unit
-            check(ax_AS_pos_neg.unit)
-            check(B_t.unit)
-            check(dBdt.unit)
+            # check(ax_AS_pos_neg.unit)
+            # check(B_t.unit)
+            # check(dBdt.unit)
             if verbose:
                 toc = time.perf_counter()
                 timeConsumption = toc - tic
@@ -588,45 +502,27 @@ class MagField(PhysicalObject):
                 tic = time.perf_counter()
 
             self.B_vec = np.zeros((numFields, numSteps, 3)) * B_t.unit
-            # self.dBdt_vec = np.zeros((numFields, numSteps, 3)) * dBdt.unit
 
             self.B_vec[:, :, 0] = B_t.real
             self.B_vec[:, :, 1] = B_t.imag
-            # self.dBdt_vec[:, :, 0] = dBdt.real
-            # self.dBdt_vec[:, :, 1] = dBdt.imag
-
-            # # Stack real and imaginary parts along the last axis
-            # self.B_vec = np.stack((Ba_t.real, Ba_t.imag, np.zeros_like(Ba_t.real)), axis=2)
-            # self.dBdt_vec = np.stack((dBadt.real, dBadt.imag, np.zeros_like(dBadt.real)), axis=2)
 
             if verbose:
                 toc = time.perf_counter()
                 timeConsumption = toc - tic
                 print(f"array-asignment time consumption = {timeConsumption:.3e} s")
 
-            # check(Bx_amp.shape)
-            # check(By_amp.shape)
-            # check(dBxdt_amp.shape)
-            # check(dBydt_amp.shape)
-
-            # check(Bx.shape)
-            # check(By.shape)
-            # check(dBxdt.shape)
-            # check(dBydt.shape)
-            # check(self.B_vec.shape)
-            # check(self.dBdt_vec.shape)
-
         setByInvFFT()
 
-    def plotField(self, demodfreq, samprate, showplt_opt):
-        specxaxis, spectrum, specxunit, specyunit = self.showTSandPSD(
-            dataX=self.B_vec[:, 0],
-            dataY=self.B_vec[:, 1],
-            demodfreq=demodfreq,
-            samprate=samprate,
-            showplt_opt=showplt_opt,
-        )
-        return specxaxis, spectrum, specxunit, specyunit
+    # def plotField(self, demodfreq, samprate, showplt_opt):
+    #     logPrefix = f"[{self.__class__.__name__}.{self.plotField.__name__}]"
+    #     specxaxis, spectrum, specxunit, specyunit = self.showTSandPSD(
+    #         dataX=self.B_vec[:, 0],
+    #         dataY=self.B_vec[:, 1],
+    #         demodfreq=demodfreq,
+    #         samprate=samprate,
+    #         showplt_opt=showplt_opt,
+    #     )
+    #     return specxaxis, spectrum, specxunit, specyunit
 
 
 class Simulations:
@@ -658,6 +554,7 @@ class Simulations:
         verbose=True,
     ):
         """ """
+        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
         self.name = name
         self.pool: list[SimuEntry] = []
         self.all_params: list[SimuParams] = all_params
@@ -836,7 +733,7 @@ class Simulations:
                     flush=True,
                 )
             # ------------------------------------
-            # simu.keepMeanStd(debug=verbose)
+            simu.keepMeanStd()
 
         if verbose:
             actu_runtime = actu_setFields_s + actu_trjry_s
@@ -850,6 +747,7 @@ class Simulations:
 
     def saveToH5(self, dir: str = None, verbose: bool = False):
         """ """
+        logPrefix = f"[{self.__class__.__name__}.{self.saveToH5.__name__}]"
         if dir[-1] != "\\":
             dir += "\\"
         ymd_hms = getDateAndTime()
@@ -874,7 +772,7 @@ class Simulations:
         :param verbose: Description
         :type verbose: bool
         """
-
+        logPrefix = f"[{self.__class__.__name__}.{self.loadFromH5.__name__}]"
         for i, path in enumerate(paths):
             newSimu = Simulation()
             newSimu.loadFromH5(path=path)
@@ -893,6 +791,7 @@ class Simulations:
         """
         Save this instance to a pickle file.
         """
+        logPrefix = f"[{self.__class__.__name__}.{self.saveToPkl.__name__}]"
         if dir is None:
             raise ValueError("dir must not be None")
 
@@ -935,6 +834,7 @@ class Simulations:
         """
         Load an instance of this class from a pickle file.
         """
+        logPrefix = f"[{cls.__name__}.{cls.loadFromPkl.__name__}]"
         if not os.path.isfile(path):
             raise FileNotFoundError(f"Pickle file not found: {path}")
 
@@ -950,6 +850,7 @@ class Simulations:
         return obj
 
     def sortByAttrs(self, *attrs, reverse: bool = False, verbose=False):
+        logPrefix = f"[{self.__class__.__name__}.{self.sortByAttrs.__name__}]"
         if not attrs:
             raise ValueError("At least one attribute must be specified")
 
@@ -979,9 +880,9 @@ class Simulation(PhysicalObject):
 
     Wraps the C++ ``blochsimulation`` extension.  Generates stochastic axion
     pseudomagnetic fields via :meth:`~axionbloch.SimuTools.MagField.setAxionFields`,
-    loops over ``numFields`` field realisations and ``Magnet.numPt`` spin
+    loops over ``numFields`` field realizations and ``Magnet.numPt`` spin
     packets, integrates the Bloch equations with RK4, and stores the
-    resulting magnetisation trajectories in :attr:`trjries`.
+    resulting magnetization trajectories in :attr:`trjries`.
 
     Key attributes
     --------------
@@ -992,7 +893,7 @@ class Simulation(PhysicalObject):
     numSteps : int
         Number of RK4 integration steps (= rate × duration).
     trjries : ndarray, shape (numFields, numSteps, 3)
-        Magnetisation trajectories for each field realisation.
+        Magnetisation trajectories for each field realization.
     """
 
     def __init__(
@@ -1052,19 +953,12 @@ class Simulation(PhysicalObject):
 
         self.name = name
 
-        # if None in [sample, magnet, excField]:
-        #     raise ValueError("sample, magnet and excField must not be None")
-
         # Instances
         self.sample = sample
         self.magnet = magnet
         self.axion = axion
         self.station = station
         self.excField = excField
-
-        # self.gamma_HzToT = np.abs(
-        #     self.sample.gamma.to_value(unit.rad * unit.Hz / unit.T)
-        # )
 
         # get the equilibrium magnetization M0
         self.M0eqb = self.sample.getM0eqb(B_pol=self.magnet.B0, verbose=verbose)
@@ -1085,18 +979,16 @@ class Simulation(PhysicalObject):
             init_M = M0_init / self.M0eqb
         elif init_M is None:
             init_M = (
-                1.0 * unit.dimensionless_unscaled
+                1.0 * unit.one
             )  # default to fully polarized if neither init_M nor sample polarization is provided
 
         self.init_M = init_M
         self.init_M_theta = init_M_theta
         self.init_M_phi = init_M_phi
 
-        self.init_M_amp = init_M.to_value(unit.dimensionless_unscaled)
+        self.init_M_amp = init_M.to_value(unit.one)
         self.init_M_theta_rad = init_M_theta.to_value(unit.rad)
         self.init_M_phi_rad = init_M_phi.to_value(unit.rad)
-
-        self.B0z_T = np.abs(self.magnet.B0).to_value(unit.T)
 
         # TODO：be more smart in setting rate and duration
         # set rotating frame frequency
@@ -1108,12 +1000,12 @@ class Simulation(PhysicalObject):
             self.RCF_freq = RCF_freq.to(unit.MHz)
         self.RCF_freq_Hz = self.RCF_freq.to_value(unit.Hz)
 
-        self.nu_L_Hz = (
-            abs(self.sample.gamma.value * self.B0z_T / (2 * np.pi)) - self.RCF_freq_Hz
-        )  # nuL_Hz is the Larmor frequency of the magnetization in the rotating frame
-
-        self.T2_s = sample.T2.to_value(unit.s)
-        self.T1_s = sample.T1.to_value(unit.s)
+        # TODO to remove
+        # self.nu_L_Hz = (
+        #     abs(self.sample.gamma.value * np.abs(self.magnet.B0).to_value(unit.T) / (2 * np.pi)) - self.RCF_freq_Hz
+        # )  # nuL_Hz is the Larmor frequency of the magnetization in the rotating frame
+        # self.T2_s = sample.T2.to_value(unit.s)
+        # self.T1_s = sample.T1.to_value(unit.s)
 
         self.trjry = None
 
@@ -1146,6 +1038,7 @@ class Simulation(PhysicalObject):
             )
         )
         # numPt = 500
+        # TODO choose better numPt for magnet
         if numPt <= 1:
             numPt = 1
         else:
@@ -1161,24 +1054,24 @@ class Simulation(PhysicalObject):
         # ---------------------------- simulation rate ----------------------------#
         T2star_relaxation_rate = 1 / self.T2star
         if self.axion is not None:
-            axion_decoherence_rate_Hz = 1 / self.axion.tau_a_est.to_value(unit.s)
+            axion_decoherence_rate = 1 / self.axion.tau_a_est.to(unit.s)
         else:
-            axion_decoherence_rate_Hz = 0.0
-        nuL_vals_Hz = (
+            axion_decoherence_rate = 0.0
+        nu_L_spread = (
             np.abs(self.sample.gamma) / (2 * PI) * magnet.B_spread - self.RCF_freq
-        ).to_value(unit.Hz)
-        nuL_Hz_abs_max = np.amax(np.abs(nuL_vals_Hz))
-        nu_Hz_range = np.amax(nuL_vals_Hz) - np.amin(nuL_vals_Hz)
+        )
+        nu_L_abs_max = max(np.abs(nu_L_spread))
+        nu_L_range = max(nu_L_spread) - min(nu_L_spread)
         if rate is None:
-            rate_Hz: float = np.amax(
+            rate = max(
                 [
-                    50.0 * nu_Hz_range,
-                    50.0 * nuL_Hz_abs_max,
-                    100.0 * T2star_relaxation_rate.to(unit.Hz),
-                    100.0 * axion_decoherence_rate_Hz,
+                    50.0 * nu_L_range,
+                    50.0 * nu_L_abs_max,
+                    100.0 * T2star_relaxation_rate,
+                    100.0 * axion_decoherence_rate,
                 ]
             )
-            rate = rate_Hz * unit.Hz
+        # TODO check if rate is chosen to be the max
         self.setRate(rate=rate)
         # -------------------------------------------------------------------------#
 
@@ -1194,34 +1087,34 @@ class Simulation(PhysicalObject):
         )
         if self.magnet.numPt < 2 * variation.to_value(unit.one):
             warnings.warn(
-                f"{self.__init__.__name__}: magnet_det.numPt may be too few.",
+                logPrefix + f" magnet_det.numPt may be too few.",
                 UserWarning,
                 stacklevel=2,
             )
 
-        # simulation rate must be 20 times larger than maximum Larmor frequency
+        # simulation rate should be 20 times larger than maximum Larmor frequency
         # from experience, simulation rate should be 20 times greater than the max. of signal frequency in the rotating frame
-        if self.rate_Hz < 20 * nuL_Hz_abs_max:
+        if self.rate < 20 * nu_L_abs_max:
             warnings.warn(
-                f"{logPrefix}: the simulation rate ({self.rate_Hz:g} Hz) might be too small compared to signal frequency ({nuL_Hz_abs_max:g} Hz).",
+                f"{logPrefix} the simulation rate ({self.rate:g} Hz) might be too small compared to signal frequency ({nu_L_abs_max:g} Hz).",
                 UserWarning,
                 stacklevel=2,
             )
 
         if self.sample.T2 > self.sample.T1:
             warnings.warn(
-                f"{logPrefix}: T2 is larger than T1.", UserWarning, stacklevel=2
+                f"{logPrefix} T2 is larger than T1.", UserWarning, stacklevel=2
             )
 
         if self.rate <= 10 * (1.0 / self.sample.T2):
             warnings.warn(
-                f"{logPrefix}: the simulation rate ({self.rate_Hz:g} Hz) might be too small compared to T2 relaxation rate ({1.0 / self.T2_s:g} Hz).",
+                f"{logPrefix} the simulation rate ({self.rate:g}) might be too small compared to T2 relaxation rate ({1.0 / self.sample.T2:g}).",
                 UserWarning,
                 stacklevel=2,
             )
         if self.rate <= 1 / self.duration:
             warnings.warn(
-                f"{logPrefix}: the simulation rate ({self.rate_Hz:g} Hz) might be too small so there are only {self.numSteps:d} step(s) in the duration of {self.duration:g}.",
+                f"{logPrefix} the simulation rate ({self.rate:g}) might be too small so there are only {self.numSteps:d} step(s) in the duration of {self.duration:g}.",
                 UserWarning,
                 stacklevel=2,
             )
@@ -1231,7 +1124,7 @@ class Simulation(PhysicalObject):
         logPrefix = f"[{self.__class__.__name__}.{self.setRate.__name__}]"
         assert rate is not None, f"{logPrefix} rate is None"
         self.rate = rate
-        self.rate_Hz = float(rate.to_value(unit.Hz))
+        self.rate_Hz = float(rate.to_value(unit.Hz))  # TODO remove?
         self.timeStep = (
             1.0 / self.rate
         )  # the key parameter in setting simulation timing
@@ -1239,12 +1132,10 @@ class Simulation(PhysicalObject):
         self.numSteps: int = self.timeLen - 1
         if self.numSteps > 1e8:
             warnings.warn(
-                f"{logPrefix}: Simulation.numSteps = {self.numSteps:.1e} > 1e8.",
+                f"{logPrefix} Simulation.numSteps = {self.numSteps:.1e} > 1e8 is very large. Long simulation time consumption expected.",
                 UserWarning,
                 stacklevel=2,
             )
-            # return
-        # self.timeStamp_s = np.arange(start=0, stop=(self.timeLen) * self.timeStep_s, step=self.timeStep_s)
 
     def suggestRate(self, verbose: bool = False):
         # ----- check if parameter values are within reasonable range -----#
@@ -1261,7 +1152,7 @@ class Simulation(PhysicalObject):
         nu_L_abs_max = max([abs(nu_L_max), abs(nu_L_min)])
 
         # compute T2 relaxation rate
-        T2Rate = 1.0 / self.T2
+        T2Rate = 1.0 / self.sample.T2
 
         # resolution bandwidth (RBW)
         RBW = (1 / self.duration).to(unit.Hz)
@@ -1282,6 +1173,7 @@ class Simulation(PhysicalObject):
         return rate
 
     def getTimeStamp(self):
+        logPrefix = f"[{self.__class__.__name__}.{self.getTimeStamp.__name__}]"
         return np.linspace(
             start=0, stop=(self.timeLen) * self.timeStep, num=self.timeLen
         )
@@ -1362,7 +1254,6 @@ class Simulation(PhysicalObject):
         # Use the kinetic simulation function from blochsimulation to generate trajectories
         self.trjry, self.dMdt, self.d2Mdt2 = bs.generateTrajectories(
             self.excField.B_vec.to_value(unit.T),
-            # self.excField.dBdt_vec.to_value(unit.T / unit.s),
             self.magnet.B_spread.to_value(unit.T),
             self.magnet.ratios,
             np.abs(self.sample.gamma).to_value(unit.rad * unit.Hz / unit.T),
@@ -1380,6 +1271,7 @@ class Simulation(PhysicalObject):
             del self.dMdt, self.d2Mdt2
 
     def cleanup(self):
+        logPrefix = f"[{self.__class__.__name__}.{self.cleanup.__name__}]"
         for attr in ["trjry", "dMdt", "d2Mdt2"]:
             if hasattr(self, attr):
                 delattr(self, attr)
@@ -1394,12 +1286,14 @@ class Simulation(PhysicalObject):
             DeprecationWarning,
             stacklevel=2,
         )
+        logPrefix = f"[{self.__class__.__name__}.{self.monitorTrajectories.__name__}]"
+        self.rate_Hz:float = self.rate.to_value(unit.Hz)
         if plotRate is None:
             plotRate = self.rate_Hz
 
         if plotRate > self.rate_Hz:
             print(
-                "WARNING: samprate > self.simurate. samprate will be decreased to simurate"
+                "WARNING: samprate > self.rate. samprate will be decreased to rate"
             )
             plotRate = self.rate_Hz
             plotIntv = 1
@@ -1632,16 +1526,15 @@ class Simulation(PhysicalObject):
         # d2Mzdt_ax.set_xlabel("time (s)")
         # d2Mzdt_ax.set_ylabel("")
 
-        fig.suptitle(f"T2={self.T2_s:.1e}s T1={self.T1_s:.1e}s")
-        # g_aNN={self.excField.g_aNN:.0e} axion_nu={self.excField.nu:.1e}\nXe
-        # print(f'TrajectoryMonitoring_g_aNN={self.ALPwind.g_aNN:.0e}_axion_nu={self.ALPwind.nu:.1e}_Xe_T2={self.T2:.1g}s_T1={self.T1:.1e}s')
-        # plt.tight_layout()
+        fig.suptitle(f"T2={self.sample.T2:g}; T1={self.sample.T1:g}")
+        
         plt.show()
 
     def keepMeanStd(self, debug: bool = False):
         """
         Keep the mean values and standard deviations of the results
         """
+        logPrefix = f"[{self.__class__.__name__}.{self.keepMeanStd.__name__}]"
         self.excField.B_vec_mean = self.excField.B_vec.mean(axis=0)
         self.excField.B_vec_std = self.excField.B_vec.std(axis=0)
         # self.excField.B_vec.shape = (numFields, numSteps, 3)
@@ -1692,12 +1585,13 @@ class Simulation(PhysicalObject):
         plotRate_Hz: float = None,  #
         verbose: bool = False,
     ):
+        logPrefix = f"[{self.__class__.__name__}.{self.displayTrjries.__name__}]"
         if plotRate_Hz is None:
             plotRate_Hz = self.rate_Hz
 
         if plotRate_Hz > self.rate_Hz:
             print(
-                "WARNING: samprate > self.simurate. samprate will be decreased to simurate"
+                "WARNING: samprate > self.rate. samprate will be decreased to rate"
             )
             plotRate_Hz = self.rate_Hz
             plotIntv = 1
@@ -1810,7 +1704,7 @@ class Simulation(PhysicalObject):
         Mz_ax.set_ylim(bottom=Mxy_ax.get_ylim()[0])
 
         fig.suptitle(
-            f"Magnet {self.magnet.B0:g} {self.magnet.FWHM.to(ppm):g}"
+            f"Magnet {self.magnet.B0.to(unit.T):g} {self.magnet.FWHM.to(ppm):g}"
             + f"\nSample {self.sample.name} T1={self.sample.T1:g} T2={self.sample.T2.si:g} T2*={self.T2star.si:g}"
         )
         plt.tight_layout()
@@ -1821,13 +1715,15 @@ class Simulation(PhysicalObject):
         self,
         plotRate_Hz: float = None,  #
         verbose: bool = False,
-    ):
+    ):  
+        # TODO remove?
+        logPrefix = f"[{self.__class__.__name__}.{self.displayTrjry.__name__}]"
         if plotRate_Hz is None:
             plotRate_Hz = self.rate_Hz
 
         if plotRate_Hz > self.rate_Hz:
             print(
-                "WARNING: samprate > self.simurate. samprate will be decreased to simurate"
+                "WARNING: samprate > self.rate. samprate will be decreased to rate"
             )
             plotRate_Hz = self.rate_Hz
             plotIntv = 1
@@ -1938,12 +1834,14 @@ class Simulation(PhysicalObject):
         # rotframe=True,
         verbose=False,
     ):
+        """3D visulization of magnetization vector trajectory"""
+        logPrefix = f"[{self.__class__.__name__}.{self.visualizeTrajectory3D.__name__}]"
         if plotrate is None:
             plotrate = self.rate_Hz
 
         if plotrate > self.rate_Hz:
-            print(
-                "WARNING: plotrate > self.simurate. plotrate will be decreased to simurate"
+            print(logPrefix, 
+                "WARNING: plotrate > self.rate. plotrate will be decreased to rate"
             )
             plotrate = self.rate_Hz
             plotintv = 1
@@ -2007,29 +1905,14 @@ class Simulation(PhysicalObject):
         threeD_ax.yaxis.set_label_text("y")  #
         threeD_ax.zaxis.set_label_text("z")  #
 
-        fig.suptitle(f"T2={self.T2_s:.1g}s T1={self.T1_s:.1e}s")
+        fig.suptitle(f"T2={self.sample.T2:g}; T1={self.sample.T1:g}")
         plt.tight_layout()
         plt.show()
 
-    def statTrajectory(self, verbose=False):
-        # TODO remove this
-        timestep = 1.0 / self.rate_Hz
-        # xs=self.trjry_visual[0:-1:int(plotintv),0][0:plotlim], \
-        # ys=self.trjry_visual[0:-1:int(plotintv),1][0:plotlim], \
-        # zs=self.trjry_visual[0:-1:int(plotintv),0][0:plotlim]
-        self.avgMxsq = np.mean(self.trjry[:, 0] ** 2, dtype=np.float64)
-        self.avgMysq = np.mean(self.trjry[:, 1] ** 2, dtype=np.float64)
-        self.avgMzsq = np.mean(self.trjry[:, 2] ** 2, dtype=np.float64)
-        if verbose:
-            check(self.avgMxsq)
-            check(self.avgMysq)
-            check(self.avgMzsq)
-            check(np.sqrt(self.avgMxsq + self.avgMysq))
-
-    # def statTrajectories(self, verbose=False):
 
     def saveToH5(self, path: str = None, verbose: bool = False):
         """ """
+        logPrefix = f"[{self.__class__.__name__}.{self.saveToH5.__name__}]"
         if path[-3:] != ".h5":
             suffix = ".h5"
         else:
@@ -2087,182 +1970,8 @@ class Simulation(PhysicalObject):
         h5f.close()
 
     def loadFromH5(self, path: str = None, verbose: bool = False):
+        logPrefix = f"[{self.__class__.__name__}.{self.loadFromH5.__name__}]"
         # print(pathAndName)
         with h5py.File(path, "r", driver="core") as df:  # h5py loading method
             if verbose:
                 check(df.keys())
-
-    # def analyzeTrajectory(
-    #     self,
-    # ):
-    #     type(Signal)
-    #     print(Signal)
-
-    #     self.trjryStream = Signal(
-    #         # name="Simulation data",
-    #         filelist=[],
-    #         verbose=True,
-    #     )
-    #     # self.trjryStream.attenuation = 0
-    #     # self.trjryStream.filterstatus = "off"
-    #     # self.trjryStream.filter_TC = 0.0
-    #     # self.trjryStream.filter_order = 0
-    #     self.trjryStream.demodfreq = self.RCF_freq_Hz
-    #     saveintv = 1
-    #     self.trjryStream.samprate = self.rate_Hz / saveintv
-    #     self.trjryStream.exptype = "Simulation"
-
-    #     self.trjryStream.dataX = (
-    #         1 * self.trjry[int(0 * self.rate_Hz) : -1 : saveintv, 0]
-    #     )  # * \
-    #     # np.cos(2 * np.pi * self.nu_rot * self.timestamp[0:-1:saveintv])
-    #     self.trjryStream.dataY = (
-    #         1 * self.trjry[int(0 * self.rate_Hz) : -1 : saveintv, 1]
-    #     )  # * \
-    #     # np.sin(2 * np.pi * self.nu_rot * self.timestamp[0:-1:saveintv])
-
-    #     # self.liastream.dataX = 0.5 * 1 * \
-    #     # 	np.cos(2 * np.pi * self.nu_rot * self.timestamp[0:-1:saveintv])
-    #     # self.liastream.dataY = 0.5 * 1 * \
-    #     # 	np.sin(2 * np.pi * self.nu_rot * self.timestamp[0:-1:saveintv])
-
-    #     self.trjryStream.getNoPulsePSD(
-    #         windowfunction="rectangle",
-    #         # decayfactor=-10,
-    #         chunksize=None,  # sec
-    #         analysisrange=[0, -1],
-    #         getstd=False,
-    #         stddev_range=None,
-    #         # polycorrparas=[],
-    #         # interestingfreq_list=[],
-    #         selectshots=[],
-    #         verbose=False,
-    #     )
-    #     self.trjryStream.FitPSD(
-    #         fitfunction="Lorentzian",  # 'Lorentzian' 'dualLorentzian' 'tribLorentzian' 'Gaussian 'dualGaussian' 'auto' 'Polyeven'
-    #         inputfitparas=["auto", "auto", "auto", "auto"],
-    #         smooth=False,
-    #         smoothlevel=10,
-    #         fitrange=["auto", "auto"],
-    #         alpha=0.05,
-    #         getresidual=False,
-    #         getchisq=False,
-    #         verbose=False,
-    #     )
-
-    # def analyzeB1(
-    #     self,
-    # ):
-    #     self.B1Stream = Signal(
-    #         name="Simulation data",
-    #         # device="Simulation",
-    #         # device_id="Simulation",
-    #         filelist=[],
-    #         verbose=True,
-    #     )
-    #     self.B1Stream.attenuation = 0
-    #     self.B1Stream.filterstatus = "off"
-    #     self.B1Stream.DTRC_TC = 0.0
-    #     self.B1Stream.DTRC_order = 0
-    #     self.B1Stream.demodfreq = self.RCF_freq_Hz
-    #     saveintv = 1
-    #     self.B1Stream.samprate = self.rate_Hz / saveintv
-    #     # check(self.timestamp.shape)
-    #     # check(self.trjry[0:-1:saveintv, 0].shape)
-
-    #     self.B1Stream.dataX = (
-    #         1 * self.excField.B_vec[int(0 * self.rate_Hz) : -1 : saveintv, 0]
-    #     )  # * \
-    #     # np.cos(2 * np.pi * self.nu_rot * self.timestamp[0:-1:saveintv])
-    #     self.B1Stream.dataY = (
-    #         1 * self.excField.B_vec[int(0 * self.rate_Hz) : -1 : saveintv, 1]
-    #     )  # * \
-    #     # np.sin(2 * np.pi * self.nu_rot * self.timestamp[0:-1:saveintv])
-
-    #     # self.B1stream.dataX = 0.5 * 1 * \
-    #     # 	np.cos(2 * np.pi * self.nu_rot * self.timestamp[0:-1:saveintv])
-    #     # self.B1stream.dataY = 0.5 * 1 * \
-    #     # 	np.sin(2 * np.pi * self.nu_rot * self.timestamp[0:-1:saveintv])
-
-    #     self.B1Stream.getNoPulsePSD(
-    #         windowfunction="rectangle",
-    #         # decayfactor=-10,
-    #         chunksize=None,  # sec
-    #         analysisrange=[0, -1],
-    #         getstd=False,
-    #         stddev_range=None,
-    #         # polycorrparas=[],
-    #         # interestingfreq_list=[],
-    #         selectshots=[],
-    #         verbose=False,
-    #     )
-    #     self.B1Stream.FitPSD(
-    #         fitfunction="Lorentzian",  # 'Lorentzian' 'dualLorentzian' 'tribLorentzian' 'Gaussian 'dualGaussian' 'auto' 'Polyeven'
-    #         inputfitparas=["auto", "auto", "auto", "auto"],
-    #         smooth=False,
-    #         smoothlevel=1,
-    #         fitrange=["auto", "auto"],
-    #         alpha=0.05,
-    #         getresidual=False,
-    #         getchisq=False,
-    #         verbose=False,
-    #     )
-
-    # def compareBandSig(self):
-    #     self.analyzeTrajectory()
-
-    #     specxaxis, ALP_signal_spec, specxunit, specyunit = self.trjryStream.getSpectrum(
-    #         showtimedomain=True,
-    #         showfit=True,
-    #         showresidual=False,
-    #         showlegend=True,  # !!!!!show or not to show legend
-    #         spectype="PSD",  # in 'PSD', 'ASD', 'FLuxPSD', 'FluxASD'
-    #         ampunit="V",
-    #         specxunit="Hz",  # 'Hz' 'kHz' 'MHz' 'GHz' 'ppm' 'ppb'
-    #         # specxlim=[self.demodfreq - 0 , self.demodfreq + 20],
-    #         # specylim=[0, 4e-23],
-    #         specyscale="linear",  # 'log', 'linear'
-    #         showstd=False,
-    #         showplt_opt=False,
-    #         return_opt=True,
-    #     )
-
-    #     specxaxis, BALP_spec, specxunit, specyunit = self.excField.plotField(
-    #         demodfreq=self.RCF_freq_Hz, samprate=self.rate_Hz, showplt_opt=False
-    #     )
-
-    #     fig = plt.figure(figsize=(6.0, 4.0), dpi=150)  # initialize a figure
-    #     gs = gridspec.GridSpec(nrows=1, ncols=1)  # create grid for multiple figures
-
-    #     ax00 = fig.add_subplot(gs[0, 0])
-    #     ax00.plot(
-    #         specxaxis,
-    #         BALP_spec / np.amax(BALP_spec),
-    #         label="BALP_spec",
-    #         linestyle="-",
-    #         zorder=1,
-    #     )
-    #     ax00.plot(
-    #         specxaxis,
-    #         ALP_signal_spec / np.amax(ALP_signal_spec),  #
-    #         label="ALP_signal_spec",
-    #         linestyle="--",
-    #     )
-    #     ax00.plot(
-    #         specxaxis,
-    #         self.trjryStream.fitcurves[0] / np.amax(self.trjryStream.fitcurves[0]),
-    #         label=self.trjryStream.fitreport,
-    #         linestyle="--",
-    #     )
-    #     check(self.trjryStream.popt[1])
-    #     check(self.trjryStream.popt[2])
-    #     # print('fit linewidth = ', self.trjryStream.popt[1])
-    #     ax00.set_xlabel("frequency" + specxunit)
-    #     ax00.set_ylabel("PSD")
-    #     # ax00.set_xscale('log')
-    #     # ax00.set_yscale('log')
-    #     ax00.legend()
-    #     ax00.set_xlim(self.RCF_freq_Hz - 10, self.RCF_freq_Hz + 10)
-    #     plt.tight_layout()
-    #     # plt.savefig('example figure - one-column.png', transparent=False)
-    #     plt.show()

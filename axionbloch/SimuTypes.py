@@ -5,6 +5,7 @@ a Bloch-equation simulation run. :class:`SimuEntry` (dataclass) pairs a live
 :class:`~axionbloch.SimuTools.Simulation` object with its :class:`SimuParams`
 for bookkeeping across multiple runs.
 """
+
 # Enable forward references for type hints (Python 3.7+)
 
 # This allows us to reference classes that are defined later or imported only during type checking.
@@ -55,15 +56,15 @@ class SimuParams(TypedDict):
     B_a_rms : Quantity, optional
         RMS axion-induced pseudomagnetic field amplitude (T).
     numFields : int
-        Number of independent stochastic field realisations.
+        Number of independent stochastic field realizations.
     rand_seed : int
-        Random seed for reproducible field realisations.
+        Random seed for reproducible field realizations.
     init_M : Quantity
-        Initial magnetisation magnitude (dimensionless, normalised by M0).
+        Initial magnetization magnitude (dimensionless, normalized by M0).
     init_M_theta : Quantity [rad]
-        Initial polar angle of the magnetisation vector.
+        Initial polar angle of the magnetization vector.
     init_M_phi : Quantity [rad]
-        Initial azimuthal angle of the magnetisation vector.
+        Initial azimuthal angle of the magnetization vector.
     rate : Quantity [Hz]
         Output sampling rate of the simulation.
     duration : Quantity [s]
