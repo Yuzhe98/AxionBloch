@@ -30,5 +30,3 @@ mu_Xe129 = -0.777969 * mu_N(const.m_p)
 # Gyromagnetic ratio of Xe129
 gamma_Xe129 = -7.441e7 * unit.rad * unit.Hz / unit.T
 
-# Earth radius: 6.371e6 (meter)
-earth_radius = 1 * unit.R_earth
