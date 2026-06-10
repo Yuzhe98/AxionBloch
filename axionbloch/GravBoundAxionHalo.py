@@ -852,7 +852,7 @@ class GravBoundAxionHalo:
             label="Earth radius",
         )
         ax00.legend()
-        ax00.set_xlabel("r (earth_radius)")
+        ax00.set_xlabel("r (earth radius)")
 
         ax00.set_xlim(-0.3, 10.3)
         fig.suptitle(
