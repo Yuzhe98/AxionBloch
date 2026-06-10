@@ -7,7 +7,6 @@ exposes the corresponding unit vector and distance from the Earth's centre.
 from axionbloch.dependency import np, unit, Quantity
 from astropy.coordinates import get_body_barycentric_posvel, GCRS
 from astropy.coordinates import EarthLocation
-from axionbloch.constants import earth_radius
 
 
 class Station:
@@ -114,7 +113,7 @@ class Station:
             ]
         )
         self.elevation = elevation
-        self.R = self.elevation + earth_radius  # distance from Earth center to station
+        self.R = self.elevation + 1 * unit.earthRad  # distance from Earth center to station
 
         # signed geographic coordinates for astropy
         _lat = self.latitude if NSsemisphere == "N" else -self.latitude
@@ -127,7 +126,7 @@ class Station:
         Builds a right-handed orthonormal frame at the given epoch:
 
         * **ẑ** — Earth → Sun direction.
-        * **x̂** — Earth's heliocentric velocity, orthogonalised against ẑ.
+        * **x̂** — Earth's heliocentric velocity, orthogonalized against ẑ.
         * **ŷ = ẑ × x̂** — completes the right-hand triad.
 
         The station's geocentric Cartesian position (GCRS) is projected onto
@@ -155,7 +154,7 @@ class Station:
         earth_to_sun = (sun_pos.xyz - earth_pos.xyz).to(unit.m).value
         z_hat = earth_to_sun / np.linalg.norm(earth_to_sun)
 
-        # x̂: Earth heliocentric velocity, orthogonalised against ẑ
+        # x̂: Earth heliocentric velocity, orthogonalized against ẑ
         v = earth_vel.xyz.to(unit.m / unit.s).value
         v_perp = v - np.dot(v, z_hat) * z_hat
         x_hat = v_perp / np.linalg.norm(v_perp)
@@ -202,7 +201,7 @@ class Station:
         ----------
         direction : array-like, shape (3,)
             Direction vector ``(x, y, z)`` in ECEF Cartesian coordinates.
-            Need not be normalised.
+            Need not be normalized.
 
         Returns
         -------
