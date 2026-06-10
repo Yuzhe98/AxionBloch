@@ -17,24 +17,22 @@ import time
 import sys
 import warnings
 
+import h5py
 import pickle
-
-
-from axionbloch.dependency import *
-from matplotlib.patches import FancyArrowPatch
-
-from mpl_toolkits.mplot3d import proj3d
 
 from functools import partial
 from typing import Sequence
 
-import h5py
+from axionbloch.dependency import *
+
+from matplotlib.patches import FancyArrowPatch
+from mpl_toolkits.mplot3d import proj3d
+
 
 
 def getDateAndTime() -> str:
     """Return the current date and time as a compact string ``'YYYYMMDD_HHMMSS'``."""
-    timestr = time.strftime("%Y%m%d_%H%M%S")
-    # timestr = 'session_'+timestr
+    timestr = Time.now().datetime.strftime("%Y%m%d_%H%M%S")
     return timestr
 
 
@@ -161,6 +159,48 @@ def Lorentzian(x, center, FWHM, area: float = 1.0, offset: float = 0.0):
     return offset + 0.5 * np.abs(FWHM) * area / (
         np.pi * ((x - center) ** 2 + (0.5 * FWHM) ** 2)
     )
+
+
+def Lorentzian_0edge(x, center, FWHM, area: float = 1.0, offset: float = 0.0):
+    """
+    Return the value of the Lorentzian function with values = 0 at edges
+        offset + 0.5*FWHM*area / (np.pi * ( (x-center)**2 + (0.5*FWHM)**2 )      )
+
+                           FWHM A
+        offset + ───────────────────────
+                  2π ((x-c)^2+(FWHM/2)^2 )
+
+    Parameters
+    ----------
+
+    x : scalar or array_like
+        argument of the Lorentzian function
+    center : scalar
+        the position of the Lorentzian peak
+    FWHM : scalar
+        full width of half maximum (FWHM) / linewidth of the Lorentzian peak
+    area : scalar
+        area under the Lorentzian curve (without taking offset into consideration)
+    offset : scalar
+        offset for the curve
+
+
+    Returns
+    -------
+    the value of the Lorentzian function : ndarray or scalar
+
+    Examples
+    --------
+    >>>
+
+    Reference
+    ----------
+    Null
+
+    """
+    return np.hamming(len(x)) * (offset + 0.5 * np.abs(FWHM) * area / (
+        np.pi * ((x - center) ** 2 + (0.5 * FWHM) ** 2)
+    ))
 
 
 def estimateLorzfit(
