@@ -188,7 +188,7 @@ for i in range(Npulses):
     _idx += _pulseLen
     _pulse_ends.append(_idx)
 
-# Complex transverse magnetisation time series
+# Complex transverse magnetization time series
 TS_complex = simu.M_mean[:, 0] + 1j * simu.M_mean[:, 1]
 total_steps = len(TS_complex)
 

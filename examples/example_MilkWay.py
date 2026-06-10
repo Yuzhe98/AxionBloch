@@ -50,7 +50,7 @@ angles_deg = np.array([
 ])
 print(f"Wind angle range: {angles_deg.min():.1f}° – {angles_deg.max():.1f}°")
 
-# ── Example 4: 3-D visualisation ─────────────────────────────────────────────
+# ── Example 4: 3-D visualization ─────────────────────────────────────────────
 
 fig = mw.plot(show=True)
 # fig.savefig("milkyway_kinematics.png", dpi=120, bbox_inches="tight")

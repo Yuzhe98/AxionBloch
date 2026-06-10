@@ -1,7 +1,7 @@
 # Example script: CW (continuous-wave) NMR free-induction-decay simulation
 #
 # A CW excitation field drives the spin ensemble continuously at signalFreqRot
-# in the rotating frame.  The simulation records the magnetisation trajectory
+# in the rotating frame.  The simulation records the magnetization trajectory
 # over `duration` seconds.
 import time
 
@@ -33,8 +33,8 @@ T2 = 1.0 * unit.s
 # Tdelta = 10.0 * unit.s
 # T2 = 10.0 * unit.s
 
-simuRate = 1000 * unit.Hz
-duration = 50 * unit.s
+simuRate = 2000 * unit.Hz
+duration = .1 * unit.s
 
 # CH3CH2OH sample
 sample = Sample(
@@ -59,9 +59,9 @@ magnet = Magnet(
     name="detection magnet",
     B0=(RCF_Freq - signalFreqRot) / (sample.gamma / (2 * PI)),
     FWHM=FWHM,
-    nFWHM=5.0,
+    nFWHM=10.0,
 )
-magnet.setHomogeneity(numPt=500)
+magnet.setHomogeneity(numPt=500, showPlot=True, verbose=True)
 print(f"numPt for magnet homogeneity = {magnet.numPt}")
 
 # Excitation field (CW)
@@ -89,9 +89,9 @@ simu.excField.setXYPulse(
 tic = time.perf_counter()
 simu.generateTrajectories(integrator="RK4")
 toc = time.perf_counter()
-print(f"GenerateTrajectory time consumption = {toc - tic:.6f} s")
+print(f"generateTrajectories time consumption = {toc - tic:.6f} s")
 
 simu.keepMeanStd()
 simu.displayTrjries(verbose=True)
-
+# simu.monitorTrajectories(verbose=True)
 save_data = False
