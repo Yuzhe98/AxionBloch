@@ -43,8 +43,17 @@ from astropy.units import Quantity
 from axionbloch.Station import Station
 
 
-def _draw_3d_arrow(ax, start, end, color="tomato", shaft_lw=2.0,
-                   head_length=0.30, head_radius=0.10, n_faces=24, zorder=10):
+def _draw_3d_arrow(
+    ax,
+    start,
+    end,
+    color="tomato",
+    shaft_lw=2.0,
+    head_length=0.30,
+    head_radius=0.10,
+    n_faces=24,
+    zorder=10,
+):
     """Draw a rotation-correct 3D arrow as a line shaft + Poly3DCollection cone."""
     start, end = np.asarray(start, float), np.asarray(end, float)
     d = end - start
@@ -55,18 +64,27 @@ def _draw_3d_arrow(ax, start, end, color="tomato", shaft_lw=2.0,
 
     shaft_tip = end - d_hat * head_length
     ax.plot(
-        [start[0], shaft_tip[0]], [start[1], shaft_tip[1]], [start[2], shaft_tip[2]],
-        color=color, lw=shaft_lw, zorder=zorder, solid_capstyle="round",
+        [start[0], shaft_tip[0]],
+        [start[1], shaft_tip[1]],
+        [start[2], shaft_tip[2]],
+        color=color,
+        lw=shaft_lw,
+        zorder=zorder,
+        solid_capstyle="round",
     )
 
     # two orthonormal vectors perpendicular to d_hat
-    ref = np.array([1., 0., 0.]) if abs(d_hat[0]) < 0.9 else np.array([0., 1., 0.])
-    e1 = np.cross(d_hat, ref); e1 /= np.linalg.norm(e1)
+    ref = (
+        np.array([1.0, 0.0, 0.0]) if abs(d_hat[0]) < 0.9 else np.array([0.0, 1.0, 0.0])
+    )
+    e1 = np.cross(d_hat, ref)
+    e1 /= np.linalg.norm(e1)
     e2 = np.cross(d_hat, e1)
 
     theta = np.linspace(0, 2 * np.pi, n_faces + 1)
-    base = np.array([shaft_tip + head_radius * (np.cos(t) * e1 + np.sin(t) * e2)
-                     for t in theta])
+    base = np.array(
+        [shaft_tip + head_radius * (np.cos(t) * e1 + np.sin(t) * e2) for t in theta]
+    )
     tris = [[base[i], base[i + 1], end] for i in range(n_faces)]
     cone = art3d.Poly3DCollection(tris, zorder=zorder)
     cone.set_facecolor(color)
@@ -689,7 +707,14 @@ class MilkyWay:
         ax.add_patch(gc_ellipse)
         art3d.pathpatch_2d_to_3d(gc_ellipse, z=0, zdir="z")
         ax.plot(
-            [], [], color="#fffacd", marker="o", ms=8, ls="none", alpha=0.8, label="Galaxy center"
+            [],
+            [],
+            color="#fffacd",
+            marker="o",
+            ms=8,
+            ls="none",
+            alpha=0.8,
+            label="Galaxy center",
         )
 
         # ---- Sun's circular orbit ----
@@ -811,9 +836,16 @@ class MilkyWay:
         # ---- orbital velocity arrow (perpendicular to radius) ----
         v_orb = np.array([-np.sin(lam_e), np.cos(lam_e), 0.0])
         v_orb_end = np.array([ex, ey, ez]) + v_orb * 0.22
-        _draw_3d_arrow(ax, [ex, ey, ez], v_orb_end,
-                       color="deepskyblue", shaft_lw=1.5,
-                       head_length=0.06, head_radius=0.025, zorder=9)
+        _draw_3d_arrow(
+            ax,
+            [ex, ey, ez],
+            v_orb_end,
+            color="deepskyblue",
+            shaft_lw=1.5,
+            head_length=0.06,
+            head_radius=0.025,
+            zorder=9,
+        )
         ax.plot([], [], color="deepskyblue", lw=1.5, label="Orbital velocity")
 
         # ---- Sun ----
@@ -849,14 +881,33 @@ class MilkyWay:
         ax_n = np.array([0.0, math.sin(eps), math.cos(eps)])
         alen = 0.42  # AU (schematic)
         earth = np.array([ex, ey, ez])
-        _draw_3d_arrow(ax, earth, earth + ax_n * alen,
-                       color="tomato", shaft_lw=2.2,
-                       head_length=0.07, head_radius=0.028, zorder=11)
-        _draw_3d_arrow(ax, earth, earth - ax_n * alen,
-                       color="tomato", shaft_lw=2.2,
-                       head_length=0.07, head_radius=0.028, zorder=11)
-        ax.plot([], [], color="tomato", lw=2.2,
-                label=f"Rotation axis  (ε = {math.degrees(eps):.1f}°)")
+        _draw_3d_arrow(
+            ax,
+            earth,
+            earth + ax_n * alen,
+            color="tomato",
+            shaft_lw=2.2,
+            head_length=0.07,
+            head_radius=0.028,
+            zorder=11,
+        )
+        _draw_3d_arrow(
+            ax,
+            earth,
+            earth - ax_n * alen,
+            color="tomato",
+            shaft_lw=2.2,
+            head_length=0.07,
+            head_radius=0.028,
+            zorder=11,
+        )
+        ax.plot(
+            [],
+            [],
+            color="tomato",
+            lw=2.2,
+            label=f"Rotation axis  (ε = {math.degrees(eps):.1f}°)",
+        )
         # N / S labels
         ax.text(
             ex + ax_n[0] * (alen + 0.06),
@@ -905,11 +956,17 @@ class MilkyWay:
             )
             n_ecl = rot @ n_gcrs
             sa = 0.30
-            _draw_3d_arrow(ax, earth, earth + n_ecl * sa,
-                           color="w", shaft_lw=1.8,
-                           head_length=0.07, head_radius=0.028, zorder=12)
-            ax.plot([], [], color="w", lw=1.8,
-                    label=f"{self.station.name}")
+            _draw_3d_arrow(
+                ax,
+                earth,
+                earth + n_ecl * sa,
+                color="w",
+                shaft_lw=1.8,
+                head_length=0.07,
+                head_radius=0.028,
+                zorder=12,
+            )
+            ax.plot([], [], color="w", lw=1.8, label=f"{self.station.name}")
 
         # ---- date label ----
         # month = self.time.to_datetime().strftime("%b %d")
