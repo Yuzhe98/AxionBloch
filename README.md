@@ -9,8 +9,13 @@ In AxionBloch, the axion (including axionlike-particle or ALP) field acts like a
 
 The package provides a **numerical platform** to study these subtle effects using Bloch-equation-based simulations efficiently.
 
+## Requirements
+
+- Python >= 3.7
+
 ## Installation
 
+Source code can be found on GitHub:
 ```python 
 git clone https://github.com/Yuzhe98/AxionBloch.git
 ```
