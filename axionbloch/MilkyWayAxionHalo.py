@@ -84,8 +84,7 @@ class MilkyWayAxionHalo:
         verbose : bool
             Print derived quantities after construction.
         """
-        logPrefix = f"[{self.__class__.__name__}.__init__]"
-        super().__init__()
+        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
         self.name = name
         self.v_0 = v_0
         self.v_lab = v_lab
