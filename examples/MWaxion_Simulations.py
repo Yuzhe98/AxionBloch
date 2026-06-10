@@ -123,9 +123,7 @@ simu_all.run(autoStart=False, verbose=True)
 for i in range(len(simu_all.pool)):
     simu_all.pool[i].simu.keepMeanStd()
     simu_all.pool[i].simu.displayTrjries()
-    # check(simu_all.pool[i].simu.T2star_s)
-    # check(simu_all.pool[i].simu.Tdelta_s)
-    # check(simu_all.pool[i].simu.T2_s)
+
 simu_all.saveToPkl(
     dir=os.path.dirname(os.path.abspath(__file__))  # , fname="new_simulation"
 )
