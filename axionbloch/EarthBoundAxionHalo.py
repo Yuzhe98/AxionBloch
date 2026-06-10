@@ -10,7 +10,7 @@ from axionbloch.GravBoundAxionHalo import GravBoundAxionHalo
 
 
 def loadPEMdata(
-    filepath="axionbloch/data/Earth_Models/PEM_Parametric_Earth_Models_data.txt",
+    filepath="axionbloch/data/Earth_Models/PREM_data.txt",
 ):
     logPrefix = f"[{loadPEMdata.__name__}]"
     data = {
@@ -285,7 +285,7 @@ def plot_earth_grav_potential(showplot=True):
     plt.rcParams["mathtext.fontset"] = "cm"
     plt.rcParams["mathtext.rm"] = "Times New Roman"
 
-    cm = 1 / 2.56  # convert cm to inch
+    cm = 1 / 2.54  # convert cm to inch
 
     fig = plt.figure(figsize=(8.5 * cm, 8.5 * cm), dpi=300)  # initialize a figure
 
@@ -358,17 +358,23 @@ def plot_earth_grav_potential(showplot=True):
 class EarthBoundAxionHalo(GravBoundAxionHalo):
     # Create the "axion stream" (axion field) object
     # you can get properties of the axion field, computed based on the input information
+    nu_a: Quantity[unit.Hz] | None = None  # axion Compton frequency
+    N: int = int(2**12)
+    extent: Quantity[unit.m] = 128.0 * unit.R_earth
+    a_0: Quantity[unit.eV] | None = None
+    totalMassEnclosed: Quantity[unit.kg] | None = 4e-9 * unit.M_earth
+    g_aNN: Quantity[unit.GeV**-1] = 1e-9 * unit.GeV**-1
+
     def __init__(
         self,
         name="Earth-Bound Axion Halo",
-        nu_a: Quantity = None,  # axion Compton frequency
+        nu_a: Quantity[unit.Hz] | None = None,  # axion Compton frequency
         N: int = int(2**12),
-        extent: Quantity = 128.0 * unit.R_earth,
+        extent: Quantity[unit.m] = 128.0 * unit.R_earth,
         getPot=earth_grav_potential_earth_center,
-        a_0: Quantity | None = None,
-        rhoE_DM: Quantity = 1e16 * 0.3 * unit.GeV / unit.cm**3,
-        totalMassEnclosed: Quantity | None = 4e-9 * unit.M_earth,
-        g_aNN: Quantity = 1e-9 * unit.GeV**-1,
+        a_0: Quantity[unit.eV] | None = None,
+        totalMassEnclosed: Quantity[unit.kg] | None = 4e-9 * unit.M_earth,
+        g_aNN: Quantity[unit.GeV**-1] = 1e-9 * unit.GeV**-1,
         verbose: bool = False,
     ):
         logPrefix = f"[{self.__class__.__name__}.__init__]"
@@ -388,10 +394,6 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         self.T_magnitude = self.T_magnitude.to(self.E_unit)
         if a_0 is not None:
             self.a_0 = a_0
-        elif rhoE_DM is not None:
-            self.a_0 = (2 * const.hbar**3 * rhoE_DM / (self.m_a**2 * const.c)) ** 0.5
-        else:
-            raise ValueError("Either a_0 or rhoE_DM must be provided.")
         self.totalMassEnclosed = totalMassEnclosed
 
     # ------------------------------------------------------------------
