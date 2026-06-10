@@ -1,10 +1,10 @@
 import warnings
 
 from axionbloch.dependency import *
-from axionbloch.utils import PhysicalObject, check, check_norm
+from axionbloch.utils import check_norm
 
 
-class MilkyWayAxionHalo(PhysicalObject):
+class MilkyWayAxionHalo:
     """Axion dark-matter field (axion wind) from the Milky Way halo.
 
     Models the pseudomagnetic field experienced by nuclear spins due to the
@@ -54,7 +54,7 @@ class MilkyWayAxionHalo(PhysicalObject):
         rho_E_DM: Quantity = 0.3 * unit.GeV / unit.cm**3,
         verbose: bool = False,
     ):
-        """Initialise the Milky Way axion halo model.
+        """Initialize the Milky Way axion halo model.
 
         Provide either ``nu_a`` or ``m_a`` (or both, in which case they are
         checked for consistency).  If ``Qa`` is omitted it is estimated from the
@@ -117,7 +117,7 @@ class MilkyWayAxionHalo(PhysicalObject):
 
         self.FWHM = 1.0 / self.Qa
 
-        #
+        # effective axion frequency considering second-order Doppler effect
         self.nu_a_eff = self.nu_a * (1 + self.v_lab**2 / const.c**2)
         self.nu_a_eff = self.nu_a_eff
 
@@ -125,23 +125,6 @@ class MilkyWayAxionHalo(PhysicalObject):
         self.tau_a_est = 1.0 / (np.pi * self.FWHM * self.nu_a_eff)
         self.tau_a_est = self.tau_a_est
 
-        # Specify all physical quantities with units
-        self.quantities = {
-            "v_0": "km/s",
-            "v_lab": "km/s",
-            "rho_E_DM": "GeV/cm**3",
-            "nu_a": "Hz",
-            "g_aNN": "1/GeV",
-            "Qa": "",
-            "FWHM": "",
-            "nu_a_eff": "Hz",
-            "tau_a_est": "s",
-        }
-        # # self.generalQuantities = {"RCF_freq": "Hz", "rate": "Hz", "duration": "s"}
-        # # self.Omega_a_rms = 0.5 * self.g_aNN * (2 * const.hbar * const.c * self.rho_E_DM)**(1/2) * self.v_lab * np.cos(windAngle) * Quantity(1e-15, "T")
-        # self.useCommonUnits()
-
-    # @classmethod
     def getRabiFreq(
         self,
         g_aNN: Quantity[unit.GeV ** (-1)] | None = None,
@@ -187,11 +170,11 @@ class MilkyWayAxionHalo(PhysicalObject):
     def axion_lineshape(
         v_0: Quantity[unit.m / unit.s],
         v_lab: Quantity[unit.m / unit.s],
-        nu_a:Quantity[unit.Hz],
-        nu:Quantity,
-        case:str="non-grad",
-        alpha:Quantity=0.0*unit.rad,
-        verbose:bool=False,
+        nu_a: Quantity[unit.Hz],
+        nu: Quantity,
+        case: str = "non-grad",
+        alpha: Quantity = 0.0 * unit.rad,
+        verbose: bool = False,
     ):
         """Calculate the analytical axion power-spectral-density lineshape.
 
@@ -226,7 +209,7 @@ class MilkyWayAxionHalo(PhysicalObject):
         Returns
         -------
         Quantity array, shape ``(len(nu),)`` [Hz⁻²]
-            Power spectral density lineshape, normalised so that
+            Power spectral density lineshape, normalized so that
             ``integral(lineshape * dnu) = 1``.
 
         References
@@ -237,7 +220,7 @@ class MilkyWayAxionHalo(PhysicalObject):
         # ----------- prepare to generate the axion lineshape ----------- #
         # return the lineshape under certain special circumstances
         v_0, v_lab = Quantity(np.abs(v_0)), Quantity(np.abs(v_lab))
-        
+
         # Q_a = 1e6
         Q_a = (const.c / v_0) ** 2.0
         Q_a = Q_a.to(unit.one)
@@ -253,8 +236,10 @@ class MilkyWayAxionHalo(PhysicalObject):
         if positive_indices.size > 0:
             nu_a_indx = positive_indices[0]
             if verbose:
-                print(logPrefix,
-                    f"nu_a = {nu_a}, first frequency element > nu_a is nu[{nu_a_indx}] = {nu[nu_a_indx]}")
+                print(
+                    logPrefix,
+                    f"nu_a = {nu_a}, first frequency element > nu_a is nu[{nu_a_indx}] = {nu[nu_a_indx]}",
+                )
         # if there is no element >= nu_a, return an array of zeros
         else:
             if verbose:
@@ -270,8 +255,10 @@ class MilkyWayAxionHalo(PhysicalObject):
         cutoff_indices = np.where(nu > (1 + 10 * FWHM) * nu_a)[0]
         if cutoff_indices.size > 0:
             if verbose:
-                print(logPrefix,
-                    f"cutoff frequency is {(1 + 10 * FWHM) * nu_a}, first frequency element > cutoff frequency is nu[{cutoff_indices[0]}] = {nu[cutoff_indices[0]]}")
+                print(
+                    logPrefix,
+                    f"cutoff frequency is {(1 + 10 * FWHM) * nu_a}, first frequency element > cutoff frequency is nu[{cutoff_indices[0]}] = {nu[cutoff_indices[0]]}",
+                )
             cutoff_idx = cutoff_indices[0]
         # elsewise set the cutoff index to the last index of the array
         else:
@@ -312,7 +299,9 @@ class MilkyWayAxionHalo(PhysicalObject):
                 "grad_perp",
             ], "Case should be 'non-grad', 'grad_par', or 'grad_perp'!"
 
-            beta = 2 * const.c * v_lab * np.sqrt(2 * (freq - nu_a) / nu_a) / v_0**2  # Eq. (13) in Gramolin lineshape paper
+            beta = (
+                2 * const.c * v_lab * np.sqrt(2 * (freq - nu_a) / nu_a) / v_0**2
+            )  # Eq. (13) in Gramolin lineshape paper
             beta = beta.to_value(unit.one)
             # WARNING:
             # Analytically, `beta` can take very large magnitudes.
@@ -337,7 +326,9 @@ class MilkyWayAxionHalo(PhysicalObject):
             elif case == "grad_par":  # Parallel gradient case, Eq. (19)
                 factor = (
                     np.cos(alpha) ** 2
-                    - (1 / np.tanh(beta) - 1.0 / beta) * (2 - 3 * np.sin(alpha) ** 2) / beta
+                    - (1 / np.tanh(beta) - 1.0 / beta)
+                    * (2 - 3 * np.sin(alpha) ** 2)
+                    / beta
                 )
                 ax_PSD_lineshape = (
                     (4 * const.c**2 / (v_0**2 + 2 * (v_lab * np.cos(alpha)) ** 2))
@@ -397,7 +388,7 @@ class MilkyWayAxionHalo(PhysicalObject):
                 )
                 * nu.unit
             )
-            fine_lineshape = np.zeros_like(fine_freqs) * fine_freqs.unit**-2
+            fine_lineshape = np.zeros_like(fine_freqs) * fine_freqs[0].unit ** -2
             # find the index corresponding to frequency > nu_a
             positive_indices = np.where(fine_freqs > nu_a)[0]
             if positive_indices.size > 0:
@@ -436,9 +427,9 @@ class MilkyWayAxionHalo(PhysicalObject):
     ) -> np.ndarray:
         """Return complex amplitude spectra for the axion pseudo-magnetic field.
 
-        Draws ``numSpectra`` realisations of the stochastic axion field in the
+        Draws ``numSpectra`` realizations of the stochastic axion field in the
         frequency domain using the SHM lineshape as the power spectral density.
-        Each realisation has random phases uniformly distributed in ``[0, 2π)``.
+        Each realization has random phases uniformly distributed in ``[0, 2π)``.
         When ``use_stoch=True``, amplitudes are additionally drawn from an
         exponential distribution, matching the expected statistics of a
         narrowband stochastic signal.
@@ -451,7 +442,7 @@ class MilkyWayAxionHalo(PhysicalObject):
             Lineshape coupling case: ``'non-grad'``, ``'grad_par'``, or
             ``'grad_perp'``.
         numSpectra : int
-            Number of independent field realisations to generate.
+            Number of independent field realizations to generate.
         rand_seed : int, optional
             Seed for the random-number generator (for reproducibility).
         use_stoch : bool
@@ -467,13 +458,14 @@ class MilkyWayAxionHalo(PhysicalObject):
         """
 
         logPrefix = f"[{self.__class__.__name__}.{self.getAmpSpectra.__name__}]"
+
         PSD_lineshape = MilkyWayAxionHalo.axion_lineshape(
             v_0=self.v_0,
             v_lab=self.v_lab,
             nu_a=self.nu_a,
             nu=frequencies,
             case=case,
-            alpha=0.0*unit.rad,
+            alpha=0.0 * unit.rad,
         )
 
         shape = (numSpectra, len(frequencies))
@@ -494,206 +486,8 @@ class MilkyWayAxionHalo(PhysicalObject):
                 np.sqrt(stochastic * PSD_lineshape) * phases
             )  # shape = (numFields, numSteps)
         else:
-            ampSpectra = np.sqrt(PSD_lineshape) * phases  # shape = (numFields, numSteps)
+            ampSpectra = (
+                np.sqrt(PSD_lineshape) * phases
+            )  # shape = (numFields, numSteps)
 
         return ampSpectra
-
-    # def GetAxionWind(
-    #     self,
-    #     year=None,
-    #     month=None,
-    #     day=None,
-    #     time_hms=None,
-    #  year=None,
-    #     month=None,
-    #     day=None,
-    #     time_hms=None,  # Use UTC time!
-    #     # example
-    #     # year=2024, month=9, day=10, time='14:35:16.235812',
-    #     timeastro=None,
-    #     # station: Station = None,
-    #     latitude=None,
-    #     longitude=None,
-    #     elevation=None,
-    #     verbose=False,
-    # ):
-    #     """
-    #     Parameters
-    #     ----------
-    #     time_hms: needs to be in the format "15:47:18"
-    #         if none is specified, use current time
-
-    #     lat: latitude of experiment location
-    #         if none is specified, use Mainz: 49.9916 deg north
-
-    #     lon: longitude of experiment location
-    #         if none is specified, use Mainz: 8.2353 deg east
-
-    #     elev: height of experiment location
-    #         if none is specified, use Uni Campus Mainz: 130 m
-
-    #     Returns
-    #     ---------
-    #         1. the velocity 'v_lab' and 'v_ALP_perp' between lab frame and
-    #     DM halo (SHM), in the galactic rest frame, for the specified
-    #     coordinates and time
-    #         2. angle [rad] between the CASPEr sensitive axis (z-direction =
-    #     earth surface normal)
-    #         3. v_ALP, v_ALP_perp, alpha_ALP go into self.
-
-    #     """
-    #     if verbose:
-    #         print("now calculating wind angle")
-
-    #     year = year or self.year
-    #     month = month or self.month
-    #     day = day or self.day
-    #     time_hms = time_hms or self.time_hms
-
-    #     if self.timeastro is None:
-    #         if (year or month or day or time_hms) is None:
-    #             time_DMmeasure = Time.now()  # UTC time
-    #             # example of the astropy.time.Time.now() return value
-    #             # 2024-09-11 14:27:44.732284
-    #             print(
-    #                 f"no date and time input provided, using current date and time: {time_DMmeasure}"
-    #             )
-    #         else:
-    #             time_DMmeasure = rf"{year}-{month}-{day}T{time_hms}"
-    #         if verbose:
-    #             print(f"time input: {time_DMmeasure}")
-    #         self.timeastro = Time(time_DMmeasure, format="isot", scale="utc")
-    #         # example of timeastro
-    #         # 2024-09-11T14:35:16.236
-
-    #     if self.station is None:
-    #         self.station = Mainz
-    #         if verbose:
-    #             print("no station specified, defaulting to CASPEr Mainz")
-
-    #     lat = latitude or self.station.latitude_deg
-    #     lon = longitude or self.station.longitude_deg
-    #     elev = elevation or self.station.elevation
-
-    #     # DMtimefrac = wind.FracDay(Y=2022, M=12, D=23)
-    #     # if verbose:
-    #     #     print("time of DM measurement (fractional days): ", DMtimefrac)
-
-    #     # LABvel = wind.ACalcV(DMtimefrac)
-    #     # if verbose:
-    #     #     print("velocity (lab frame) @DM time: ", LABvel)
-
-    #     DMtime, unit_North, unit_East, unit_Up, Vhalo = wind.get_CASPEr_vect(
-    #         time=self.timeastro,
-    #         lat=lat,
-    #         lon=lon,
-    #         elev=elev,
-    #     )
-
-    #     # print(type(Vhalo))
-    #     Vlab = Vhalo.get_d_xyz()  # convert into a vector
-    #     Bz = (
-    #         unit_Up.get_xyz()
-    #     )  # our leading field is pointing up perpendicular to earth's surface
-
-    #     alpha_ALP = angle_between(Vlab, Bz).value
-    #     v_ALP = np.linalg.norm(Vlab.value) * 1e3
-    #     v_ALP_perp = v_ALP * math.sin(alpha_ALP)
-
-    #     if verbose:
-    #         # print("time of DM measurement: ", DMtime)
-    #         print("Bz vector @DM time (galaxy frame):", Bz)
-    #         print("v_halo @DM time (galaxy frame):", Vhalo)
-    #         print("v_lab @DM time:", Vlab)
-    #         print("angle between sensitive axis & lab velocity @DM time: ", alpha_ALP)
-
-    #     ###############################################################################################
-    #     # do not delete
-    #     self.windangle = alpha_ALP
-    #     self.v_lab = v_ALP
-    #     self.v_ALP_perp = v_ALP_perp
-    #     self.alpha_ALP = alpha_ALP
-    #     return v_ALP, v_ALP_perp, alpha_ALP
-
-    # # check Gramolin paper for functions:
-    # # axion_beta, axion_lambda, axion_C_para, axion_C_perp
-    # def axion_beta(self, nu_a, nu):
-    #     if nu <= nu_a:
-    #         return 0.0
-    #     else:
-    #         return (
-    #             (2 * self.c * self.v_lab)
-    #             / self.v_0**2
-    #             * np.sqrt(2 * (nu - nu_a) / nu_a)
-    #         )
-
-    # def axion_lambda(
-    #     self,
-    #     nu_a,
-    #     nu,
-    #     alpha,
-    # ):
-    #     p0 = (2 * self.c**2) / (np.sqrt(np.pi) * self.v_0 * self.v_lab * nu_a)
-    #     p1 = np.exp(
-    #         -self.axion_beta(nu_a=nu_a, nu=nu) ** 2 * self.v_0**2 / (4 * self.v_lab**2)
-    #         - (self.v_lab / self.v_0) ** 2
-    #     )
-    #     p2 = np.sinh(self.axion_beta(nu_a=nu_a, nu=nu))
-    #     return p0 * p1 * p2
-
-    # def axion_C_para(
-    #     self,
-    #     alpha,
-    # ):
-    #     return self.v_0**2 / 2.0 + self.v_lab**2 * np.cos(alpha) ** 2
-
-    # def axion_C_perp(
-    #     self,
-    #     alpha,
-    # ):
-    #     return self.v_0**2 + self.v_lab**2 * np.sin(alpha) ** 2
-
-    # def lineshape_t(self, nu, nu_a=None, case="grad_perp") -> np.ndarray:
-    #     """
-    #     axion_lineshape at time t
-    #     """
-    #     # v_ALP, v_ALP_perp, alpha_ALP = get_ALP_wind(\
-    #     if nu_a is None:
-    #         nu_a = self.nu_a
-    #     if self.station is None:
-    #         self.station = Mainz
-    #         # print('no station specified, defaulting to CASPEr Mainz')
-    #     self.GetAxionWind(
-    #         year=self.year,
-    #         month=self.month,
-    #         day=self.day,
-    #         time_hms=self.time_hms,
-    #         latitude=self.station.latitude_deg,
-    #         longitude=self.station.longitude_deg,
-    #         elevation=self.station.elevation,
-    #         verbose=False,
-    #     )
-
-    #     return axion_lineshape(
-    #         v_0=self.v_0,
-    #         v_lab=self.v_lab,
-    #         nu_a=nu_a,
-    #         nu=nu,
-    #         case=case,
-    #         alpha=self.windangle,
-    #     )  # type: ignore
-
-    #     conv_step_len = 1.0 * conv_step / abs(xstamp[1]-xstamp[0])
-    #     if conv_step_len < 1.0:
-    #         check(conv_step_len)
-    #         raise ValueError('conv_step_len too short. Increase conv_step.')
-    #     conv_step_len = int(conv_step_len)
-
-    #     conv_step_num = int(1.0 * abs(xstamp[-1]-xstamp[0]) / conv_step)
-    #     for i in range(conv_step_num):
-    #         if i * conv_step_len + conv_line_len > len(signal)-1:
-    #             break
-    #         conv_xstamp.append([i * conv_step + xstamp[0]])
-    #         p = signal[i * conv_step_len:i * conv_step_len + conv_line_len] * conv_line
-    #         conv_signal.append(np.sum(p)/np.sum(conv_line)**2)
-    #     return conv_xstamp, conv_signal
