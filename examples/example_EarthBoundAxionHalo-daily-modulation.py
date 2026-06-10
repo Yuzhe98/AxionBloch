@@ -1,5 +1,4 @@
 # plot the daily modulation of the axion gradient at various stations on Earth, for an Earth-bound axion halo with a given Compton frequency and axion-nucleon coupling. The modulation is due to the rotation of the Earth, which changes the direction of the station relative to the axion halo. The code solves the time-independent Schrödinger equation for the axion halo and then computes the gradient at each station as a function of time over one day. Finally, it plots the results.
-# TODO: to be completed
 import os
 
 from axionbloch.dependency import *
@@ -77,9 +76,6 @@ result = halo.findGradientsOverTime(
     verbose=True,
 )
 
-
-plt.rcParams["font.family"] = "Times New Roman"
-
 fig = plt.figure(figsize=(8.5 / 2.54, 8.5 / 2.54), dpi=300)
 gs = gridspec.GridSpec(3, 1)
 fig.subplots_adjust(left=0.22, bottom=0.12, right=0.67, top=0.93, hspace=0.12)
@@ -87,7 +83,7 @@ fig.subplots_adjust(left=0.22, bottom=0.12, right=0.67, top=0.93, hspace=0.12)
 ax_r = fig.add_subplot(gs[0])
 ax_theta = fig.add_subplot(gs[1], sharex=ax_r, sharey=ax_r)
 ax_phi = fig.add_subplot(gs[2], sharex=ax_r, sharey=ax_r)
-check(result["grad_r"][0:10])
+# check(result["grad_r"][0:10])
 ax_r.plot(t_hours, result["grad_r"], label="Re", color="tab:blue")
 # ax_r.plot(t_hours, result["grad_r"].imag, label="Im", color="tab:orange", ls="--")
 ax_theta.plot(t_hours, result["grad_theta"], color="tab:green")
@@ -95,7 +91,7 @@ ax_theta.plot(t_hours, result["grad_theta"], color="tab:green")
 ax_phi.plot(t_hours, result["grad_phi"], color="tab:brown")
 # ax_phi.plot(t_hours, result["grad_phi"].imag, color="tab:orange", ls="--")
 
-ax_phi.set_xlabel("UTC hour")
+ax_phi.set_xlabel("time (hour)")
 
 
 def _ylabel(label, q):
@@ -127,7 +123,7 @@ for ax in [ax_r, ax_theta]:
 
 # ax_r.legend(loc="upper left", bbox_to_anchor=(1.0, 1.0), fontsize=7)
 fig.suptitle(
-    f"Mainz  ·  {states_to_check[0]}  ·  $\\nu_a={halo.nu_a.to_value(unit.MHz):.3f}$ MHz"
+    f"Mainz  ·  {states_to_check[0]}  ·  $\\nu_a={halo.nu_a.to_value(unit.MHz):.3f}$ MHz\nstart from {t0}"
 )
 ylim_abs = 0
 for ax in [ax_r, ax_phi, ax_theta]:

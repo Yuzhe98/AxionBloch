@@ -151,7 +151,7 @@ for stateName in states_to_check:
         )
     ax.tick_params(axis="x", labelrotation=20)
     # ax.set_xlabel("Station")
-    ax.set_ylabel(f"Gradient Value ({yUnit.to_string('latex_inline')})")
+    ax.set_ylabel(f"Rabi frequency ({yUnit.to_string('latex_inline')})")
     ax.set_ylim(bottom_min, top_max)
     ax.legend(
         handles=[grad_r_scatter, grad_theta_scatter, grad_phi_scatter],

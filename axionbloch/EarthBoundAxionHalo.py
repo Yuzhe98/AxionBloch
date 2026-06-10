@@ -392,8 +392,11 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         self.E_unit = unit.attoelectronvolt
         self.pot = self.pot.to(self.E_unit)
         self.T_magnitude = self.T_magnitude.to(self.E_unit)
+        self.N_a = totalMassEnclosed / self.m_a
         if a_0 is not None:
             self.a_0 = a_0
+        else:
+            self.a_0_reduced = np.sqrt(2 * self.N_a * const.hbar**3 * const.c / self.m_a).si
         self.totalMassEnclosed = totalMassEnclosed
 
     # ------------------------------------------------------------------
