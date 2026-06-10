@@ -2,7 +2,7 @@ from axionbloch.dependency import *
 
 from functools import partial
 
-from axionbloch.utils import Lorentzian
+from axionbloch.utils import Lorentzian, Lorentzian_0edge
 
 
 class Magnet:
@@ -126,7 +126,7 @@ class Magnet:
         # inhomogeneous field
         else:
             pdf = partial(
-                Lorentzian,
+                Lorentzian_0edge,
                 center=self.B0,
                 FWHM=self.FWHM_B0,
                 area=1,
@@ -159,51 +159,70 @@ class Magnet:
                 ax.plot(
                     (bin_edges[1:] - self.B0) / self.FWHM_B0,
                     hist,
-                    label="", marker="o", color='goldenrod', markeredgecolor='darkgoldenrod'
+                    label="",
+                    marker="o",
+                    color="goldenrod",
+                    markeredgecolor="darkgoldenrod",
                 )
                 ax.set_xlabel("Magnetic field - $B_0$ (FWHM)")
                 ax.set_ylabel("Number of sampling points")
-                ax.set_title("Histogram of number of sampling \nover magnetic field spread")
+                ax.set_title(
+                    "Histogram of number of sampling \nover magnetic field spread"
+                )
                 plt.tight_layout()
                 # plt.savefig('example figure - one-column.png', transparent=False)
                 plt.show()
 
-            # Define interval edges (midpoints between adjacent x's)
-            edges = np.zeros(len(self.B_spread) + 1) * self.B_spread.unit
+            # Define interval edges
+            edges = np.zeros(len(self.B_spread) + 1) * self.B_spread[0].unit
             edges[1:-1] = (self.B_spread[:-1] + self.B_spread[1:]) / 2
-            edges[0] = self.B_spread[0]
-            edges[-1] = self.B_spread[-1]
+            edges[0] = self.B_spread[0] - abs(edges[2] - edges[1]) / 2
+            edges[-1] = self.B_spread[-1] + abs(edges[-2] - edges[-3]) / 2
 
             if verbose:
-                print(f"{logPrefix} B_spread: {len(self.B_spread)} points  "
-                      f"range=[{self.B_spread.min():.6g}, {self.B_spread.max():.6g}]")
+                print(
+                    f"{logPrefix} B_spread: {len(self.B_spread)} points  "
+                    f"range=[{self.B_spread.min():.6g}, {self.B_spread.max():.6g}]"
+                )
 
             self.ratios = np.zeros(self.B_spread.shape)
             for i in range(len(self.B_spread)):
                 a, b = edges[i], edges[i + 1]
                 x = np.linspace(a, b, 32)
                 self.ratios[i] = np.trapezoid(pdf(x), x)
+            # high-frequency spins can create wiggles in the magnetization signal
+            # to suppress wiggles, add hamming window to decrease the ratio of high-frequency spins
+            # this is not ideal or physical. However, in simulations, we cannot use extremely large nFWHM
+            # to account for the real magnetic field distribution. We truncate at edges, instead. 
+            self.ratios *= np.hamming(len(self.ratios))**2
+            # normalize ratios to sum to 1
+            self.ratios /= np.sum(self.ratios)
 
             if verbose:
-                print(f"{logPrefix} ratios computed  sum={self.ratios.sum():.6g}  "
-                      f"min={self.ratios.min():.4g}  max={self.ratios.max():.4g}")
+                print(
+                    f"{logPrefix} ratios computed  sum={self.ratios.sum():.6g}  "
+                    f"min={self.ratios.min():.4g}  max={self.ratios.max():.4g}"
+                )
 
             if showPlot:
-                fig = plt.figure(
-                    figsize=(8.5 / 2.54, 6.5 / 2.54), dpi=300
-                )
+                fig = plt.figure(figsize=(8.5 / 2.54, 6.5 / 2.54), dpi=300)
                 gs = gridspec.GridSpec(
                     nrows=1, ncols=1
                 )  # create grid for multiple figures
                 ax = fig.add_subplot(gs[0, 0])
-                ax.plot(self.B_spread, self.ratios, label="", marker="o")
-                ax.set_xlabel("")
+                ax.plot(
+                    (self.B_spread - self.B0) / self.FWHM_B0,
+                    self.ratios,
+                    label="",
+                    marker="o",
+                )
+                ax.set_xlabel("Magnetic field - $B_0$ (FWHM)")
                 ax.set_ylabel("")
-                ax.set_title("Histogram of spin packet ratio over magnetic field spread")
+                ax.set_title(
+                    "Histogram of spin packet ratio over magnetic field spread"
+                )
                 plt.tight_layout()
                 plt.show()
 
-            # normalize ratios to sum to 1
-            self.ratios /= np.sum(self.ratios)
             if verbose:
-                print(logPrefix, f" ratios normalized sum={self.ratios.sum():g}")
+                print(logPrefix, f"self.ratios normalized sum={self.ratios.sum():g}")
