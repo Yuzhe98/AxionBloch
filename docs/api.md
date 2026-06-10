@@ -238,7 +238,6 @@ supported.
 | `mu_p` | Proton magnetic dipole moment |
 | `gamma_Xe129` | ¹²⁹Xe gyromagnetic ratio (rad Hz T⁻¹) |
 | `mu_Xe129` | ¹²⁹Xe magnetic dipole moment |
-| `earth_radius` | Earth radius (m) |
 
 ```{automodule} axionbloch.constants
 :members:
