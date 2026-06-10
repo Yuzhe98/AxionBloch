@@ -107,7 +107,7 @@ plt.rcParams["mathtext.rm"] = "Times New Roman"
 # plt.style.use('seaborn-dark')  # to specify different styles
 # print(plt.style.available)  # if you want to know available styles
 
-cm = 1 / 2.56  # convert cm to inch
+cm = 1 / 2.54  # convert cm to inch
 # fig = plt.figure(figsize=(8.5 * cm, 12 * cm), dpi=300)  # initialize a figure following APS journal requirements
 fig = plt.figure(figsize=(6.0, 4.0), dpi=150)  # initialize a figure
 
