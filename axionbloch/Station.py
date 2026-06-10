@@ -69,7 +69,7 @@ class Station:
             Print derived spherical coordinates after construction.
         """
 
-        logPrefix = f"[{self.__class__.__name__}.__init__]"
+        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
         self.name = name
         self.NSsemisphere = NSsemisphere
         self.EWsemisphere = EWsemisphere
@@ -226,6 +226,7 @@ Mainz = Station(
     elevation=100.0 * unit.m,
     verbose=False,
 )
+
 Geneva = Station(
     name="Geneva",
     NSsemisphere="N",
@@ -235,6 +236,7 @@ Geneva = Station(
     elevation=375.0 * unit.m,
     verbose=False,
 )
+
 Baltimore = Station(
     name="Baltimore",
     NSsemisphere="N",  # 'N' or 'S'
@@ -244,6 +246,7 @@ Baltimore = Station(
     elevation=35.0 * unit.m,
     verbose=False,
 )
+
 Tokyo = Station(
     name="Tokyo",
     NSsemisphere="N",
@@ -253,7 +256,6 @@ Tokyo = Station(
     elevation=44.0 * unit.m,
     verbose=False,
 )
-
 
 Mumbai = Station(
     name="Mumbai",
@@ -298,7 +300,6 @@ CapeTown = Station(
     verbose=False,
 )
 
-
 BuenosAires = Station(
     name="BuenosAires",
     NSsemisphere="S",
@@ -309,6 +310,3 @@ BuenosAires = Station(
     verbose=False,
 )
 
-# print(Mainz.name, Mainz.theta.to("deg"), Mainz.phi.to("deg"), Mainz.nvec, Mainz.R)
-# print(Baltimore.name, Baltimore.theta.to("deg"), Baltimore.phi.to("deg"), Baltimore.nvec, Baltimore.R)
-# print(Sanya.name, Sanya.theta.to("deg"), Sanya.phi.to("deg"), Sanya.nvec, Sanya.R)
