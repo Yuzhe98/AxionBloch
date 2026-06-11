@@ -1,21 +1,17 @@
 """
 TNMR signal classes for the CASPEr high-field (HF) NMR spectrometer.
 
-This module provides Signal subclasses tailored to data acquired by the
-TecMag TNMR spectrometer.  The raw FID is stored on disk as interleaved
-float64 pairs (Re, Im) by TNMR's binary export; ``TNMR_Signal.loadBinData``
-reads that format and converts it to a complex time-series compatible with
-the rest of the CASPErG analysis pipeline.
+This module provides Signal subclasses tailored to data acquired simulation.
 
 Classes
 -------
-TNMR_Signal
-    Single-shot FID acquired by the TNMR spectrometer.
-TNMR_SignalEntry
-    Thin dataclass that bundles a ``TNMR_Signal`` with an auxiliary
+Simu_Signal
+    Signal acquired by the simulation.
+Simu_SignalEntry
+    Thin dataclass that bundles a ``Simu_Signal`` with an auxiliary
     parameter dictionary.
-TNMR_Signals
-    Ordered collection of ``TNMR_SignalEntry`` objects with batch
+Simu_Signals
+    Ordered collection of ``Simu_SignalEntry`` objects with batch
     analysis helpers inherited from ``Signals``.
 """
 
@@ -50,9 +46,8 @@ class Simu_Signal(Signal):
         self,
         name="TNMR signal",
         filePath=None,
-        # fileList=None,
-        device="Tecmag",
-        deviceID="HF_TNMR_LIA",
+        device="Simulation",
+        deviceID="Simulation",
         verbose=False,
     ):
         logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}] "
@@ -103,7 +98,7 @@ class Simu_Signal(Signal):
             Masked time-series data.
         """
         assert self.TS_raw is not None, "Raw time-series data (TS_raw) is not loaded."
-        
+
         return self.TS_raw[mask]
 
 @dataclass
