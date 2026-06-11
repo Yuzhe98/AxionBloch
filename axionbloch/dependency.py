@@ -49,7 +49,7 @@ from matplotlib.axes import Axes
 import textwrap
 
 # plot style
-plt.rc("font", size=6)  # font size for all figures
+plt.rc("font", size=8)  # font size for all figures  TODO check this fontsize
 # plt.rcParams['font.family'] = 'serif'
 # plt.rcParams['font.serif'] = ['Times New Roman']
 plt.rcParams["font.family"] = "Times New Roman"
