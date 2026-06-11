@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "axionbloch"
-version = "0.1.2"
+version = "0.2.0"
 description = "Simulation tool for axion-induced spin dynamics."
 
 authors = [
