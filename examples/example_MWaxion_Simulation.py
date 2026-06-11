@@ -18,7 +18,8 @@ script_path = os.path.abspath(__file__)
 savedir = script_path
 
 # set the sample (including T2 and T1)
-# CH3OH
+
+# Xe-129
 sample = Sample(
     name="Liquid Xe-129",  # name of the sample
     gamma=gamma_Xe129,  # [Hz/T]. Remember input it with 2 * np.pi
@@ -34,12 +35,27 @@ sample = Sample(
     verbose=False,
 )
 
+# # CH3OH
+# sample = Sample(
+#     name="C-12 Methanol",
+#     gamma=gamma_p,
+#     massDensity=0.792 * unit.g * unit.cm ** (-3),
+#     molarMass=32.04 * unit.g / unit.mol,
+#     numOfSpinsPerMolecule=4 * unit.one,
+#     T2=1 * unit.s,
+#     T1=5 * unit.s,
+#     vol=1 * unit.cm**3,
+#     mu=mu_p,
+#     temp=300 * unit.K,
+#     verbose=False,
+# )
+
 # axion Compton frequency
-nu_a_array = np.array([nu * unit.Hz for nu in [1e3]])
+nu_a_list = [nu * unit.Hz for nu in [1e3]]
 # nu_a_array = np.array([nu * unit.Hz for nu in [1e3, 1e6, 1e9]])
 
 # set magnet homogeneity
-mag_FWHMs = np.array([nu * ppm for nu in [2]])
+mag_FWHMs = [nu * ppm for nu in [2]]
 
 # set the strength of the pseudomagnetic field (rms of the field) Brms
 B_a_rms = None
@@ -58,7 +74,7 @@ simulations = Simulations()
 # list of simulation parameter dictionaries
 all_params = []
 
-for nu_a in nu_a_array:
+for nu_a in nu_a_list:
     for mag_FWHM in mag_FWHMs:
         nu_a_Hz = nu_a.to_value(unit.Hz)
         print("Axion Compton frequency =", nu_a, flush=True)
@@ -69,16 +85,14 @@ for nu_a in nu_a_array:
             g_aNN=1.0e-9 * unit.GeV ** (-1),
         )
 
-        # set RCF frequency to it RCF_Freq_Hz = nu_a*(1+v_a^2/c^2)
+        # set RCF frequency to effective axion Compton frequency
         RCF_freq = axion.nu_a_eff
-        RCF_freq_Hz = RCF_freq.to_value(unit.Hz)
 
         # set the detection magnet (bias field) accordingly
         # also set detection magnet (bias field) homogeneity
         magnet = Magnet(
             name="detection magnet",
-            B0=RCF_freq / (sample.gamma / (2 * np.pi)),
-            direction=[0, 0, 1],
+            B0=RCF_freq / (sample.gamma / (2 * PI)),
             FWHM=mag_FWHM,
             nFWHM=10.0,
         )
@@ -89,12 +103,12 @@ for nu_a in nu_a_array:
             if axion.g_aNN is None:
                 raise ValueError("B_a_rms and g_aNN cannot be both None")
             else:
-                B_a_rms = axion.getRabiFreq(verbose=True) / (sample.gamma)
+                B_a_rms = axion.getRabiFreq(verbose=True) / (sample.gamma / (2 * PI))
                 B_a_rms = B_a_rms.to("T")
                 print(f"Calculated B_a_rms from g_aNN = {B_a_rms}", flush=True)
         key_info = {"mag_FWHM": mag_FWHM, "nu_a": axion.nu_a}
         # duration = 10 * axion.tau_a_est
-        duration = 4000 * unit.s
+        duration = 400 * unit.s
         rate = 1 * unit.Hz
         params: SimuParams = {
             "key_info": key_info,
@@ -115,9 +129,9 @@ for nu_a in nu_a_array:
         }
         all_params.append(params)
 
-simu_all = Simulations(name="Axion-Xe_NMR-simulations", all_params=all_params)
+simu_all = Simulations(name="Axion-NMR-simulations", all_params=all_params)
 # print("simu_all.run started", flush=True)
-simu_all.run(autoStart=False, verbose=True)
+simu_all.run(autoStart=True, verbose=True)
 
 # simu_all.pool[0].simu.monitorTrajectories()
 for i in range(len(simu_all.pool)):
@@ -127,7 +141,7 @@ for i in range(len(simu_all.pool)):
 simu_all.saveToPkl(
     dir=os.path.dirname(os.path.abspath(__file__))  # , fname="new_simulation"
 )
-save_data = True
+save_data = False
 if save_data:
     i = 0
     simu: Simulation = simu_all.pool[i].simu
