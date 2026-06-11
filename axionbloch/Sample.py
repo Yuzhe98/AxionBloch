@@ -125,7 +125,7 @@ class Sample:
         if verbose:
             print(
                 logPrefix,
-                f"Thermal polarization at B_pol={B_pol} and temp={temp} is {pol}. ",
+                f"Thermal polarization at B_pol={B_pol.to(unit.T)} and temp={temp.to(unit.K)} is {pol.to(unit.one)}. ",
             )
         return pol
 
@@ -176,7 +176,9 @@ class Sample:
         """
         logPrefix = f"[{self.__class__.__name__}.{self.getM0_SPN.__name__}]"
 
-        M0_SPN = (self.mu * np.sqrt(self.totalNumOfSpins) / self.vol).to(unit.A / unit.m)
+        M0_SPN = (self.mu * np.sqrt(self.totalNumOfSpins) / self.vol).to(
+            unit.A / unit.m
+        )
         self.M0_SPN = M0_SPN
         if verbose:
             print(logPrefix, f"Spin projection noise magnetization M0_SPN is {M0_SPN}")
