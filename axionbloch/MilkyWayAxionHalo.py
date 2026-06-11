@@ -155,14 +155,13 @@ class MilkyWayAxionHalo:
                 * g_aNN
                 * (2 * const.hbar * const.c * self.rho_E_DM) ** (1 / 2)
                 * self.v_lab
-            )
-            Omega_rms = Omega_rms
+            ).to(unit.Hz)
         else:
             raise ValueError(
                 f"case {case} not recognized, should be 'grad_perp'"
             )  #  'non-grad', 'grad_par' or
         if verbose:
-            print(logPrefix, f"axion wind Rabi frequency (case={case}): {Omega_rms}")
+            print(logPrefix, f"axion wind Rabi frequency (case={case}): {Omega_rms.to(unit.Hz)}")
         return Omega_rms
 
     @staticmethod
