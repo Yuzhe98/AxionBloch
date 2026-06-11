@@ -1,10 +1,6 @@
 # $env:PYTHONPATH = "your:\path\here;$env:PYTHONPATH”
-
-import numpy as np
+from axionbloch.dependency import *
 import time
-
-from astropy import units as unit
-
 from axionbloch.SimuTools import MagField, Simulation
 from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet
@@ -12,7 +8,7 @@ from axionbloch.utils import check
 from axionbloch.constants import gamma_p, mu_p
 
 
-RCF_Freq_Hz = 1e6
+RCF_Freq = 1 * unit.MHz
 
 T1 = 1e8 * unit.s
 
@@ -36,8 +32,8 @@ sample = Sample(
 
 magnet = Magnet(
     name="detection magnet",
-    B0=RCF_Freq_Hz * unit.Hz / (sample.gamma / (2 * np.pi)),
-    FWHM=(1 / (np.pi * Tdelta_s) / RCF_Freq_Hz) * unit.one,
+    B0=RCF_Freq / (sample.gamma / (2 * PI)),
+    FWHM=(1 / (np.pi * Tdelta_s) / np.abs(RCF_Freq)) * unit.one,
     nFWHM=10.0,
 )
 magnet.setHomogeneity(
