@@ -1,18 +1,18 @@
-"""Calibration tests – free-decay signal.
+"""Calibration tests – free-decay signal envelope.
 
 Usage
 -----
-Run all 108 cases::
+Run all 36 cases::
 
     pytest tests/test_calibrations_free_decay.py
 
 Run a single case with a diagnostic plot::
 
-    pytest "tests/test_calibrations_free_decay.py::test_free_decay_peak_frequency[0.0-1ppm-1.0-1e+06Hz]" --show-plots
+    pytest "tests/test_calibrations_free_decay.py::test_free_decay_envelope[1ppm-1-1e+06Hz]" --show-plots
 
 Filter by FWHM and frequency::
 
-    pytest tests/test_calibrations_free_decay.py --show-plots -k "1ppm and 1e+06Hz"
+    pytest tests/test_calibrations_free_decay.py --show-plots -k "[1ppm-"
 
 Run both calibration suites::
 
@@ -20,108 +20,85 @@ Run both calibration suites::
 
 Free-decay calibration
 ----------------------
-A 90° pulse is applied and the free-decay signal (Mx + i·My) is observed
-in the rotating frame.  The test sweeps over four magnet homogeneity
-values (in ppm), three RCF (carrier) frequencies, three Larmor-frequency
-offsets, and three demodulation detunings.
+A 90° pulse is applied and the free-decay amplitude envelope |Mxy(t)| =
+sqrt(Mx² + My²) is compared to the analytically expected free-decay kernel.
 
 Physics
 -------
-The simulator runs in a rotating frame at ``RCF_freq``.  We set
+The simulator runs in a rotating frame at RCF_freq.  B0 is chosen so that
 
-    B0 = (RCF_freq - signal_offset) / (γ / 2π)
+    ν_L = RCF_freq − Delta_nu_L  (Larmor below carrier),
 
-so that the Larmor frequency is
+where Delta_nu_L = rel_detuning × RCF_freq.  After a 90° pulse the
+transverse magnetisation precesses freely.  In the rotating frame:
 
-    ν_L = γ B0 / 2π = RCF_freq - signal_offset.
+    M+(t) = exp(−2πi · Delta_nu_L · t) · FD_sub(t)
 
-The z-axis offset in the rotating frame is
+where the free-decay kernel is
 
-    Ω_z = 2π (ν_L − RCF_freq) = −2π · signal_offset.
+    FD_sub(t) = Σᵢ wᵢ · exp(2πi · δᵢ · t),
 
-The Bloch equation for M+ = Mx + iMy gives dM+/dt = −i Ω_z M+, so
-after a 90° pulse M+ oscillates at
+    δᵢ = γ/(2π) · B_spread_i
 
-    f_signal = +signal_offset.   (positive)
+is the detuning of spin packet i from the centre Larmor frequency, and
+wᵢ are the Hamming-squared weights from the magnet model.  The amplitude
+envelope is independent of Delta_nu_L:
 
-The free-decay envelope decays at the effective rate
+    |Mxy(t)| = |FD_sub(t)|.
 
-    1/T2star = 1/T2 + 1/Tdelta,
+The test quantifies agreement between simulation and theory via
 
-where T2 is the intrinsic relaxation time and
-Tdelta = 1/(π · FWHM_freq) is the dephasing time from magnet
-inhomogeneity.  FWHM is specified in ppm (parts per million) of B0:
+    χ² = ‖|Mxy| − |FD_sub|‖² / ‖|FD_sub|‖²
 
-    FWHM_freq  = FWHM_ppm × 1e-6 × RCF_freq      (Hz)
-    Tdelta     = 1 / (π × FWHM_ppm × 1e-6 × RCF_freq)
+and asserts χ² ≤ _CHI2_TOLERANCE.
 
-Because Tdelta ∝ 1/RCF_freq, the same ppm value gives a much shorter
-dephasing time at higher field.
+Simulation parameters
+---------------------
+    duration = N_T2STAR × T₂*_analytic
+    rate     = max(N_PER_T2STAR × Delta_nu_L, N_PER_T2STAR / T₂*_analytic)
 
-Adaptive simulation window
---------------------------
-Rather than skipping short-T2star cases the simulation duration is set to
-``10 × T2star`` (capped at ``_MAX_DURATION``) and the sampling rate is
-set to ``max(_MIN_RATE, _N_PER_T2STAR / T2star)`` so that each run
-always produces ~1 000 RK4 steps regardless of T2star.  The FFT
-frequency resolution is ``1 / duration``; the assertion tolerance is
-``2 × resolution``.  For very short T2star the tolerance is coarse (poor
-frequency resolution), so the test verifies correct simulation execution;
-for long T2star it is tight and gives a precise frequency calibration.
+This keeps the total RK4 step count ≈ N_T2STAR × N_PER_T2STAR = 2000
+regardless of FWHM or RCF_freq.
 
-Applying digital demodulation at ``f_demod = f_signal + δ`` shifts the
-oscillation to
-
-    f_peak = f_signal − f_demod = −δ.
-
-We parametrise over:
-  • four FWHM values: 0.1, 1, 10, 20 ppm
-  • three RCF frequencies: 1 kHz, 1 MHz, 1 GHz
-  • three signal offsets: 1.0, 2.5, 5.0 Hz
-  • three demodulation detunings δ: 0.0, 0.3, −0.7 Hz
+Parametrisation
+---------------
+  • four FWHM values:        0.1, 1, 10, 20 ppm
+  • three RCF frequencies:   1 kHz, 1 MHz, 1 GHz
+  • three Larmor detunings:  0, 1, 10 ppm of RCF_freq
+  Total: 36 test cases, all expected to pass.
 """
 
-import matplotlib.pyplot as plt
-import numpy as np
 import pytest
-from astropy import units as unit
-
+from axionbloch.dependency import *
 from axionbloch.Apparatus import Magnet
 from axionbloch.Sample import Sample
 from axionbloch.SimuTools import MagField, Simulation
 from axionbloch.constants import gamma_p, mu_p
-from axionbloch.dependency import ppm  # 1 ppm = 1e-6 (dimensionless)
-
-PI = np.pi * unit.rad
 
 # ---------------------------------------------------------------------------
 # Shared simulation parameters
 # ---------------------------------------------------------------------------
-_T1 = 1e6 * unit.s  # negligible longitudinal relaxation
-_T2 = 1e6 * unit.s  # negligible intrinsic T2 → T2star ≈ Tdelta
-_T90_STEPS = 5  # 90° pulse length in time steps
-_NFWHM = 5.0  # half-width range for spin-packet sampling
+_T1 = 1e6 * unit.s   # negligible longitudinal relaxation
+_T2 = 1e3 * unit.s   # negligible intrinsic T2 → T2* ≈ Tdelta
+_NFWHM = 10.0          # half-width range; larger nFWHM adds outer packets that
+                      # precess ~1 rad during the 90° pulse, raising χ²
+_T90_STEPS = 5        # 90° pulse length in time steps
 
-# Adaptive timing: duration = min(10 × T2star, _MAX_DURATION),
-#                  rate     = max(_MIN_RATE, _N_PER_T2STAR / T2star)
-_MAX_DURATION = 10.0 * unit.s
-_MIN_RATE = 200.0 * unit.Hz
-_N_PER_T2STAR = 100  # target samples per T2star for RK4 accuracy
+# χ² tolerance: ‖Mxy − FD_sub‖² / ‖FD_sub‖² over full post-pulse trajectory
+_CHI2_TOLERANCE = 1e-4
+
+# Adaptive timing
+_N_T2STAR = 10.0     # observe for 10 × T₂*_analytic
+_N_PER_T2STAR = 300  # RK4 samples per T₂*_analytic
 
 # ---------------------------------------------------------------------------
 # Parametrisation
 # ---------------------------------------------------------------------------
-# Four magnet homogeneity values in ppm
 _FWHM_CASES = [0.1 * ppm, 1.0 * ppm, 10.0 * ppm, 20.0 * ppm]
-
-# Three carrier (RCF) frequencies spanning audio, RF, and microwave bands
 _RCF_FREQS = [1.0 * unit.kHz, 1.0 * unit.MHz, 1.0 * unit.GHz]
+_REL_DETUNINGS = [0.0 * ppm, 1.0 * ppm, 10.0 * ppm]
 
-# Three Larmor-frequency offsets below RCF_freq: ν_L = RCF_freq − signal_offset
-_SIGNAL_OFFSETS = [1.0 * unit.Hz, 2.5 * unit.Hz, 5.0 * unit.Hz]
-
-# Three demodulation detunings δ: f_demod = f_signal + δ → peak at −δ
-_DEMOD_DETUNES = [0.0 * unit.Hz, 0.3 * unit.Hz, -0.7 * unit.Hz]
+_GAMMA = gamma_p
 
 
 # ---------------------------------------------------------------------------
@@ -130,11 +107,11 @@ _DEMOD_DETUNES = [0.0 * unit.Hz, 0.3 * unit.Hz, -0.7 * unit.Hz]
 
 
 def _build_free_decay_simulation(
-    RCF_freq: unit.Quantity,
-    signal_offset: unit.Quantity,
-    FWHM: unit.Quantity,
-    rate: unit.Quantity,
-    duration: unit.Quantity,
+    RCF_freq: Quantity,
+    Delta_nu_L: Quantity,
+    FWHM: Quantity,
+    rate: Quantity,
+    duration: Quantity,
 ) -> Simulation:
     """Build and run a 90°-pulse free-decay simulation.
 
@@ -142,17 +119,15 @@ def _build_free_decay_simulation(
     ----------
     RCF_freq:
         Rotating-frame carrier frequency.
-    signal_offset:
-        Larmor offset below ``RCF_freq``.
+    Delta_nu_L:
+        Larmor offset below RCF_freq: ν_L = RCF_freq − Delta_nu_L.
     FWHM:
-        Fractional field homogeneity (in ppm or dimensionless).
+        Fractional field inhomogeneity (ppm or dimensionless).
     rate:
         Simulation sampling rate.
     duration:
         Observation window.
     """
-    FWHM_dimless = FWHM.to(unit.one)
-
     sample = Sample(
         name="calibration_proton",
         gamma=gamma_p,
@@ -167,19 +142,19 @@ def _build_free_decay_simulation(
         verbose=False,
     )
 
-    B0 = (RCF_freq - signal_offset) / (sample.gamma / (2 * PI))
+    B0 = (RCF_freq - Delta_nu_L) / (sample.gamma / (2 * PI))
 
     magnet = Magnet(
         name="calibration_magnet",
         B0=B0,
-        FWHM=FWHM_dimless,
+        FWHM=FWHM,
         nFWHM=_NFWHM,
     )
 
     simu = Simulation(
         name=(
-            f"free_decay_{RCF_freq.to_value(unit.Hz):.3g}Hz"
-            f"_{signal_offset.to_value(unit.Hz):.1f}Hz"
+            f"fd_{RCF_freq.to_value(unit.Hz):.3g}Hz"
+            f"_{Delta_nu_L.to_value(unit.Hz):.1f}Hz"
             f"_{FWHM.to_value(ppm):.4g}ppm"
         ),
         sample=sample,
@@ -196,39 +171,31 @@ def _build_free_decay_simulation(
         timeLen=simu.timeLen,
         gamma=simu.sample.gamma,
         t90=_T90_STEPS * simu.timeStep,
-        nu_rot=signal_offset,
+        nu_rot=Delta_nu_L,
     )
 
     simu.generateTrajectories(integrator="RK4")
     return simu
 
 
-def _free_decay_peak_frequency(
-    simu: Simulation, t90_steps: int, demodfreq: unit.Quantity
-) -> unit.Quantity:
-    """Return the FFT peak frequency of the demodulated free-decay signal.
+def _fd_expected_curve(simu: Simulation, t90_steps: int) -> np.ndarray:
+    """Expected |Mxy(t)| envelope from the free-decay kernel.
 
-    Parameters
-    ----------
-    simu:
-        Completed simulation (``trjry`` populated).
-    t90_steps:
-        Trajectory steps occupied by the excitation pulse to skip.
-    demodfreq:
-        Digital demodulation frequency in the rotating frame.
+    Returns an array of length ``simu.timeLen − t90_steps``.
+    Each spin packet i contributes exp(2πi · δᵢ · t) with
+    δᵢ = γ/(2π) · B_spread_i.
     """
     t_s = simu.getTimeStamp().to_value(unit.s)
-    t_sig = t_s[t90_steps:]
-    demodfreq_Hz = demodfreq.to_value(unit.Hz)
+    t_sig = t_s[t90_steps:] - t_s[t90_steps]  # time since end of pulse
 
-    sig = simu.trjry[0, t90_steps:, 0] + 1j * simu.trjry[0, t90_steps:, 1]
-    demod_sig = sig * np.exp(-2j * np.pi * demodfreq_Hz * t_sig)
+    gamma_over_2pi = _GAMMA.to_value(unit.rad * unit.Hz / unit.T) / (2 * np.pi)
+    B_spread = simu.magnet.B_spread.to_value(unit.T)
 
-    N = len(demod_sig)
-    dt = t_sig[1] - t_sig[0]
-    spectrum = np.fft.fftshift(np.fft.fft(demod_sig))
-    freqs = np.fft.fftshift(np.fft.fftfreq(N, d=dt))
-    return freqs[np.argmax(np.abs(spectrum))] * unit.Hz
+    T2_s = simu.sample.T2.to_value(unit.s)
+    fd = np.zeros(len(t_sig), dtype=complex)
+    for Bs, w in zip(B_spread, simu.magnet.ratios):
+        fd += w * np.exp(2j * np.pi * gamma_over_2pi * Bs * t_sig)
+    return np.abs(fd) * np.exp(-t_sig / T2_s)
 
 
 # ---------------------------------------------------------------------------
@@ -236,74 +203,76 @@ def _free_decay_peak_frequency(
 # ---------------------------------------------------------------------------
 
 
+def _show_figure(fig, name: str) -> None:
+    """Display *fig* interactively (TkAgg/QtAgg) or as a PNG file (Agg fallback)."""
+    import matplotlib
+
+    if matplotlib.get_backend().lower() != "agg":
+        plt.show()
+    else:
+        import os
+        import tempfile
+
+        tmp = tempfile.NamedTemporaryFile(prefix=f"{name}_", suffix=".png", delete=False)
+        path = tmp.name
+        tmp.close()
+        fig.savefig(path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
+        os.startfile(path)
+
+
 def _plot_free_decay_result(
     simu: Simulation,
     t90_steps: int,
-    demodfreq: unit.Quantity,
-    expected_freq: unit.Quantity,
-    peak: unit.Quantity,
-    freq_resolution: unit.Quantity,
+    Delta_nu_L: Quantity,
+    T2star: Quantity,
+    chi2: float,
 ) -> None:
     """Show a two-panel diagnostic figure for one free-decay test case.
 
-    Panel 1 – raw Mx(t) and My(t) after the 90° pulse.
-    Panel 2 – FFT magnitude of the demodulated signal with the expected peak
-               and tolerance band marked.
+    Panel 1 – Mx(t), My(t) after the 90° pulse (oscillation at Delta_nu_L).
+    Panel 2 – |Mxy(t)| vs expected envelope |FD_sub(t)|.
     """
-    # Extract floats at the matplotlib boundary
-    demodfreq_Hz = demodfreq.to_value(unit.Hz)
-    expected_Hz = expected_freq.to_value(unit.Hz)
-    peak_Hz = peak.to_value(unit.Hz)
-    freq_res_Hz = freq_resolution.to_value(unit.Hz)
-
     t_s = simu.getTimeStamp().to_value(unit.s)
     t_sig = t_s[t90_steps:]
     Mx = simu.trjry[0, t90_steps:, 0]
     My = simu.trjry[0, t90_steps:, 1]
-    sig = Mx + 1j * My
-    demod = sig * np.exp(-2j * np.pi * demodfreq_Hz * t_sig)
-    N = len(demod)
-    dt = t_sig[1] - t_sig[0]
-    spectrum = np.abs(np.fft.fftshift(np.fft.fft(demod)))
-    freqs = np.fft.fftshift(np.fft.fftfreq(N, d=dt))
+    Mxy = np.sqrt(Mx**2 + My**2)
+    expected_curve = _fd_expected_curve(simu, t90_steps)
 
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+    marksize = 1
+    cm = 1 / 2.54
+    fig = plt.figure(figsize=(2 * 8.5 * cm, 2 * 0.4 * 8.5 * cm), dpi=300)
+    gs = gridspec.GridSpec(nrows=1, ncols=2)
+    ax00 = fig.add_subplot(gs[0, 0])
+    ax01 = fig.add_subplot(gs[0, 1])
+    axes: list[Axes] = [ax00, ax01]
 
-    ax = axes[0]
-    ax.plot(t_sig, Mx, lw=0.8, label="Mx")
-    ax.plot(t_sig, My, lw=0.8, label="My")
+    ax: Axes = axes[0]
+    ax.plot(t_sig, Mx, label="$M_x / M_\\mathrm{eqb}$", marker="o", markersize=marksize)
+    ax.plot(t_sig, My, label="$M_y / M_\\mathrm{eqb}$", marker="*", markersize=marksize)
     ax.set_xlabel("Time (s)")
-    ax.set_ylabel("Magnetisation (normalised)")
-    ax.set_title("Free-decay signal (rotating frame)")
-    ax.legend(fontsize=8)
+    ax.set_ylabel("$M / M_\\mathrm{eqb}$")
+    ax.set_title("$M_x$, $M_y$ vs time")
+    ax.legend()
 
     ax = axes[1]
-    ax.plot(freqs, spectrum, lw=1.0)
-    ax.axvline(
-        expected_Hz, color="C1", lw=1.5, ls="--", label=f"expected {expected_freq:.3g}"
-    )
-    ax.axvline(peak_Hz, color="C2", lw=1.0, ls=":", label=f"detected {peak:.3g}")
-    ax.axvspan(
-        expected_Hz - 2 * freq_res_Hz,
-        expected_Hz + 2 * freq_res_Hz,
-        alpha=0.15,
-        color="C1",
-        label=f"±2·Δf tol",
-    )
-    ax.set_xlabel("Frequency (Hz)")
-    ax.set_ylabel("|FFT|")
-    ax.set_title("Demodulated spectrum")
-    ax.legend(fontsize=8)
+    ax.scatter(t_sig, Mxy, label="$|M_{xy}|$ simulation", s=marksize, color="tab:red")
+    ax.plot(t_sig, expected_curve, label="$|\\mathrm{FD}_\\mathrm{sub}|$ expected", color="tab:purple")
+    ax.set_xlabel("Time (s)")
+    ax.set_ylabel("$M / M_\\mathrm{eqb}$")
+    ax.set_title("$|M_{xy}|$ envelope")
+    ax.legend()
 
     fig.suptitle(
         f"Free decay  RCF={simu.RCF_freq:.3g}  "
-        f"FWHM={simu.magnet.FWHM.to(ppm):.4g}\n"
-        f"demod={demodfreq:.3g}  "
-        f"peak err={abs(peak - expected_freq):.4g}  "
-        f"tol=±{2 * freq_resolution:.4g}"
+        f"FWHM={simu.magnet.FWHM.to(ppm):.4g}  "
+        f"signal={Delta_nu_L.to(unit.Hz):.4g}\n"
+        "$T_2^*$" + f"_analytic={T2star:.3g}  "
+        f"$\\chi^2$={chi2:.2e}"
     )
     plt.tight_layout()
-    plt.show()
+    _show_figure(fig, simu.name)
 
 
 # ---------------------------------------------------------------------------
@@ -315,60 +284,44 @@ def _plot_free_decay_result(
     "RCF_freq", _RCF_FREQS, ids=lambda f: f"{f.to_value(unit.Hz):.3g}Hz"
 )
 @pytest.mark.parametrize(
-    "signal_offset", _SIGNAL_OFFSETS, ids=lambda f: f"{f.to_value(unit.Hz):.4g}"
+    "rel_detuning", _REL_DETUNINGS, ids=lambda f: f"{f.to_value(ppm):.4g}"
 )
 @pytest.mark.parametrize("FWHM", _FWHM_CASES, ids=lambda f: f"{f.to_value(ppm):.4g}ppm")
-@pytest.mark.parametrize(
-    "demod_detune", _DEMOD_DETUNES, ids=lambda d: f"{d.to_value(unit.Hz):.4g}"
-)
-def test_free_decay_peak_frequency(
-    RCF_freq: unit.Quantity,
-    signal_offset: unit.Quantity,
-    FWHM: unit.Quantity,
-    demod_detune: unit.Quantity,
+def test_free_decay_envelope(
+    RCF_freq: Quantity,
+    rel_detuning: Quantity,
+    FWHM: Quantity,
     show_plots: bool,
 ):
-    """Free-decay peak matches expected detuning after digital demodulation.
+    """Free-decay |Mxy(t)| envelope matches expected free-decay kernel.
 
-    ``ν_L = RCF_freq − signal_offset``
-    → M+ oscillates at ``f_signal = +signal_offset``.
-    Envelope decays with ``T2star = T2 · Tdelta / (T2 + Tdelta) ≈ Tdelta``.
-    Simulation window = ``min(10 · T2star, _MAX_DURATION)``;
-    sampling rate    = ``max(_MIN_RATE, _N_PER_T2STAR / T2star)``.
-    Demodulating at ``f_demod = f_signal + demod_detune``
-    → free-decay peak at ``f_peak = −demod_detune``.
-    Tolerance = 2 × FFT frequency resolution = 2 / (N_sig × dt).
+    ν_L = RCF_freq − Delta_nu_L  (spins below carrier).
+    After 90° pulse, |Mxy(t)| = |FD_sub(t)| = |Σᵢ wᵢ exp(2πi · δᵢ · t)|
+    where δᵢ = γ/(2π) · B_spread_i.
+
+    Tolerance: χ² = ‖Mxy − FD_sub‖² / ‖FD_sub‖² ≤ _CHI2_TOLERANCE.
     """
     Tdelta = (1.0 / (np.pi * FWHM.to(unit.one) * RCF_freq)).to(unit.s)
-    T2star = (_T2 * Tdelta / (_T2 + Tdelta)).to(unit.s)  # harmonic mean ≈ Tdelta
+    T2star = (_T2 * Tdelta / (_T2 + Tdelta)).to(unit.s)
+    Delta_nu_L = rel_detuning * RCF_freq
 
-    # Adaptive observation window: 10 × T2star, capped at _MAX_DURATION
-    duration = min(10.0 * T2star, _MAX_DURATION)
+    duration = _N_T2STAR * T2star
+    rate = max(_N_PER_T2STAR * Delta_nu_L, (_N_PER_T2STAR / T2star))
 
-    # Adaptive rate: enough samples per T2star for accurate RK4 integration
-    rate = max(_MIN_RATE, (_N_PER_T2STAR / T2star).to(unit.Hz))
+    simu = _build_free_decay_simulation(RCF_freq, Delta_nu_L, FWHM, rate, duration)
 
-    simu = _build_free_decay_simulation(RCF_freq, signal_offset, FWHM, rate, duration)
+    Mxy = np.sqrt(simu.trjry[0, _T90_STEPS:, 0] ** 2 + simu.trjry[0, _T90_STEPS:, 1] ** 2)
+    expected_curve = _fd_expected_curve(simu, _T90_STEPS)
+    chi2 = float(np.sum((Mxy - expected_curve) ** 2) / np.sum(expected_curve ** 2))
 
-    f_demod = signal_offset + demod_detune
-    peak = _free_decay_peak_frequency(simu, t90_steps=_T90_STEPS, demodfreq=f_demod)
-    expected_freq = -demod_detune
-
-    t = simu.getTimeStamp()
-    dt = t[1] - t[0]
-    N_sig = simu.timeLen - _T90_STEPS
-    freq_resolution = (1.0 / (N_sig * dt)).to(unit.Hz)
+    t_end = simu.getTimeStamp()[-1]
 
     if show_plots:
-        _plot_free_decay_result(
-            simu, _T90_STEPS, f_demod, expected_freq, peak, freq_resolution
-        )
+        _plot_free_decay_result(simu, _T90_STEPS, Delta_nu_L, T2star, chi2)
 
-    assert abs(peak - expected_freq) <= 2.0 * freq_resolution, (
+    assert chi2 <= _CHI2_TOLERANCE, (
         f"RCF_freq={RCF_freq}, FWHM={FWHM.to(ppm):.4g}, "
-        f"T2*={T2star:.3g}, signal_offset={signal_offset}, "
-        f"demod_detune={demod_detune}: "
-        f"expected peak at {expected_freq:.4f}, got {peak:.4f} "
-        f"(resolution={freq_resolution:.4f}, "
-        f"tolerance={2 * freq_resolution:.4f})"
+        f"T2*_analytic={T2star:.3g}, rel_detuning={rel_detuning}: "
+        f"t_end={t_end:.4g} ({(t_end / T2star).to_value(unit.one):.2f}·T2*_analytic), "
+        f"χ²={chi2:.2e} (tol={_CHI2_TOLERANCE:.0e})"
     )
