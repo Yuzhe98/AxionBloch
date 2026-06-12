@@ -1,27 +1,20 @@
 import inspect  # for check()
 import re  # for check()
-import time
 import sys
+import time
 import warnings
-
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-
-from matplotlib.patches import FancyArrowPatch
-
-from mpl_toolkits.mplot3d import proj3d
-
 from functools import partial
-
-# physical units and constants
-from astropy import units as unit
-from astropy.units import Quantity, CompositeUnit
-from astropy.constants import codata2018 as const
-
 from typing import Sequence, Tuple
 
 import h5py
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
+import numpy as np
+# physical units and constants
+from astropy import units as unit
+from astropy.units import Quantity
+from matplotlib.patches import FancyArrowPatch
+from mpl_toolkits.mplot3d import proj3d
 
 # from evidently.report import Report
 # from evidently.metric_preset import DataDriftPreset
@@ -1905,7 +1898,7 @@ def LIA_FFT(
         window_name = winInfo
     else:
         raise ValueError("window must be a dict or a string")
-    
+
     window_dict = {
         "rectangle".upper(): [np.ones],
         "expDecay".upper(): [partial(expDecayWindow, NC=param, verbose=False)],
@@ -1918,7 +1911,7 @@ def LIA_FFT(
     if window_key not in window_dict:
         raise ValueError(f"Unsupported window function: {window_name}")
 
-    window_arr:np.ndarray = window_dict[window_key][0](timeLen)
+    window_arr: np.ndarray = window_dict[window_key][0](timeLen)
 
     S2 = np.sum(window_arr**2)
     if verbose:
@@ -1929,7 +1922,7 @@ def LIA_FFT(
 
         cm = 1 / 2.54  # convert cm to inch
         # linewidth = 1  # line width in points
-        fig = plt.figure(figsize=(8.5 * cm, 8. * cm), dpi=300)
+        fig = plt.figure(figsize=(8.5 * cm, 8.0 * cm), dpi=300)
         gs = gridspec.GridSpec(nrows=2, ncols=1)
 
         left = 0.216
@@ -1952,7 +1945,6 @@ def LIA_FFT(
             label="real",
             color="tab:green",
             alpha=1,
-
         )
         (imag_raw_line,) = raw_ax.plot(
             xstamp,
@@ -1960,7 +1952,6 @@ def LIA_FFT(
             label="imag",
             color="tab:brown",
             alpha=1,
-
         )
         raw_ax.set_ylabel("Amplitude (Arb. Units)")
         # raw_ax.grid(True)
@@ -1984,7 +1975,6 @@ def LIA_FFT(
             label="imag",
             color="tab:brown",
             alpha=1,
-
         )
         win_ax.set_ylabel("Amplitude (Arb. Units)")
         # win_ax.grid(True)
@@ -1994,7 +1984,6 @@ def LIA_FFT(
             window_arr,
             label="Window",
             color="tab:blue",
-
         )
         win_ax2.set_ylabel("Window value", color="tab:blue")
         win_ax2.tick_params(axis="y", colors="tab:blue")
@@ -2002,8 +1991,10 @@ def LIA_FFT(
         # set the ylim of the twin axis so that zeros of both axes match
         win_ax_ylim_bottom, win_ax_ylim_top = win_ax.get_ylim()
         win_ax2_ylim_bottom, win_ax2_ylim_top = win_ax2.get_ylim()
-        if win_ax_ylim_top>0 and win_ax2_ylim_top>0:
-            new_win_ax2_ylim_bottom = win_ax2_ylim_top * (win_ax_ylim_bottom / win_ax_ylim_top)
+        if win_ax_ylim_top > 0 and win_ax2_ylim_top > 0:
+            new_win_ax2_ylim_bottom = win_ax2_ylim_top * (
+                win_ax_ylim_bottom / win_ax_ylim_top
+            )
             win_ax2.set_ylim(bottom=new_win_ax2_ylim_bottom)
 
         raw_ax.legend(

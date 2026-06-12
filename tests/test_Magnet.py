@@ -12,13 +12,13 @@ Run with::
     pytest tests/test_Magnet.py -q
     $env:PRINT_RESULTS="1"; pytest tests/test_Magnet.py -s
 """
+
 import os
+
 import pytest
 
-from axionbloch.dependency import *
-from axionbloch.Sample import Sample
-from axionbloch.constants import gamma_p, mu_p, gamma_Xe129, mu_Xe129
 from axionbloch.Apparatus import Magnet
+from axionbloch.dependency import *
 
 PRINT_RESULTS = os.getenv("PRINT_RESULTS", "0") == "1"
 SEED = int(os.getenv("SEED", "42"))
@@ -37,10 +37,12 @@ def test_magnet_uses_astropy_quantities_by_default():
 
 
 def test_magnet_homogeneity_sampling_normalizes_weights():
-	"""setHomogeneity produces non-negative weights that sum to exactly 1."""
-	magnet = Magnet(B0=2.0 * unit.T, FWHM=5.0 * ppm, nFWHM=10, numPt=100, verbose=PRINT_RESULTS)
-	magnet.setHomogeneity(numPt=100, showPlot=PRINT_RESULTS)
+    """setHomogeneity produces non-negative weights that sum to exactly 1."""
+    magnet = Magnet(
+        B0=2.0 * unit.T, FWHM=5.0 * ppm, nFWHM=10, numPt=100, verbose=PRINT_RESULTS
+    )
+    magnet.setHomogeneity(numPt=100, showPlot=False)
 
-	assert magnet.ratios.shape == (100,)
-	assert np.all(magnet.ratios >= 0)
-	assert np.sum(magnet.ratios) == pytest.approx(1.0)
+    assert magnet.ratios.shape == (100,)
+    assert np.all(magnet.ratios >= 0)
+    assert np.sum(magnet.ratios) == pytest.approx(1.0)

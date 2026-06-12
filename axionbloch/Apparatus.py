@@ -1,8 +1,7 @@
-from axionbloch.dependency import *
-
 from functools import partial
 
-from axionbloch.utils import Lorentzian, Lorentzian_0edge
+from axionbloch.dependency import *
+from axionbloch.utils import Lorentzian_0edge
 
 
 class Magnet:

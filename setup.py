@@ -1,11 +1,12 @@
 # Use this command to build
 # python setup.py build_ext --inplace
 
-from setuptools import setup, find_namespace_packages
-from pybind11.setup_helpers import Pybind11Extension, build_ext
-import pybind11
-import sys
 import os
+import sys
+
+import pybind11
+from pybind11.setup_helpers import Pybind11Extension, build_ext
+from setuptools import find_namespace_packages, setup
 
 on_rtd = os.environ.get("READTHEDOCS") == "True"
 

@@ -20,10 +20,13 @@ Run with::
 
     $env:PRINT_RESULTS="1"; pytest tests/test_numpy_unit_performance.py -q -s
 """
+
 import os
 import time
+
 import pytest
 import scipy.fft as sp_fft
+
 from axionbloch.dependency import *
 
 ARRAY_SIZE = int(os.getenv("ARRAY_SIZE", "1000000"))
@@ -83,7 +86,9 @@ def compare_numpy_operation_efficiency(
     """Compare timing for plain NumPy arrays vs Astropy Quantity arrays."""
     rng = np.random.default_rng(seed)
     arr = rng.random(array_size)
-    arr_with_unit = arr * unit.m * unit.s * unit.kg  # attach a composite unit for more realistic conversion
+    arr_with_unit = (
+        arr * unit.m * unit.s * unit.kg
+    )  # attach a composite unit for more realistic conversion
     operations = (
         "addition",
         "multiplication",
@@ -126,7 +131,9 @@ def compare_numpy_operation_efficiency(
     if print_results:
         print("\nNumPy vs Astropy Quantity timing comparison (ms)")
         print(f"array_size={array_size:,}, repeat={repeat}, seed={seed}")
-        print("operation         plain (ms)    with_units (ms)    runtime ratio (units/plain)")
+        print(
+            "operation         plain (ms)    with_units (ms)    runtime ratio (units/plain)"
+        )
         for operation, values in results.items():
             plain = "N/A" if values["plain_ms"] is None else f"{values['plain_ms']:.3f}"
             with_units = f"{values['with_units_ms']:.3f}"
@@ -174,9 +181,9 @@ def compare_fft_efficiency(
 
     # --- forward FFT ---
     np_fft_plain = _timed_average(lambda: np.fft.fft(arr) * unit.V, repeat)
-    np_fft_units  = _timed_average(lambda: np.fft.fft(arr_V),            repeat)
+    np_fft_units = _timed_average(lambda: np.fft.fft(arr_V), repeat)
     sp_fft_plain = _timed_average(lambda: sp_fft.fft(arr) * unit.V, repeat)
-    sp_fft_units  = _timed_average(lambda: sp_fft.fft(arr_V.value) * unit.V, repeat)
+    sp_fft_units = _timed_average(lambda: sp_fft.fft(arr_V.value) * unit.V, repeat)
 
     # --- inverse FFT (run on pre-computed forward result to time only ifft) ---
     np_spec = np.fft.fft(arr)
@@ -185,9 +192,11 @@ def compare_fft_efficiency(
     sp_spec_V = sp_fft.fft(arr_V.value) * unit.V
 
     np_ifft_plain = _timed_average(lambda: np.fft.ifft(np_spec) * unit.V, repeat)
-    np_ifft_units = _timed_average(lambda: np.fft.ifft(np_spec_V),                 repeat)
+    np_ifft_units = _timed_average(lambda: np.fft.ifft(np_spec_V), repeat)
     sp_ifft_plain = _timed_average(lambda: sp_fft.ifft(sp_spec) * unit.V, repeat)
-    sp_ifft_units = _timed_average(lambda: sp_fft.ifft(sp_spec_V.value) * unit.V,     repeat)
+    sp_ifft_units = _timed_average(
+        lambda: sp_fft.ifft(sp_spec_V.value) * unit.V, repeat
+    )
 
     results = {
         "np_fft": {
@@ -213,11 +222,13 @@ def compare_fft_efficiency(
     }
 
     if print_results:
-        print(f"\nFFT / invFFT timing comparison (ms)")
+        print("\nFFT / invFFT timing comparison (ms)")
         print(f"array_size={array_size:,}, repeat={repeat}, seed={seed}")
         print(f"{'op':<10}  {'plain (ms)':>10}  {'with_units (ms)':>15}  {'ratio':>8}")
         for op, v in results.items():
-            print(f"{op:<10}  {v['plain_ms']:>10.3f}  {v['with_units_ms']:>15.3f}  {v['ratio']:>7.2f}x")
+            print(
+                f"{op:<10}  {v['plain_ms']:>10.3f}  {v['with_units_ms']:>15.3f}  {v['ratio']:>7.2f}x"
+            )
 
     return results
 

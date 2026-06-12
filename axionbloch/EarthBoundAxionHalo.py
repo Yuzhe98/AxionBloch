@@ -1,12 +1,11 @@
-from axionbloch.dependency import *
 from astropy.coordinates import EarthLocation
+from scipy.interpolate import interp1d
 from scipy.signal import correlate as correlate
 
-from scipy.interpolate import interp1d
-
-from axionbloch.utils import check
-from axionbloch.Station import Station
+from axionbloch.dependency import *
 from axionbloch.GravBoundAxionHalo import GravBoundAxionHalo
+from axionbloch.Station import Station
+from axionbloch.utils import check
 
 
 def loadPEMdata(
@@ -312,7 +311,7 @@ def plot_earth_grav_potential(showplot=True):
         label="Density Profile",
         color="darkblue",
     )
-    density_ax.set_xlabel(f"Radius (earth radius)")
+    density_ax.set_xlabel("Radius (earth radius)")
     density_ax.set_ylabel(f"Density ({density_rho.unit})")
 
     # cumulative mass
@@ -322,8 +321,8 @@ def plot_earth_grav_potential(showplot=True):
         label="Mass Profile",
         color="darkgreen",
     )
-    mass_ax.set_xlabel(f"Radius (earth radius)")
-    mass_ax.set_ylabel(f"Enclosed Mass ($10^{{24}}\\,$kg)")
+    mass_ax.set_xlabel("Radius (earth radius)")
+    mass_ax.set_ylabel("Enclosed Mass ($10^{24}\\,$kg)")
     mass_ax.ticklabel_format(useOffset=False)
 
     # gravitational potential
@@ -342,8 +341,8 @@ def plot_earth_grav_potential(showplot=True):
         label="Earth radius",
     )
 
-    pot_ax.set_xlabel(f"Radius (earth radius)")
-    pot_ax.set_ylabel(f"Grav. Pot. (MJ/kg) ref. to $\\infty$")
+    pot_ax.set_xlabel("Radius (earth radius)")
+    pot_ax.set_ylabel("Grav. Pot. (MJ/kg) ref. to $\\infty$")
     pot_ax.legend()
 
     fig.suptitle("Earth Profiles (from PEM Data)")
@@ -396,7 +395,9 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         if a_0 is not None:
             self.a_0 = a_0
         else:
-            self.a_0_reduced = np.sqrt(2 * self.N_a * const.hbar**3 * const.c / self.m_a).si
+            self.a_0_reduced = np.sqrt(
+                2 * self.N_a * const.hbar**3 * const.c / self.m_a
+            ).si
         self.totalMassEnclosed = totalMassEnclosed
 
     # ------------------------------------------------------------------

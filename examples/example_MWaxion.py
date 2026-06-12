@@ -1,18 +1,15 @@
 # Example script to run axion NMR simulations
 
 # numpy, matplotlib, astropy dependency
-from axionbloch.dependency import *
-
+from axionbloch.Apparatus import Magnet
 # Gyromagnetic ratio and magnetic dipole moment of Xe-129
 from axionbloch.constants import gamma_Xe129, mu_Xe129
-
+from axionbloch.dependency import *
+from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
+from axionbloch.Sample import Sample
 # classes for simulations
 from axionbloch.SimuTools import MagField, Simulations
 from axionbloch.SimuTypes import SimuParams
-from axionbloch.Sample import Sample
-from axionbloch.Apparatus import Magnet
-from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
-from axionbloch.utils import check
 
 # Define the Xe-129 sample with gyromagnetic ratio,
 # mass density, molar mass, number of spins per molecule,

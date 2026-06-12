@@ -1,10 +1,8 @@
 import os
-import time
+
 from axionbloch.dependency import *
-from axionbloch.EarthBoundAxionHalo import (
-    EarthBoundAxionHalo,
-)
-from axionbloch.Station import Mainz, Baltimore, Sanya
+from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo
+from axionbloch.Station import Baltimore
 
 station = Baltimore
 rhoE_DM = 0.3 * unit.GeV / unit.cm**3
@@ -32,7 +30,11 @@ halo.solve_TISE_3D(
 
 r, R_r, r_line, grad_r_line, grad_theta_line, grad_phi_line = (
     halo.findGradientsAtDirection(
-        stateNames=["2p"], station=station, truncRadius=2 * unit.earthRad, verbose=True, showPlot=False
+        stateNames=["2p"],
+        station=station,
+        truncRadius=2 * unit.earthRad,
+        verbose=True,
+        showPlot=False,
     )
 )
 halo.plotGradients(

@@ -23,26 +23,25 @@ Useful run commands::
 
 import os
 import warnings
+
 import pytest
 
-from axionbloch.dependency import *
-from axionbloch.utils import check_norm, check
-
+from axionbloch.Apparatus import Magnet
 # Gyromagnetic ratio and magnetic dipole moment of Xe-129
-from axionbloch.constants import gamma_Xe129, mu_Xe129, gamma_p, mu_p
-
+from axionbloch.constants import gamma_p, gamma_Xe129, mu_p, mu_Xe129
+from axionbloch.dependency import *
+from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
+from axionbloch.Sample import Sample
 # classes for simulations
 from axionbloch.SimuTools import MagField, Simulations
 from axionbloch.SimuTypes import SimuParams
-from axionbloch.Sample import Sample
-from axionbloch.Apparatus import Magnet
-from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
+from axionbloch.utils import check_norm
 
 PRINT_RESULTS = os.getenv("PRINT_RESULTS", "0") == "1"
 SEED = int(os.getenv("SEED", "42"))
-# the number of field should be larger than 100. 
+# the number of field should be larger than 100.
 # Otherwise the mean of axion lineshape may deviate from 1.
-NUM_FIELD = int(os.getenv("NUM_FIELD", "1000"))  
+NUM_FIELD = int(os.getenv("NUM_FIELD", "1000"))
 
 
 LXe = Sample(

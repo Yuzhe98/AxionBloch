@@ -69,26 +69,27 @@ Parametrisation
 """
 
 import pytest
-from axionbloch.dependency import *
+
 from axionbloch.Apparatus import Magnet
+from axionbloch.constants import gamma_p, mu_p
+from axionbloch.dependency import *
 from axionbloch.Sample import Sample
 from axionbloch.SimuTools import MagField, Simulation
-from axionbloch.constants import gamma_p, mu_p
 
 # ---------------------------------------------------------------------------
 # Shared simulation parameters
 # ---------------------------------------------------------------------------
-_T1 = 1e6 * unit.s   # negligible longitudinal relaxation
-_T2 = 1e3 * unit.s   # negligible intrinsic T2 → T2* ≈ Tdelta
-_NFWHM = 10.0          # half-width range; larger nFWHM adds outer packets that
-                      # precess ~1 rad during the 90° pulse, raising χ²
-_T90_STEPS = 5        # 90° pulse length in time steps
+_T1 = 1e6 * unit.s  # negligible longitudinal relaxation
+_T2 = 1e3 * unit.s  # negligible intrinsic T2 → T2* ≈ Tdelta
+_NFWHM = 10.0  # half-width range; larger nFWHM adds outer packets that
+# precess ~1 rad during the 90° pulse, raising χ²
+_T90_STEPS = 5  # 90° pulse length in time steps
 
 # χ² tolerance: ‖Mxy − FD_sub‖² / ‖FD_sub‖² over full post-pulse trajectory
 _CHI2_TOLERANCE = 1e-4
 
 # Adaptive timing
-_N_T2STAR = 10.0     # observe for 10 × T₂*_analytic
+_N_T2STAR = 10.0  # observe for 10 × T₂*_analytic
 _N_PER_T2STAR = 500  # RK4 samples per T₂*_analytic
 
 # ---------------------------------------------------------------------------
@@ -213,7 +214,9 @@ def _show_figure(fig, name: str) -> None:
         import os
         import tempfile
 
-        tmp = tempfile.NamedTemporaryFile(prefix=f"{name}_", suffix=".png", delete=False)
+        tmp = tempfile.NamedTemporaryFile(
+            prefix=f"{name}_", suffix=".png", delete=False
+        )
         path = tmp.name
         tmp.close()
         fig.savefig(path, dpi=300, bbox_inches="tight")
@@ -258,7 +261,12 @@ def _plot_free_decay_result(
 
     ax = axes[1]
     ax.scatter(t_sig, Mxy, label="$|M_{xy}|$ simulation", s=marksize, color="tab:red")
-    ax.plot(t_sig, expected_curve, label="$|\\mathrm{FD}_\\mathrm{sub}|$ expected", color="tab:purple")
+    ax.plot(
+        t_sig,
+        expected_curve,
+        label="$|\\mathrm{FD}_\\mathrm{sub}|$ expected",
+        color="tab:purple",
+    )
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("$M / M_\\mathrm{eqb}$")
     ax.set_title("$|M_{xy}|$ envelope")
@@ -310,9 +318,11 @@ def test_free_decay_envelope(
 
     simu = _build_free_decay_simulation(RCF_freq, Delta_nu_L, FWHM, rate, duration)
 
-    Mxy = np.sqrt(simu.trjry[0, _T90_STEPS:, 0] ** 2 + simu.trjry[0, _T90_STEPS:, 1] ** 2)
+    Mxy = np.sqrt(
+        simu.trjry[0, _T90_STEPS:, 0] ** 2 + simu.trjry[0, _T90_STEPS:, 1] ** 2
+    )
     expected_curve = _fd_expected_curve(simu, _T90_STEPS)
-    chi2 = float(np.sum((Mxy - expected_curve) ** 2) / np.sum(expected_curve ** 2))
+    chi2 = float(np.sum((Mxy - expected_curve) ** 2) / np.sum(expected_curve**2))
 
     t_end = simu.getTimeStamp()[-1]
 

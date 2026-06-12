@@ -6,15 +6,13 @@
 # which libraries are being used throughout the project.
 # ################################################################### #
 
+# ----------- physical units and constants ----------- #
 # numerical computing
 import numpy as np
-
-# ----------- physical units and constants ----------- #
-import astropy
 from astropy import units as unit
-from astropy.units import Quantity, CompositeUnit
 from astropy.constants import codata2018 as const
-from astropy.time import Time
+from astropy.time import Time  # noqa: F401
+from astropy.units import CompositeUnit, Quantity  # noqa: F401
 
 # pi with unit.radian
 PI = np.pi * unit.rad
@@ -41,12 +39,14 @@ Phi0 = magnetic_flux_quantum = unit.def_unit(
 )
 # ----------- ---------------------------- ----------- #
 
+
+import textwrap  # noqa: F401
+
+import matplotlib.gridspec as gridspec  # noqa: F401
 # --------------- plotting --------------- #
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec  # for creating subplots
-import matplotlib.ticker as mticker
-from matplotlib.axes import Axes
-import textwrap
+import matplotlib.ticker as mticker  # noqa: F401
+from matplotlib.axes import Axes  # noqa: F401
 
 # plot style
 plt.rc("font", size=8)  # font size for all figures  TODO check this fontsize

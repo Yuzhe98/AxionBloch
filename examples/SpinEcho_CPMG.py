@@ -1,13 +1,11 @@
 # Example script: spin-echo NMR simulation using a CPMG pulse train
 import time
 
-from axionbloch.dependency import *
-from axionbloch.SimuTools import MagField, Simulation
-from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet
 from axionbloch.constants import gamma_p, mu_p
-from axionbloch.utils import check
-
+from axionbloch.dependency import *
+from axionbloch.Sample import Sample
+from axionbloch.SimuTools import MagField, Simulation
 
 RCF_Freq = 1 * unit.MHz
 signalFreqRot = 1 * unit.Hz

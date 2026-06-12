@@ -24,21 +24,17 @@ and is handled entirely by :mod:`astropy.coordinates` at the requested epoch.
 
 import math
 
+import astropy.coordinates as coord
 import matplotlib.pyplot as plt
+import numpy as np
+from astropy import units as unit
+from astropy.coordinates import (EarthLocation, SkyCoord,
+                                 get_body_barycentric_posvel)
+from astropy.time import Time
+from astropy.units import Quantity
 from matplotlib.figure import Figure
 from matplotlib.patches import Ellipse
 from mpl_toolkits.mplot3d import art3d
-import numpy as np
-from astropy import units as unit
-from astropy.coordinates import (
-    EarthLocation,
-    Galactocentric,
-    SkyCoord,
-    get_body_barycentric_posvel,
-)
-import astropy.coordinates as coord
-from astropy.time import Time
-from astropy.units import Quantity
 
 from axionbloch.Station import Station
 

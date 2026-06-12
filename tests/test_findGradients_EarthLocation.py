@@ -7,11 +7,10 @@ Run with::
 
 import numpy as np
 import pytest
-
 from astropy import units as unit
 from astropy.coordinates import EarthLocation
 
-from axionbloch.Station import Mainz, Baltimore, Station
+from axionbloch.Station import Mainz, Station
 
 # ---------------------------------------------------------------------------
 # Station.location

@@ -5,13 +5,12 @@
 #
 import time
 
-from axionbloch.dependency import *
-from axionbloch.SimuTools import MagField, Simulation
-from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet
-from axionbloch.constants import gamma_Xe129, mu_Xe129, gamma_p, mu_p
+from axionbloch.constants import gamma_Xe129, mu_Xe129
+from axionbloch.dependency import *
+from axionbloch.Sample import Sample
+from axionbloch.SimuTools import MagField, Simulation
 from axionbloch.utils import check
-from axionbloch.kits.Simu_Signal import Simu_Signal
 
 # ──────────────────────────────────────────────────────────────────────────── #
 # Physical parameters (all as Quantity)
@@ -155,9 +154,7 @@ simu.displayTrjry(verbose=True)
 save_data = True
 
 if save_data:
-    simu.saveToPkl(
-        fileDir="examples/", fileName="HF-Simulation-0.pkl", verbose=True
-    )
+    simu.saveToPkl(fileDir="examples/", fileName="HF-Simulation-0.pkl", verbose=True)
 
 # # ──────────────────────────────────────────────────────────────────────────── #
 # # Extract per-pulse signal windows

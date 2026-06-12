@@ -1,22 +1,9 @@
 # plot the daily modulation of the axion gradient at various stations on Earth, for an Earth-bound axion halo with a given Compton frequency and axion-nucleon coupling. The modulation is due to the rotation of the Earth, which changes the direction of the station relative to the axion halo. The code solves the time-independent Schrödinger equation for the axion halo and then computes the gradient at each station as a function of time over one day. Finally, it plots the results.
-import os
 
 from axionbloch.dependency import *
-from axionbloch.EarthBoundAxionHalo import (
-    EarthBoundAxionHalo,
-)
-from axionbloch.utils import check
-from axionbloch.Station import (
-    Mainz,
-    Baltimore,
-    Sanya,
-    Tokyo,
-    Geneva,
-    Sydney,
-    BuenosAires,
-    CapeTown,
-    Mumbai,
-)
+from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo
+from axionbloch.Station import (Baltimore, BuenosAires, CapeTown, Geneva,
+                                Mainz, Mumbai, Sanya, Sydney, Tokyo)
 
 stations = [
     Mainz,
@@ -62,8 +49,9 @@ halo.solve_TISE_3D(
 # import matplotlib.pyplot as plt
 # from matplotlib import gridspec
 
-from zoneinfo import ZoneInfo
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
 t0 = Time(datetime(2022, 12, 13, 7, 0, tzinfo=ZoneInfo("Europe/Berlin")))
 t_hours = np.linspace(0, 72, 72) * unit.hour
 meas_times = t0 + t_hours  # every 1 hour

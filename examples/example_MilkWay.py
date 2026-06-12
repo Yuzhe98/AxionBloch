@@ -1,13 +1,12 @@
 """Examples for MilkyWay and MilkyWayAxionHalo."""
 
 import numpy as np
-import matplotlib.pyplot as plt
-from astropy.time import Time
 from astropy import units as unit
+from astropy.time import Time
 
 from axionbloch.MilkyWay import MilkyWay
 from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
-from axionbloch.Station import Mainz, Sanya
+from axionbloch.Station import Mainz
 
 station = Mainz
 # station = Sanya
@@ -44,10 +43,12 @@ mw.summary()
 print("\n=== MilkyWay: daily modulation over 24 h ===")
 t_day = Time("2024-06-01", scale="utc") + np.linspace(0, 24, 144) * unit.hour
 mw_day = MilkyWay(time=t_day, station=station)
-angles_deg = np.array([
-    MilkyWay(time=ti, station=station).get_wind_angle().to(unit.deg).value
-    for ti in t_day
-])
+angles_deg = np.array(
+    [
+        MilkyWay(time=ti, station=station).get_wind_angle().to(unit.deg).value
+        for ti in t_day
+    ]
+)
 print(f"Wind angle range: {angles_deg.min():.1f}° – {angles_deg.max():.1f}°")
 
 # ── Example 4: 3-D visualization ─────────────────────────────────────────────

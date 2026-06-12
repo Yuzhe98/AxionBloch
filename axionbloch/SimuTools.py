@@ -19,36 +19,26 @@ T_SETFIELD_S, T_SIMUSTEP_S : float
 """
 
 import os
+# for saving data
+import pickle
 import time
 import warnings
 
-from axionbloch.dependency import *
-
+import h5py
 from matplotlib.ticker import ScalarFormatter
 from mpl_toolkits.mplot3d import Axes3D  # for type hinting
-
-from scipy.stats import uniform, expon
 from scipy.fft import ifft as sp_ifft
 
-# for saving data
-import pickle
-import h5py
-
-from axionbloch.utils import (
-    PhysicalObject,
-    check,
-    save_phys_quantity,
-    getDateAndTime,
-)
-
-from axionbloch.Sample import Sample
-from axionbloch.Apparatus import Magnet
-from axionbloch.SimuTypes import SimuParams, SimuEntry
-from axionbloch.Station import Station
-from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
-from axionbloch.FineGrainedAxionStream import FineGrainedAxionStream
-
 import axionbloch.blochsimulation as bs
+from axionbloch.Apparatus import Magnet
+from axionbloch.dependency import *
+from axionbloch.FineGrainedAxionStream import FineGrainedAxionStream
+from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
+from axionbloch.Sample import Sample
+from axionbloch.SimuTypes import SimuEntry, SimuParams
+from axionbloch.Station import Station
+from axionbloch.utils import (PhysicalObject, check, getDateAndTime,
+                              save_phys_quantity)
 
 RECORD_RUNTIME = True
 
@@ -614,7 +604,7 @@ class Simulations:
                     print(key, "=", pq, flush=True)
                 print(
                     logPrefix,
-                    f"simu.magnet.numPt =",
+                    "simu.magnet.numPt =",
                     simu.magnet.numPt,
                     flush=True,
                 )
@@ -1013,9 +1003,7 @@ class Simulation(PhysicalObject):
         # TODO：be more smart in setting rate and duration
         # set rotating frame frequency
         if RCF_freq is None or type(RCF_freq) != Quantity:
-            self.RCF_freq = (self.sample.gamma / (2 * PI) * self.magnet.B0).to(
-                unit.MHz
-            )
+            self.RCF_freq = (self.sample.gamma / (2 * PI) * self.magnet.B0).to(unit.MHz)
         else:
             self.RCF_freq = RCF_freq.to(unit.MHz)
 
@@ -1099,7 +1087,7 @@ class Simulation(PhysicalObject):
         )
         if self.magnet.numPt < 2 * variation.to_value(unit.one):
             warnings.warn(
-                logPrefix + f" magnet_det.numPt may be too few.",
+                logPrefix + " magnet_det.numPt may be too few.",
                 UserWarning,
                 stacklevel=2,
             )
@@ -1154,11 +1142,11 @@ class Simulation(PhysicalObject):
         logPrefix = f"[{self.__class__.__name__}.{self.suggestRate.__name__}]"
         # compute the maximum of (absolute) Larmor frequencies
         nu_L_max = (
-            (self.sample.gamma / (2 * PI) * self.magnet.B_spread).max() - self.RCF_freq
-        )
+            self.sample.gamma / (2 * PI) * self.magnet.B_spread
+        ).max() - self.RCF_freq
         nu_L_min = (
-            (self.sample.gamma / (2 * PI) * self.magnet.B_spread).min() - self.RCF_freq
-        )
+            self.sample.gamma / (2 * PI) * self.magnet.B_spread
+        ).min() - self.RCF_freq
         nu_L_abs_max = max([abs(nu_L_max), abs(nu_L_min)])
 
         # compute T2 relaxation rate
@@ -1554,9 +1542,9 @@ class Simulation(PhysicalObject):
             self.excField.B_vec_std = self.excField.B_vec.std(axis=0)
             # self.excField.B_vec.shape = (numFields, numSteps, 3)
             # self.excField.B_vec_mean.shape = (numSteps, 3)
-            if not debug: 
+            if not debug:
                 del self.excField.B_vec
-        else: 
+        else:
             assert hasattr(self.excField, "B_vec_mean"), (
                 logPrefix + "No excField.B_vec nor B_vec_mean"
             )
@@ -1603,7 +1591,7 @@ class Simulation(PhysicalObject):
                     My,
                     Mz,
                 )
-        else: 
+        else:
             assert hasattr(self, "Mxy_mrs"), logPrefix + "No trjry nor Mxy_mrs"
             assert hasattr(self, "Mxy_srs"), logPrefix + "No trjry nor Mxy_srs"
             assert hasattr(self, "Mxy_rms"), logPrefix + "No trjry nor Mxy_rms"

@@ -4,9 +4,10 @@ A :class:`Station` stores the location of an experimental site on Earth and
 exposes the corresponding unit vector and distance from the Earth's centre.
 """
 
-from axionbloch.dependency import np, unit, Quantity
-from astropy.coordinates import get_body_barycentric_posvel, GCRS
-from astropy.coordinates import EarthLocation
+from astropy.coordinates import (GCRS, EarthLocation,
+                                 get_body_barycentric_posvel)
+
+from axionbloch.dependency import Quantity, np, unit
 
 
 class Station:
@@ -113,7 +114,9 @@ class Station:
             ]
         )
         self.elevation = elevation
-        self.R = self.elevation + 1 * unit.earthRad  # distance from Earth center to station
+        self.R = (
+            self.elevation + 1 * unit.earthRad
+        )  # distance from Earth center to station
 
         # signed geographic coordinates for astropy
         _lat = self.latitude if NSsemisphere == "N" else -self.latitude
@@ -309,4 +312,3 @@ BuenosAires = Station(
     elevation=25.0 * unit.m,
     verbose=False,
 )
-

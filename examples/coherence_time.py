@@ -1,10 +1,6 @@
-from math import tau
+import numpy as np
 
 from axionbloch.utils import coh_time_g1
-
-import numpy as np
-import time
-
 
 timeStamp = np.linspace(
     0, 1e1, 10_000

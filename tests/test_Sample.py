@@ -26,8 +26,8 @@ import numpy as np
 import pytest
 from astropy import units as unit
 
+from axionbloch.constants import gamma_p, gamma_Xe129, mu_p, mu_Xe129
 from axionbloch.Sample import Sample
-from axionbloch.constants import gamma_p, mu_p, gamma_Xe129, mu_Xe129
 
 # def _to_angular_gamma(gamma: unit.Quantity) -> unit.Quantity:
 #     return gamma.to(1 / (unit.s * unit.T)) * unit.rad

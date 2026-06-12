@@ -1,13 +1,16 @@
 # Define a quantity from scalars and units:
 # a magnetic field of 1 Gauss
 from astropy import units as unit
+
 B = 1.0 * unit.gauss
 print(B.si)
 # <Quantity 0.0001 T>
 
+import numpy as np
+
 # Import constants and use them with scalars
 from axionbloch.constants import gamma_p
-import numpy as np
+
 # find the 90 degree pulse duration
 t90 = np.pi / 2 / (gamma_p * B)
 print(t90.to(unit.microsecond))

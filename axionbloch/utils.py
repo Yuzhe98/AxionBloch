@@ -12,22 +12,19 @@ Contents
 
 import inspect  # for check()
 import os
-import re  # for check()
-import time
-import sys
-import warnings
-
-import h5py
 import pickle
-
+import re  # for check()
+import sys
+import time
+import warnings
 from functools import partial
 from typing import Sequence
 
-from axionbloch.dependency import *
-
+import h5py
 from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
 
+from axionbloch.dependency import *
 
 
 def getDateAndTime() -> str:
@@ -198,9 +195,10 @@ def Lorentzian_0edge(x, center, FWHM, area: float = 1.0, offset: float = 0.0):
     Null
 
     """
-    return np.hamming(len(x)) * (offset + 0.5 * np.abs(FWHM) * area / (
-        np.pi * ((x - center) ** 2 + (0.5 * FWHM) ** 2)
-    ))
+    return np.hamming(len(x)) * (
+        offset
+        + 0.5 * np.abs(FWHM) * area / (np.pi * ((x - center) ** 2 + (0.5 * FWHM) ** 2))
+    )
 
 
 def estimateLorzfit(
@@ -2848,8 +2846,7 @@ class PhysicalObject:
                     value = value.item()
 
                 setattr(self, attr_name, value)
-    
-    
+
     def saveToPkl(
         self,
         fileDir: str = "",
@@ -2870,7 +2867,7 @@ class PhysicalObject:
             fileName = base + "_" + getDateAndTime()
         if fileName.endswith(".pkl"):
             fileName = fileName[:-4]
-        
+
         os.makedirs(fileDir, exist_ok=True)
         path = os.path.join(fileDir, f"{fileName}.pkl")
 
@@ -2908,6 +2905,7 @@ class PhysicalObject:
             print(f"Loaded object from {path}")
 
         return obj
+
 
 def save_phys_quantity(
     group: h5py.Group,

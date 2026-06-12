@@ -11,22 +11,21 @@ for bookkeeping across multiple runs.
 # This allows us to reference classes that are defined later or imported only during type checking.
 from __future__ import annotations
 
-# Standard typing utilities
-from typing import TypedDict, TYPE_CHECKING
 from dataclasses import dataclass
+# Standard typing utilities
+from typing import TYPE_CHECKING, TypedDict
 
 # Only import these for type checking to avoid circular imports or runtime overhead
 if TYPE_CHECKING:
-    from axionbloch.SimuTools import (
-        Simulation,
-        MagField,
-    )  # Simulation engine and magnetic field type
+    from axionbloch.SimuTools import (  # Simulation engine and magnetic field type
+        MagField, Simulation)
 
 # Import physical quantities and modules used in simulation
-from axionbloch.dependency import *  # physical quantity with units
-from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo  # axion field information
-from axionbloch.Sample import Sample  # NMR sample
 from axionbloch.Apparatus import Magnet  # magnet
+from axionbloch.dependency import *  # physical quantity with units
+from axionbloch.MilkyWayAxionHalo import \
+    MilkyWayAxionHalo  # axion field information
+from axionbloch.Sample import Sample  # NMR sample
 
 
 # -------------------------------------------------------------------

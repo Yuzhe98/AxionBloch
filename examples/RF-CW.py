@@ -5,13 +5,11 @@
 # over `duration` seconds.
 import time
 
-from axionbloch.dependency import *
-from axionbloch.SimuTools import MagField, Simulation
-from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet
 from axionbloch.constants import gamma_p, mu_p
-from axionbloch.utils import check
-
+from axionbloch.dependency import *
+from axionbloch.Sample import Sample
+from axionbloch.SimuTools import MagField, Simulation
 
 RCF_Freq = 1 * unit.MHz
 signalFreqRot = 0 * unit.Hz
@@ -34,7 +32,7 @@ T2 = 1.0 * unit.s
 # T2 = 10.0 * unit.s
 
 simuRate = 2000 * unit.Hz
-duration = .1 * unit.s
+duration = 0.1 * unit.s
 
 # CH3CH2OH sample
 sample = Sample(
@@ -82,7 +80,11 @@ simu = Simulation(
 simu.excField.setXYPulse(
     timeStep=simu.timeStep,
     timeLen=simu.timeLen,
-    B1=0.005 * unit.Hz / (sample.gamma / (2 * PI)),  # B1 field amplitude in Tesla, converted from Rabi frequency in Hz
+    B1=0.005
+    * unit.Hz
+    / (
+        sample.gamma / (2 * PI)
+    ),  # B1 field amplitude in Tesla, converted from Rabi frequency in Hz
     nu_rot=signalFreqRot,
 )
 

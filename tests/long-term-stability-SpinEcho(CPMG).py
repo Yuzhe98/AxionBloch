@@ -1,12 +1,12 @@
 # $env:PYTHONPATH = "your:\path\here;$env:PYTHONPATH”
-from axionbloch.dependency import *
 import time
-from axionbloch.SimuTools import MagField, Simulation
-from axionbloch.Sample import Sample
-from axionbloch.Apparatus import Magnet
-from axionbloch.utils import check
-from axionbloch.constants import gamma_p, mu_p
 
+from axionbloch.Apparatus import Magnet
+from axionbloch.constants import gamma_p, mu_p
+from axionbloch.dependency import *
+from axionbloch.Sample import Sample
+from axionbloch.SimuTools import MagField, Simulation
+from axionbloch.utils import check
 
 RCF_Freq = 1 * unit.MHz
 

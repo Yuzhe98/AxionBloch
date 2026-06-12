@@ -101,12 +101,13 @@ Parametrisation
 """
 
 import pytest
-from axionbloch.dependency import *
+
 from axionbloch.Apparatus import Magnet
+from axionbloch.constants import gamma_p, mu_p
+from axionbloch.dependency import *
 from axionbloch.Sample import Sample
 from axionbloch.SimuTools import MagField, Simulation
-from axionbloch.constants import gamma_p, mu_p
-from axionbloch.utils import Lorentzian, check
+
 # ---------------------------------------------------------------------------
 # Shared simulation parameters
 # ---------------------------------------------------------------------------
@@ -127,7 +128,7 @@ _N_PER_T2STAR = 500  # RK4 samples per T₂*_analytic
 # ---------------------------------------------------------------------------
 _FWHM_CASES = [0.1 * ppm, 1.0 * ppm, 10.0 * ppm, 20.0 * ppm]
 _RCF_FREQS = [1.0 * unit.kHz, 1.0 * unit.MHz, 1.0 * unit.GHz]
-_REL_DETUNINGS = [.0 * ppm, 1.0 * ppm, 10 * ppm]
+_REL_DETUNINGS = [0.0 * ppm, 1.0 * ppm, 10 * ppm]
 
 # gyromagnetic ratio (rad Hz / T) — used at numpy boundaries only
 _GAMMA = gamma_p
@@ -239,7 +240,11 @@ def _cw_expected_curve(
     for dnu, w in zip(delta_nu_i, simu.magnet.ratios):
         fd += w * np.exp(2j * np.pi * dnu * t_s - t_s / T2_s)
     # fd = 1 - np.exp(- t_s / T2_s)
-    return _GAMMA.to_value(unit.rad * unit.Hz / unit.T) * B1_eff_T * np.abs(np.cumsum(fd) * dt)
+    return (
+        _GAMMA.to_value(unit.rad * unit.Hz / unit.T)
+        * B1_eff_T
+        * np.abs(np.cumsum(fd) * dt)
+    )
 
 
 def _cw_expected_amplitude(
@@ -295,7 +300,7 @@ def _plot_cw_result(
     Mxy = np.sqrt(Mx**2 + My**2)
 
     expected_curve = _cw_expected_curve(simu, B1_eff, Delta_nu_L)
-    chi2 = float(np.sum((Mxy - expected_curve) ** 2) / np.sum(expected_curve ** 2))
+    chi2 = float(np.sum((Mxy - expected_curve) ** 2) / np.sum(expected_curve**2))
 
     marksize = 1
     cm = 1 / 2.54  # convert cm to inch
@@ -413,7 +418,7 @@ def test_cw_signal_buildup(
 
     Mxy = np.sqrt(simu.trjry[0, :, 0] ** 2 + simu.trjry[0, :, 1] ** 2)
     expected_curve = _cw_expected_curve(simu, B1_eff, Delta_nu_L)
-    chi2 = float(np.sum((Mxy - expected_curve) ** 2) / np.sum(expected_curve ** 2))
+    chi2 = float(np.sum((Mxy - expected_curve) ** 2) / np.sum(expected_curve**2))
 
     t_end = simu.getTimeStamp()[-1]
     nutation = (np.abs(_GAMMA) * B1_eff * t_end).to(unit.rad)

@@ -17,20 +17,21 @@ Run::
 import math
 
 import matplotlib
-matplotlib.use("Agg")   # non-interactive backend — no window needed
+
+matplotlib.use("Agg")  # non-interactive backend — no window needed
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
-from astropy.time import Time
 from astropy import units as unit
+from astropy.time import Time
 
 from axionbloch.MilkyWay import MilkyWay
-from axionbloch.Station import Mainz, Baltimore, Sanya
-
+from axionbloch.Station import Baltimore, Mainz, Sanya
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def mw_june():
@@ -54,6 +55,7 @@ def mw_no_station():
 # Earth velocity / v_lab
 # ---------------------------------------------------------------------------
 
+
 class TestEarthVelocity:
     def test_v_lab_shape(self, mw_june):
         v = mw_june.get_v_lab()
@@ -68,11 +70,11 @@ class TestEarthVelocity:
     def test_v_lab_annual_modulation(self, mw_june, mw_dec):
         """v_lab magnitude should differ by ~20–40 km/s between June and December."""
         v_june = mw_june.get_v_lab_magnitude().to(unit.km / unit.s).value
-        v_dec  = mw_dec.get_v_lab_magnitude().to(unit.km / unit.s).value
+        v_dec = mw_dec.get_v_lab_magnitude().to(unit.km / unit.s).value
         delta = abs(v_june - v_dec)
-        assert 10 < delta < 70, (
-            f"Annual |v_lab| modulation = {delta:.1f} km/s — expected ~30 km/s"
-        )
+        assert (
+            10 < delta < 70
+        ), f"Annual |v_lab| modulation = {delta:.1f} km/s — expected ~30 km/s"
 
     def test_v_lab_dominated_by_galactic_rotation(self, mw_june):
         """The y-component (galactic rotation direction) should be the largest."""
@@ -88,6 +90,7 @@ class TestEarthVelocity:
 # ---------------------------------------------------------------------------
 # Sun and Earth galactocentric positions
 # ---------------------------------------------------------------------------
+
 
 class TestGalactocentricPosition:
     def test_earth_position_shape(self, mw_june):
@@ -122,6 +125,7 @@ class TestGalactocentricPosition:
 # Earth heliocentric velocity
 # ---------------------------------------------------------------------------
 
+
 class TestHeliocentricVelocity:
     def test_magnitude(self, mw_june):
         """Earth's heliocentric speed should be ~29–31 km/s."""
@@ -133,13 +137,18 @@ class TestHeliocentricVelocity:
         """Heliocentric velocities in June and December should be roughly anti-parallel."""
         v_jun = mw_june.get_earth_heliocentric_velocity().to(unit.km / unit.s).value
         v_dec = mw_dec.get_earth_heliocentric_velocity().to(unit.km / unit.s).value
-        cos_angle = np.dot(v_jun, v_dec) / (np.linalg.norm(v_jun) * np.linalg.norm(v_dec))
-        assert cos_angle < -0.8, f"Helio velocities not anti-parallel: cos = {cos_angle:.3f}"
+        cos_angle = np.dot(v_jun, v_dec) / (
+            np.linalg.norm(v_jun) * np.linalg.norm(v_dec)
+        )
+        assert (
+            cos_angle < -0.8
+        ), f"Helio velocities not anti-parallel: cos = {cos_angle:.3f}"
 
 
 # ---------------------------------------------------------------------------
 # Station sensitive-axis (nvec)
 # ---------------------------------------------------------------------------
+
 
 class TestNvecGalactic:
     """get_nvec_galactic() returns the Earth/Sun direction from the galactic
@@ -189,11 +198,15 @@ class TestNvecGcrs:
         # Mainz ~50°N: dot ≈ +0.17 after 12 h
         n1 = MilkyWay(t1, station=Mainz).get_nvec_gcrs()
         n2 = MilkyWay(t2, station=Mainz).get_nvec_gcrs()
-        assert np.dot(n1, n2) < 0.5, f"nvec_gcrs barely moved at Mainz: cos = {np.dot(n1,n2):.4f}"
+        assert (
+            np.dot(n1, n2) < 0.5
+        ), f"nvec_gcrs barely moved at Mainz: cos = {np.dot(n1,n2):.4f}"
         # Sanya ~18°N: dot ≈ −0.81 after 12 h
         n3 = MilkyWay(t1, station=Sanya).get_nvec_gcrs()
         n4 = MilkyWay(t2, station=Sanya).get_nvec_gcrs()
-        assert np.dot(n3, n4) < 0.0, f"nvec_gcrs barely moved at Sanya: cos = {np.dot(n3,n4):.4f}"
+        assert (
+            np.dot(n3, n4) < 0.0
+        ), f"nvec_gcrs barely moved at Sanya: cos = {np.dot(n3,n4):.4f}"
 
     def test_different_stations_differ(self, mw_june):
         n_mainz = MilkyWay(mw_june.time, station=Mainz).get_nvec_gcrs()
@@ -209,6 +222,7 @@ class TestNvecGcrs:
 # Wind angle
 # ---------------------------------------------------------------------------
 
+
 class TestWindAngle:
     def test_range(self, mw_june):
         """Wind angle must be in [0, π]."""
@@ -217,16 +231,22 @@ class TestWindAngle:
 
     def test_changes_with_time(self):
         """Wind angle should vary during the day because nvec_gcrs rotates with Earth."""
-        times = Time(["2024-06-21T00:00:00", "2024-06-21T06:00:00",
-                      "2024-06-21T12:00:00", "2024-06-21T18:00:00"])
+        times = Time(
+            [
+                "2024-06-21T00:00:00",
+                "2024-06-21T06:00:00",
+                "2024-06-21T12:00:00",
+                "2024-06-21T18:00:00",
+            ]
+        )
         angles = [
             MilkyWay(t, station=Mainz).get_wind_angle().to(unit.deg).value
             for t in times
         ]
         # Over 18 h the sensitive axis sweeps ~270° — expect > 30° variation
-        assert max(angles) - min(angles) > 30.0, (
-            f"Wind angle variation too small: {[f'{a:.1f}' for a in angles]}"
-        )
+        assert (
+            max(angles) - min(angles) > 30.0
+        ), f"Wind angle variation too small: {[f'{a:.1f}' for a in angles]}"
 
     def test_raises_without_station(self, mw_no_station):
         with pytest.raises(ValueError, match="station"):
@@ -236,16 +256,17 @@ class TestWindAngle:
         """Stations at different latitudes/longitudes give different wind angles."""
         a_mainz = MilkyWay(mw_june.time, Mainz).get_wind_angle().to(unit.deg).value
         a_sanya = MilkyWay(mw_june.time, Sanya).get_wind_angle().to(unit.deg).value
-        a_balt  = MilkyWay(mw_june.time, Baltimore).get_wind_angle().to(unit.deg).value
-        assert abs(a_mainz - a_sanya) > 1.0, (
-            f"Mainz {a_mainz:.2f}° vs Sanya {a_sanya:.2f}°"
-        )
+        a_balt = MilkyWay(mw_june.time, Baltimore).get_wind_angle().to(unit.deg).value
+        assert (
+            abs(a_mainz - a_sanya) > 1.0
+        ), f"Mainz {a_mainz:.2f}° vs Sanya {a_sanya:.2f}°"
         assert abs(a_mainz - a_balt) > 0.1
 
 
 # ---------------------------------------------------------------------------
 # Earth rotation velocity
 # ---------------------------------------------------------------------------
+
 
 class TestEarthRotation:
     def test_shape_and_units(self, mw_june):
@@ -255,16 +276,20 @@ class TestEarthRotation:
 
     def test_magnitude_at_mainz(self, mw_june):
         """At Mainz (lat ~50°), rotation speed should be ~0.25–0.35 km/s."""
-        v_rot = float(np.linalg.norm(
-            mw_june.get_earth_rotation_velocity().to(unit.km / unit.s).value
-        ))
+        v_rot = float(
+            np.linalg.norm(
+                mw_june.get_earth_rotation_velocity().to(unit.km / unit.s).value
+            )
+        )
         assert 0.20 < v_rot < 0.40, f"|v_rot| Mainz = {v_rot:.4f} km/s"
 
     def test_magnitude_smaller_than_v_lab(self, mw_june):
         """Rotation speed must be much less than v_lab."""
-        v_rot = float(np.linalg.norm(
-            mw_june.get_earth_rotation_velocity().to(unit.km / unit.s).value
-        ))
+        v_rot = float(
+            np.linalg.norm(
+                mw_june.get_earth_rotation_velocity().to(unit.km / unit.s).value
+            )
+        )
         v_lab = mw_june.get_v_lab_magnitude().to(unit.km / unit.s).value
         assert v_rot < v_lab / 100
 
@@ -276,6 +301,7 @@ class TestEarthRotation:
 # ---------------------------------------------------------------------------
 # Galactic (l, b) of station
 # ---------------------------------------------------------------------------
+
 
 class TestStationGalacticLB:
     def test_shape_and_units(self, mw_june):
@@ -293,9 +319,11 @@ class TestStationGalacticLB:
 # plot() smoke test
 # ---------------------------------------------------------------------------
 
+
 class TestPlot:
     def test_returns_figure(self, mw_june):
         from matplotlib.figure import Figure
+
         fig = mw_june.plot(show=False)
         assert isinstance(fig, Figure)
         plt.close("all")

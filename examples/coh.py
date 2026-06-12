@@ -17,7 +17,7 @@
 # 1      3    5              5f     5.015e-18       2.420e-19       3.243e+03
 # 0      4    5              5g     nan             nan             nan
 
-import time
+
 from axionbloch.dependency import *
 from axionbloch.utils import coh_time_g1
 

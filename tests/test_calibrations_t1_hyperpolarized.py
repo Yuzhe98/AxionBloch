@@ -74,31 +74,32 @@ Parametrisation
 """
 
 import pytest
-from axionbloch.dependency import *
+
 from axionbloch.Apparatus import Magnet
+from axionbloch.constants import gamma_p, mu_p
+from axionbloch.dependency import *
 from axionbloch.Sample import Sample
 from axionbloch.SimuTools import MagField, Simulation
-from axionbloch.constants import gamma_p, mu_p
 
 # ---------------------------------------------------------------------------
 # Shared simulation parameters
 # ---------------------------------------------------------------------------
-_FWHM = 1.0 * ppm       # placeholder — ignored because nFWHM=0
-_T2_T1_RATIO = 0.1      # T2 = T1 × _T2_T1_RATIO  (NMR condition T2 ≤ T1)
-_NFWHM = 0.0            # uniform field: one spin packet at B0, no precession
+_FWHM = 1.0 * ppm  # placeholder — ignored because nFWHM=0
+_T2_T1_RATIO = 0.1  # T2 = T1 × _T2_T1_RATIO  (NMR condition T2 ≤ T1)
+_NFWHM = 0.0  # uniform field: one spin packet at B0, no precession
 _TEMP = 300.0 * unit.K  # sample temperature for thermal polarization reference
 
 # χ² tolerance: ‖Mz − Mz_expected‖² / ‖Mz_expected − 1‖²
 _CHI2_TOLERANCE = 1e-7
 
 # Timing
-_N_T1 = 5.0      # observe for 5 × T1
+_N_T1 = 5.0  # observe for 5 × T1
 _N_PER_T1 = 500  # RK4 samples per T1 (sufficient for single-packet case)
 
 # ---------------------------------------------------------------------------
 # Parametrisation
 # ---------------------------------------------------------------------------
-_OVERPOL_CASES = [2.0, 10.0, 100.0, 1e4]     # overpolarization factor k
+_OVERPOL_CASES = [2.0, 10.0, 100.0, 1e4]  # overpolarization factor k
 _T1_CASES = [1e-3 * unit.s, 1.0 * unit.s, 1e3 * unit.s]
 _RCF_FREQS = [1.0 * unit.kHz, 1.0 * unit.MHz, 1.0 * unit.GHz]
 
@@ -216,7 +217,9 @@ def _show_figure(fig, name: str) -> None:
         import os
         import tempfile
 
-        tmp = tempfile.NamedTemporaryFile(prefix=f"{name}_", suffix=".png", delete=False)
+        tmp = tempfile.NamedTemporaryFile(
+            prefix=f"{name}_", suffix=".png", delete=False
+        )
         path = tmp.name
         tmp.close()
         fig.savefig(path, dpi=300, bbox_inches="tight")
@@ -251,7 +254,9 @@ def _plot_hyperpol_result(
 
     ax: Axes = axes[0]
     ax.scatter(t_s, Mz, label="$M_z$ simulation", s=marksize, color="tab:red")
-    ax.plot(t_s, expected_curve, label="$1+(k-1)e^{-t/T_1}$ expected", color="tab:purple")
+    ax.plot(
+        t_s, expected_curve, label="$1+(k-1)e^{-t/T_1}$ expected", color="tab:purple"
+    )
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("$M_z / M_\\mathrm{eqb}$")
     ax.set_title("$M_z$ T1 decay")
@@ -262,8 +267,15 @@ def _plot_hyperpol_result(
     norm_exp = np.exp(-t_s / simu.sample.T1.to_value(unit.s))
     # avoid log(0) at t=0 end
     valid = norm_sim > 0
-    ax.semilogy(t_s[valid], norm_sim[valid], label="$(M_z-1)/(k-1)$ simulation",
-                color="tab:red", marker="o", markersize=marksize, linestyle="none")
+    ax.semilogy(
+        t_s[valid],
+        norm_sim[valid],
+        label="$(M_z-1)/(k-1)$ simulation",
+        color="tab:red",
+        marker="o",
+        markersize=marksize,
+        linestyle="none",
+    )
     ax.semilogy(t_s, norm_exp, label="$e^{-t/T_1}$ expected", color="tab:purple")
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("")
@@ -287,9 +299,7 @@ def _plot_hyperpol_result(
 @pytest.mark.parametrize(
     "RCF_freq", _RCF_FREQS, ids=lambda f: f"{f.to_value(unit.Hz):.3g}Hz"
 )
-@pytest.mark.parametrize(
-    "T1", _T1_CASES, ids=lambda t: f"{t.to_value(unit.s):.3g}s"
-)
+@pytest.mark.parametrize("T1", _T1_CASES, ids=lambda t: f"{t.to_value(unit.s):.3g}s")
 @pytest.mark.parametrize("k", _OVERPOL_CASES, ids=lambda x: f"{x:.4g}x")
 def test_t1_hyperpolarized(
     RCF_freq: Quantity,
@@ -316,7 +326,7 @@ def test_t1_hyperpolarized(
     expected_curve = _hyperpol_expected_curve(simu)
     departure = expected_curve - 1.0  # (k − 1)·exp(−t/T1), always > 0
 
-    chi2 = float(np.sum((Mz - expected_curve) ** 2) / np.sum(departure ** 2))
+    chi2 = float(np.sum((Mz - expected_curve) ** 2) / np.sum(departure**2))
 
     if show_plots:
         _plot_hyperpol_result(simu, T1, k, chi2)

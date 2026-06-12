@@ -8,22 +8,17 @@ bound-state wavefunctions and energies for each orbital quantum number *l*.
 subclass pre-configured with the Earth's gravitational potential.
 """
 
-from calendar import c
 import time
 
-from axionbloch.dependency import *
-
-from scipy.sparse import diags
+from scipy.interpolate import RegularGridInterpolator
 from scipy.linalg import eigh
-
+from scipy.sparse import diags
 # for wavefunction construction
 from scipy.special import sph_harm_y
-from scipy.interpolate import RegularGridInterpolator
 
-from astropy.coordinates import EarthLocation
-
+from axionbloch.dependency import *
 from axionbloch.Station import Station
-from axionbloch.utils import high_contrast_extended as colors, check
+from axionbloch.utils import high_contrast_extended as colors
 
 
 class GravBoundAxionHalo:
@@ -129,13 +124,19 @@ class GravBoundAxionHalo:
         mismatches easy to spot during development.
         """
         logPrefix = f"[{self.__class__.__name__}.{self.showValueAndUnits.__name__}]"
-        print(logPrefix, "self.r.mean():", self.r.mean())   # mean of radial grid
-        print(logPrefix, "self.r.std():", self.r.std())     # spread of radial grid
-        print(logPrefix, "self.dr:", self.dr)               # grid spacing
-        print(logPrefix, "self.pot.mean():", self.pot.mean())  # mean gravitational potential energy
-        print(logPrefix, "self.pot.std():", self.pot.std())    # spread of gravitational potential energy
-        print(logPrefix, "self.T_magnitude:", self.T_magnitude)  # kinetic energy prefactor ℏ²/(2m dr²)
-        print(logPrefix, "self.m_a:", self.m_a.si)              # axion mass
+        print(logPrefix, "self.r.mean():", self.r.mean())  # mean of radial grid
+        print(logPrefix, "self.r.std():", self.r.std())  # spread of radial grid
+        print(logPrefix, "self.dr:", self.dr)  # grid spacing
+        print(
+            logPrefix, "self.pot.mean():", self.pot.mean()
+        )  # mean gravitational potential energy
+        print(
+            logPrefix, "self.pot.std():", self.pot.std()
+        )  # spread of gravitational potential energy
+        print(
+            logPrefix, "self.T_magnitude:", self.T_magnitude
+        )  # kinetic energy prefactor ℏ²/(2m dr²)
+        print(logPrefix, "self.m_a:", self.m_a.si)  # axion mass
 
     def solve_TISE_3D_l(
         self,
@@ -1172,7 +1173,7 @@ class GravBoundAxionHalo:
         if max(radius_start, radius_stop) > np.amax(self.r) or min(
             radius_start, radius_stop
         ) < np.amin(self.r):
-            raise ValueError(f"Radius range too large. ")
+            raise ValueError("Radius range too large. ")
 
         start_indx = np.argmin(np.abs(self.r - radius_start))
         stop_indx = np.argmin(np.abs(self.r - radius_stop))

@@ -67,11 +67,12 @@ Parametrisation
 """
 
 import pytest
-from axionbloch.dependency import *
+
 from axionbloch.Apparatus import Magnet
+from axionbloch.constants import gamma_p, mu_p
+from axionbloch.dependency import *
 from axionbloch.Sample import Sample
 from axionbloch.SimuTools import MagField, Simulation
-from axionbloch.constants import gamma_p, mu_p
 
 # ---------------------------------------------------------------------------
 # Shared simulation parameters
@@ -85,16 +86,16 @@ from axionbloch.constants import gamma_p, mu_p
 #      high integration rate for RK4 stability, inflating the step count.
 # Field inhomogeneity has no effect on Mz recovery (T1 is uniform), so a
 # single on-resonance packet is sufficient and exact.
-_FWHM = 1.0 * ppm       # placeholder — ignored because nFWHM=0
-_T2_T1_RATIO = 0.1      # T2 = T1 × _T2_T1_RATIO  (NMR condition T2 ≤ T1)
-_NFWHM = 0.0            # uniform field: one spin packet at B0, no precession
-_T90_STEPS = 5          # 90° pulse length in time steps
+_FWHM = 1.0 * ppm  # placeholder — ignored because nFWHM=0
+_T2_T1_RATIO = 0.1  # T2 = T1 × _T2_T1_RATIO  (NMR condition T2 ≤ T1)
+_NFWHM = 0.0  # uniform field: one spin packet at B0, no precession
+_T90_STEPS = 5  # 90° pulse length in time steps
 
 # χ² tolerance: ‖Mz − Mz_expected‖² / ‖Mz_expected − 1‖²
 _CHI2_TOLERANCE = 1e-7
 
 # Timing
-_N_T1 = 5.0      # observe for 5 × T1
+_N_T1 = 5.0  # observe for 5 × T1
 _N_PER_T1 = 500  # RK4 samples per T1 (sufficient for single-packet case)
 
 # ---------------------------------------------------------------------------
@@ -157,10 +158,7 @@ def _build_t1_simulation(
     )
 
     simu = Simulation(
-        name=(
-            f"t1_{RCF_freq.to_value(unit.Hz):.3g}Hz"
-            f"_{T1.to_value(unit.s):.3g}s"
-        ),
+        name=(f"t1_{RCF_freq.to_value(unit.Hz):.3g}Hz" f"_{T1.to_value(unit.s):.3g}s"),
         sample=sample,
         magnet=magnet,
         excField=MagField(name="90deg_pulse"),
@@ -214,7 +212,9 @@ def _show_figure(fig, name: str) -> None:
         import os
         import tempfile
 
-        tmp = tempfile.NamedTemporaryFile(prefix=f"{name}_", suffix=".png", delete=False)
+        tmp = tempfile.NamedTemporaryFile(
+            prefix=f"{name}_", suffix=".png", delete=False
+        )
         path = tmp.name
         tmp.close()
         fig.savefig(path, dpi=300, bbox_inches="tight")
@@ -286,9 +286,7 @@ def _plot_t1_result(
 @pytest.mark.parametrize(
     "RCF_freq", _RCF_FREQS, ids=lambda f: f"{f.to_value(unit.Hz):.3g}Hz"
 )
-@pytest.mark.parametrize(
-    "T1", _T1_CASES, ids=lambda t: f"{t.to_value(unit.s):.3g}s"
-)
+@pytest.mark.parametrize("T1", _T1_CASES, ids=lambda t: f"{t.to_value(unit.s):.3g}s")
 def test_t1_recovery(
     RCF_freq: Quantity,
     T1: Quantity,
@@ -315,7 +313,7 @@ def test_t1_recovery(
     expected_curve = _t1_expected_curve(simu, _T90_STEPS)
     departure = expected_curve - 1.0  # (Mz0 − 1)·exp(−t/T1), always ≤ 0
 
-    chi2 = float(np.sum((Mz - expected_curve) ** 2) / np.sum(departure ** 2))
+    chi2 = float(np.sum((Mz - expected_curve) ** 2) / np.sum(departure**2))
 
     if show_plots:
         _plot_t1_result(simu, _T90_STEPS, T1, chi2)

@@ -14,39 +14,40 @@
 # import matplotlib.ticker as mticker
 # from matplotlib.axes import Axes
 
+import os
+import pickle
+# monitor run time
+from dataclasses import dataclass
+# for handling time
+from datetime import datetime, timezone
+from functools import partial
+
+# importing and processing hdf5 files
+import h5py
+# statistic tools
+# for interpolation
+# curve fitting (including calculating uncertainties)
+# data processing
+from scipy.stats import norm
+
 # # physical units and constants
 # from astropy import units as unit
 # from astropy.units import Quantity, CompositeUnit
 # from astropy.constants import codata2018 as const
 from ..dependency import *
+from .utils import (LIA_FFT, DTRC_filter, ExpCos, ExpCosiSinResidual, Gaussian,
+                    Lorentzian, check, clear_lines, dualExpCos, dualGaussian,
+                    dualLorentzian, estimatedualExpCos, estimatedualGaussFit,
+                    estimatedualLorzfit, estimateExpCos, estimateExpCosiSin,
+                    estimateGaussfit, estimateLorzfit, estimatetribLorzfit,
+                    getDateAndTime, plotaxisfmt_Hz2ppm, plotaxisfmt_MHz2ppm,
+                    plotaxisfmt_ppm2MHz, tribLorentzian)
 
 # -----------------------------------------------------
 
-import os
-
-# curve fitting (including calculating uncertainties)
-from scipy.optimize import curve_fit
-import scipy.stats.distributions
 
 # from uncertainties import ufloat
 
-# for interpolation
-from scipy import interpolate
-
-# statistic tools
-import scipy.stats as stats
-from scipy.stats import norm, chi2, shapiro
-
-# data processing
-from scipy.signal import ShortTimeFFT, savgol_filter
-
-# importing and processing hdf5 files
-import h5py
-
-# monitor run time
-import time
-
-from functools import partial
 
 # from BaselineRemoval import BaselineRemoval
 
@@ -54,45 +55,6 @@ from functools import partial
 # BaselineRemoval will effect the randomness of the script.
 # Better to set the random seed to None so as to restore the randomness
 
-# for handling time
-from datetime import datetime, timezone, timedelta
-
-import pickle
-
-from dataclasses import dataclass
-
-from .utils import (
-    check,
-    getDateAndTime,
-    record_runtime_YorN,
-    Lorentzian,
-    estimateLorzfit,
-    dualLorentzian,
-    estimatedualLorzfit,
-    tribLorentzian,
-    estimatetribLorzfit,
-    Gaussian,
-    estimateGaussfit,
-    dualGaussian,
-    estimatedualGaussFit,
-    ExpCos,
-    estimateExpCos,
-    ExpCosiSin,
-    ExpCosiSinResidual,
-    estimateExpCosiSin,
-    dualExpCos,
-    estimatedualExpCos,
-    stdPSD,
-    stdLIAPSD,
-    DTRC_filter,
-    LIA_FFT,
-    PolyEven,
-    plotaxisfmt_ppm2MHz,
-    plotaxisfmt_Hz2ppm,
-    plotaxisfmt_MHz2ppm,
-    MovAvgByStep,
-    clear_lines,
-)
 
 # include possible typos of "auto"
 AUTO_LIST = ["AUTO", "AUTP", "AUT0"]
@@ -250,18 +212,14 @@ class NMRio:
         if type(quantity) == Quantity:
             q_value = quantity.value
             q_unit = quantity.unit.to_string()
-            subgroup.create_dataset(
-                "value", data=[q_value]
-            )
+            subgroup.create_dataset("value", data=[q_value])
             subgroup.create_dataset("unit", data=[q_unit])
             if verbose:
                 print(logPrefix, "quantity.unit:", q_unit)
         else:
             q_value = quantity
-            q_unit = ''
-            subgroup.create_dataset(
-                "value", data=[q_value]
-            )
+            q_unit = ""
+            subgroup.create_dataset("value", data=[q_value])
         return subgroup
 
     @staticmethod
@@ -287,7 +245,7 @@ class NMRio:
         # plain scalar saved without unit
         if "unit" not in subgroup:
             return raw_val[0]
-    
+
         # Quantity saved with unit
         unit_str = Signal._h5_decode_str(subgroup["unit"][0])
         # if value is a scalar
@@ -572,7 +530,7 @@ class NMRio:
     @acqDur.setter
     def acqDur(self, value: Quantity[unit.millisecond]):
         self._acq_duration = value
-    
+
     @property
     def acqPts(self):
         return self._acq_points
@@ -580,8 +538,6 @@ class NMRio:
     @acqPts.setter
     def acqPts(self, value: int):
         self._acq_points = value
-    
-    
 
 
 class Signal(NMRio):
@@ -848,26 +804,26 @@ class Signal(NMRio):
                 )
 
             if "Expinfo" in dataFile.keys() and Expinfo is not None:
-                Expinfo.name = dataFile[f"Expinfo/name"][0]
-                Expinfo.dateandtime = dataFile[f"Expinfo/dateandtime"][0]
-                Expinfo.exptype = dataFile[f"Expinfo/exptype"][0]
-                self.exptype = dataFile[f"Expinfo/exptype"][0]
+                Expinfo.name = dataFile["Expinfo/name"][0]
+                Expinfo.dateandtime = dataFile["Expinfo/dateandtime"][0]
+                Expinfo.exptype = dataFile["Expinfo/exptype"][0]
+                self.exptype = dataFile["Expinfo/exptype"][0]
 
             if "Keadevice" in dataFile.keys() and Keadevice is not None:
-                Keadevice.name = dataFile[f"Keadevice/name"][0]
-                Keadevice.B1freq = dataFile[f"Keadevice/B1freq"][0]
-                Keadevice.pulseamp = dataFile[f"Keadevice/pulseamp"][0]
-                Keadevice.pulsedur = dataFile[f"Keadevice/pulsedur"][0]
+                Keadevice.name = dataFile["Keadevice/name"][0]
+                Keadevice.B1freq = dataFile["Keadevice/B1freq"][0]
+                Keadevice.pulseamp = dataFile["Keadevice/pulseamp"][0]
+                Keadevice.pulsedur = dataFile["Keadevice/pulsedur"][0]
 
             if "SQDsensor" in dataFile.keys():
                 if SQDsensor is not None:
-                    SQDsensor.name = dataFile[f"SQDsensor/name"][0]
-                    SQDsensor.Mf = dataFile[f"SQDsensor/Mf"][0]
-                    SQDsensor.Rf = dataFile[f"SQDsensor/Rf"][0]
-                    SQDsensor.attenuation = dataFile[f"SQDsensor/attenuation"][0]
-                self.y = dataFile[f"SQDsensor/Mf"][0]
-                self.SQD_Rf = dataFile[f"SQDsensor/Rf"][0]
-                self.attenuation = dataFile[f"SQDsensor/attenuation"][0]
+                    SQDsensor.name = dataFile["SQDsensor/name"][0]
+                    SQDsensor.Mf = dataFile["SQDsensor/Mf"][0]
+                    SQDsensor.Rf = dataFile["SQDsensor/Rf"][0]
+                    SQDsensor.attenuation = dataFile["SQDsensor/attenuation"][0]
+                self.y = dataFile["SQDsensor/Mf"][0]
+                self.SQD_Rf = dataFile["SQDsensor/Rf"][0]
+                self.attenuation = dataFile["SQDsensor/attenuation"][0]
 
         def loadstream_UI(dataFile):
             self.dataX += list(
@@ -1344,7 +1300,7 @@ class Signal(NMRio):
             plotintv = max(int(1.0 * self.sampRate / plotrate), 1)
         else:
             raise ValueError("plotrate < 0. ")
-        
+
         fig = plt.figure(figsize=(10, 4), dpi=150)  #
         gs = gridspec.GridSpec(nrows=3, ncols=1)  #
         pulse_ax = fig.add_subplot(gs[0, 0])
@@ -1416,7 +1372,7 @@ class Signal(NMRio):
         fig.suptitle(titletext, wrap=True)
         plt.tight_layout()
         # plt.grid()
-        #plt.show()
+        # plt.show()
 
         return 0
 
@@ -7082,7 +7038,7 @@ class Signal(NMRio):
 
         if return_opt:
             return specxaxis, self.spectrum, specxunit, specyunit
-    
+
     @classmethod
     def getStackedSpectra(
         cls, freqs, specStack, labels=None, specxunit=None, specyunit=None, offset=None
@@ -7138,17 +7094,19 @@ class Signal(NMRio):
 
     # @classmethod
     def getPSDIntegrals(self, freq_center: Quantity, halfwidth: Quantity):
-        """Integrate over [freq_center-halfwidth, freq_center+halfwidth] of the PSD and return the integral. Note that cls.PSD is a 2-D arry with shape (Npulses, acqPts). the returned array has shape (Npulses)
-        """
+        """Integrate over [freq_center-halfwidth, freq_center+halfwidth] of the PSD and return the integral. Note that cls.PSD is a 2-D arry with shape (Npulses, acqPts). the returned array has shape (Npulses)"""
         #  freq_center= cls.freqs.to(.unit)
-        mask = (self.freqs >= freq_center - halfwidth) & (self.freqs <= freq_center + halfwidth)
+        mask = (self.freqs >= freq_center - halfwidth) & (
+            self.freqs <= freq_center + halfwidth
+        )
         return np.trapezoid(self.PSD[:, mask], self.freqs[mask], axis=1)
 
     def getFSIntegrals(self, freq_center: Quantity, halfwidth: Quantity):
-        """Integrate over [freq_center-halfwidth, freq_center+halfwidth] of the FS and return the integral. Note that cls.PSD is a 2-D arry with shape (Npulses, acqPts). the returned array has shape (Npulses)
-        """
+        """Integrate over [freq_center-halfwidth, freq_center+halfwidth] of the FS and return the integral. Note that cls.PSD is a 2-D arry with shape (Npulses, acqPts). the returned array has shape (Npulses)"""
         #  freq_center= cls.freqs.to(.unit)
-        mask = (self.freqs >= freq_center - halfwidth) & (self.freqs <= freq_center + halfwidth)
+        mask = (self.freqs >= freq_center - halfwidth) & (
+            self.freqs <= freq_center + halfwidth
+        )
         return np.trapezoid(self.FS[:, mask], self.freqs[mask], axis=1)
 
     def getFS(
@@ -7192,8 +7150,8 @@ class Signal(NMRio):
 
         self.PSD: Quantity = np.abs(self.FS) ** 2
 
-        #if showPlot==True:
-            #self.plotFS(showPlot=showPlot)
+        # if showPlot==True:
+        # self.plotFS(showPlot=showPlot)
 
     def plotFS(self, xUnit=None, yUnit=None, savePlot=False, showPlot=False):
         print("i am the function plotFS from DataAnalysis.py")
@@ -7291,8 +7249,8 @@ class Signal(NMRio):
         # fig.tight_layout()
         if savePlot:
             plt.savefig()  # TODO complete this
-        #if showPlot==True:
-            #plt.show()
+        # if showPlot==True:
+        # plt.show()
         plt.close("all")
 
     @classmethod
@@ -7302,43 +7260,52 @@ class Signal(NMRio):
         pass
 
     @classmethod
-    def _plotTS_(cls, ax: Axes, x: Quantity, y: Quantity, color: str, label:str=""):
-        yUnit = "Arb. Units" if y.unit.is_equivalent(unit.one) else y.unit.to_string("unicode")
+    def _plotTS_(cls, ax: Axes, x: Quantity, y: Quantity, color: str, label: str = ""):
+        yUnit = (
+            "Arb. Units"
+            if y.unit.is_equivalent(unit.one)
+            else y.unit.to_string("unicode")
+        )
         # plot real array
         ax.plot(x, y, color=color, label=label, alpha=1)
         ax.set_xlabel(f"Time ({x.unit.to_string('unicode')})")
         ax.set_ylabel(f"Signal ({yUnit})")
         ax.grid()
 
-    def plotTS(self,
-               showPlot=True,
+    def plotTS(
+        self,
+        showPlot=True,
         verbose=False,
-        watermark:str|None=None,):
+        watermark: str | None = None,
+    ):
         cm = 1 / 2.54
         figsize = (
-            (1. * 10. * cm),
+            (1.0 * 10.0 * cm),
             (6.5 * cm),
         )
         fig = plt.figure(figsize=figsize, dpi=300)
-        
+
         # Initialize the grid structure for subplots
-        gs = gridspec.GridSpec(
-            nrows=2, ncols=1, width_ratios=[1], height_ratios=[1, 1]
-        ) 
-        left=0.13
-        bottom=0.173
-        right=0.973
-        top=0.94
-        wspace=0.472
-        hspace=0.516
-        fig.subplots_adjust(left=left, top=top, right=right,
-                            bottom=bottom, wspace=wspace, hspace=hspace)
+        gs = gridspec.GridSpec(nrows=2, ncols=1, width_ratios=[1], height_ratios=[1, 1])
+        left = 0.13
+        bottom = 0.173
+        right = 0.973
+        top = 0.94
+        wspace = 0.472
+        hspace = 0.516
+        fig.subplots_adjust(
+            left=left, top=top, right=right, bottom=bottom, wspace=wspace, hspace=hspace
+        )
         dataX_ax = fig.add_subplot(gs[0, 0])
         dataY_ax = fig.add_subplot(gs[1, 0], sharex=dataX_ax)
         # spec_ax = fig.add_subplot(gs[:, 1])
         # if not hasattr(self, "acqDur"):
         #     self.acqDur = self.TS_raw.shape[0] / self.samp_rate
-        timeStamp = np.linspace(0, (self.TS_raw.shape[0] / self.sampRate).to(unit.s), num=self.TS_raw.shape[0])
+        timeStamp = np.linspace(
+            0,
+            (self.TS_raw.shape[0] / self.sampRate).to(unit.s),
+            num=self.TS_raw.shape[0],
+        )
 
         # plot raw time series
         self._plotTS_(
@@ -7362,17 +7329,19 @@ class Signal(NMRio):
         # )
 
         titletext = ""
-        if self.fileList is None or self.fileList ==[]:
+        if self.fileList is None or self.fileList == []:
             if self.filePath is None or type(self.filePath) != str:
                 pass
             else:
                 titletext = self.filePath
         else:
             for singlefile in self.fileList:
-                titletext += "\n" + singlefile  # include the data file name(s) in the title
-        
+                titletext += (
+                    "\n" + singlefile
+                )  # include the data file name(s) in the title
+
         fig.suptitle(textwrap.fill(titletext, width=80), fontsize=4)
-        
+
         dataX_ax.legend()
         dataY_ax.legend()
 
@@ -7386,11 +7355,17 @@ class Signal(NMRio):
         pass
 
     @classmethod
-    def _plotPSD_(cls, ax: Axes, x: Quantity, y: Quantity, color: str="k"):
+    def _plotPSD_(cls, ax: Axes, x: Quantity, y: Quantity, color: str = "k"):
         freq_center = np.mean(x)
-        yUnit = "Arb. Units" if y.unit.is_equivalent(unit.one) else y.unit.to_string("unicode")
+        yUnit = (
+            "Arb. Units"
+            if y.unit.is_equivalent(unit.one)
+            else y.unit.to_string("unicode")
+        )
         ax.plot(x - freq_center, y, color=color, alpha=1)
-        ax.set_xlabel(f"Frequency - {freq_center.to_value(x.unit):g} ({x.unit.to_string('unicode')})")
+        ax.set_xlabel(
+            f"Frequency - {freq_center.to_value(x.unit):g} ({x.unit.to_string('unicode')})"
+        )
         ax.set_ylabel(f"PSD ({yUnit})")
         ax.grid()
 
@@ -7399,9 +7374,9 @@ class Signal(NMRio):
     ):
 
         pass
-    
+
     @staticmethod
-    def addWaterMark(watermark:str|None=None, fontsize:int|None=None):
+    def addWaterMark(watermark: str | None = None, fontsize: int | None = None):
         if watermark is None:
             return
         plt.annotate(
@@ -7416,7 +7391,7 @@ class Signal(NMRio):
         self,
         showPlot=True,
         verbose=False,
-        watermark:str|None=None,
+        watermark: str | None = None,
     ):
         """
         plot time series and
@@ -7428,23 +7403,24 @@ class Signal(NMRio):
         # )
         cm = 1 / 2.54
         figsize = (
-            (1. * 10. * cm),
+            (1.0 * 10.0 * cm),
             (6.5 * cm),
         )
         fig = plt.figure(figsize=figsize, dpi=300)
-        
+
         # Initialize the grid structure for subplots
         gs = gridspec.GridSpec(
             nrows=2, ncols=2, width_ratios=[1, 1], height_ratios=[1, 1]
-        ) 
-        left=0.13
-        bottom=0.173
-        right=0.973
-        top=0.94
-        wspace=0.472
-        hspace=0.516
-        fig.subplots_adjust(left=left, top=top, right=right,
-                            bottom=bottom, wspace=wspace, hspace=hspace)
+        )
+        left = 0.13
+        bottom = 0.173
+        right = 0.973
+        top = 0.94
+        wspace = 0.472
+        hspace = 0.516
+        fig.subplots_adjust(
+            left=left, top=top, right=right, bottom=bottom, wspace=wspace, hspace=hspace
+        )
         dataX_ax = fig.add_subplot(gs[0, 0])
         dataY_ax = fig.add_subplot(gs[1, 0], sharex=dataX_ax)
         spec_ax = fig.add_subplot(gs[:, 1])
@@ -7461,10 +7437,18 @@ class Signal(NMRio):
         )
 
         self._plotTS_(
-            ax=dataX_ax, x=timeStamp, y=(self.TS.real * self.window_arr).reshape(-1), color="tab:orange", label="windowed"
+            ax=dataX_ax,
+            x=timeStamp,
+            y=(self.TS.real * self.window_arr).reshape(-1),
+            color="tab:orange",
+            label="windowed",
         )
         self._plotTS_(
-            ax=dataY_ax, x=timeStamp, y=(self.TS.imag * self.window_arr).reshape(-1), color="blue", label="windowed"
+            ax=dataY_ax,
+            x=timeStamp,
+            y=(self.TS.imag * self.window_arr).reshape(-1),
+            color="blue",
+            label="windowed",
         )
 
         # TODO add window here
@@ -7474,17 +7458,19 @@ class Signal(NMRio):
         )
 
         titletext = ""
-        if self.fileList is None or self.fileList ==[]:
+        if self.fileList is None or self.fileList == []:
             if self.filePath is None or type(self.filePath) != str:
                 pass
             else:
                 titletext = self.filePath
         else:
             for singlefile in self.fileList:
-                titletext += "\n" + singlefile  # include the data file name(s) in the title
-        
+                titletext += (
+                    "\n" + singlefile
+                )  # include the data file name(s) in the title
+
         fig.suptitle(textwrap.fill(titletext, width=80), fontsize=4)
-        
+
         dataX_ax.legend()
         dataY_ax.legend()
 
@@ -7500,12 +7486,14 @@ class Signal(NMRio):
         return self.meanPower
 
     def exportPSD(self, filePath: str):
-        assert hasattr(self, "freqs") and hasattr(self, "PSD"), \
-            "Run getFS() before exportSpectrum()"
+        assert hasattr(self, "freqs") and hasattr(
+            self, "PSD"
+        ), "Run getFS() before exportSpectrum()"
         freqs_Hz = self.freqs.to(unit.Hz).value
         psd_mean = self.PSD.mean(axis=0)
         psd_unit_str = (
-            "Arb. Units" if psd_mean.unit.is_equivalent(unit.one)
+            "Arb. Units"
+            if psd_mean.unit.is_equivalent(unit.one)
             else psd_mean.unit.to_string("unicode")
         )
         header = f"Frequency (Hz)\tMean PSD ({psd_unit_str})"
@@ -7618,7 +7606,7 @@ class Signal(NMRio):
             group, "sampleY", self.TS_raw.imag, verbose=verbose
         )
         for attr in ["demodFreq", "sampRate", "acqDur", "acqPts"]:
-            print(logPrefix, attr )
+            print(logPrefix, attr)
             Signal.saveQuantityToH5group(
                 group, attr, getattr(self, attr), verbose=verbose
             )
@@ -7669,7 +7657,7 @@ class Signal(NMRio):
         # )
         obj.TS_raw = np.asanyarray(sampleX + 1j * sampleY)
         try:
-            obj.acqPts = (cls.loadAttrFromH5group(group["acqPts"]))
+            obj.acqPts = cls.loadAttrFromH5group(group["acqPts"])
         except Exception:
             print("missing acqPts")
         if obj.TS_raw.ndim != 1:
@@ -7684,12 +7672,12 @@ class Signal(NMRio):
 
         # add .h5 extension if needed
         path = filePath if str(filePath).endswith(".h5") else f"{filePath}.h5"
-        
+
         # if no such file
         if not os.path.isfile(path):
             raise FileNotFoundError(f"{logPrefix} file not found: {path}")
         grp_key = f"{deviceID}/demods/{demodIndex}"
-        
+
         # load from a h5 group
         with h5py.File(path, "r") as h5f:
             if grp_key not in h5f:

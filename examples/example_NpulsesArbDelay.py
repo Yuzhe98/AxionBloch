@@ -8,13 +8,13 @@
 # delays[i] is the free-precession interval BEFORE pulse i.
 import time
 
-from axionbloch.dependency import *
-from axionbloch.SimuTools import MagField, Simulation
-from axionbloch.Sample import Sample
 from axionbloch.Apparatus import Magnet
-from axionbloch.constants import gamma_Xe129, mu_Xe129, gamma_p, mu_p
-from axionbloch.utils import check
+from axionbloch.constants import gamma_Xe129, mu_Xe129
+from axionbloch.dependency import *
 from axionbloch.kits.Simu_Signal import Simu_Signal
+from axionbloch.Sample import Sample
+from axionbloch.SimuTools import MagField, Simulation
+from axionbloch.utils import check
 
 # ──────────────────────────────────────────────────────────────────────────── #
 # Physical parameters (all as Quantity)
@@ -220,10 +220,7 @@ signal.TS = signals_2d * unit.one
 check(signal.TS.shape)
 signal.sampRate = simu.rate
 signal.demodFreq = simu.RCF_freq
-signal.getFS(
-    winInfo={"name": "expDecay", "param": 20},
-    verbose=True
-)
+signal.getFS(winInfo={"name": "expDecay", "param": 20}, verbose=True)
 # signal.plotTS()
 signal.getStackedSpectra(freqs=signal.freqs, specStack=signal.PSD)
 # signal.getStackedSpectra(
@@ -243,8 +240,8 @@ fig = plt.figure(figsize=(6.0, 4.0), dpi=150)  # initialize a figure
 gs = gridspec.GridSpec(nrows=1, ncols=1)  # create grid for multiple figures
 
 ax00 = fig.add_subplot(gs[0, 0])
-ax00.plot(indices, integrals.real, label='real')
-ax00.plot(indices, integrals.imag, label='imag')
+ax00.plot(indices, integrals.real, label="real")
+ax00.plot(indices, integrals.imag, label="imag")
 ax00.set_xlabel("")
 ax00.set_ylabel("")
 # ax00.set_xscale('log')

@@ -1,5 +1,5 @@
-from axionbloch.dependency import *
 from axionbloch.constants import gamma_p
+from axionbloch.dependency import *
 from axionbloch.utils import Lorentzian
 
 # dimensionless quantities with python scalars
@@ -123,7 +123,7 @@ try:
     timeStamp = np.linspace(1.23, duration, num=5)
 except Exception as exc:
     print(
-        f"np.linspace(1.23, duration, num=5) failed because the start/stop must be a quantity (unless zero/infinity/nan)"
+        "np.linspace(1.23, duration, num=5) failed because the start/stop must be a quantity (unless zero/infinity/nan)"
     )
     print(f"error message: {exc}")
 
@@ -131,7 +131,7 @@ print("\nnp.arange with Quantity:")
 try:
     timeStamp = np.arange(0, duration + 1e-9 * unit.s, step=1 * unit.s)
 except Exception as exc:
-    print(f"np.arange does not work with Quantity")
+    print("np.arange does not work with Quantity")
     print(f"error message: {exc}")
 
 # np.where

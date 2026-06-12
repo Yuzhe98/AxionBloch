@@ -4,9 +4,11 @@ Run directly (``python tests/test_constants.py``) to print all module-level
 constants with their types, shapes and values using :func:`~axionbloch.utils.check`.
 No assertions are made; the purpose is human inspection.
 """
+
+from astropy import units as u
+
 from axionbloch.constants import *
 from axionbloch.utils import check
-from astropy import units as u
 
 
 def _print_constants():

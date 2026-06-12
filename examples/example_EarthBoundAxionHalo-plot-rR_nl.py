@@ -1,10 +1,6 @@
-import os
-import time
 from axionbloch.dependency import *
-from axionbloch.EarthBoundAxionHalo import (
-    EarthBoundAxionHalo,
-)
-from axionbloch.Station import Mainz, Baltimore, Sanya
+from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo
+from axionbloch.Station import Baltimore
 
 station = Baltimore
 rhoE_DM = 0.3 * unit.GeV / unit.cm**3

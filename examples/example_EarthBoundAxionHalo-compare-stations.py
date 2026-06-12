@@ -1,22 +1,8 @@
-import os
-import time
-
 from axionbloch.dependency import *
-from axionbloch.EarthBoundAxionHalo import (
-    EarthBoundAxionHalo,
-)
+from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo
+from axionbloch.Station import (Baltimore, BuenosAires, CapeTown, Geneva,
+                                Mainz, Mumbai, Sanya, Sydney, Tokyo)
 from axionbloch.utils import check
-from axionbloch.Station import (
-    Mainz,
-    Baltimore,
-    Sanya,
-    Tokyo,
-    Geneva,
-    Sydney,
-    BuenosAires,
-    CapeTown,
-    Mumbai,
-)
 
 stations = [
     Mainz,

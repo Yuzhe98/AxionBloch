@@ -1,16 +1,14 @@
 # Example script to run stochastic axion wind NMR simulations
 import os
-
 import time
 
+from axionbloch.Apparatus import Magnet
+from axionbloch.constants import gamma_Xe129, mu_Xe129
 from axionbloch.dependency import *
 from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
-
+from axionbloch.Sample import Sample
 # from axionbloch.utils import check, dualLorentzian
 from axionbloch.SimuTools import MagField, Simulation, Simulations
-from axionbloch.Sample import Sample
-from axionbloch.Apparatus import Magnet
-from axionbloch.constants import gamma_p, mu_p, gamma_Xe129, mu_Xe129
 from axionbloch.SimuTypes import SimuParams
 
 # set directory for saving data

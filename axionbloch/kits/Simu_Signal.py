@@ -15,10 +15,10 @@ Simu_Signals
     analysis helpers inherited from ``Signals``.
 """
 
-from axionbloch.dependency import *
-from axionbloch.utils import check
-from axionbloch.kits.DataAnalysis import Signal, Signals
 from dataclasses import dataclass
+
+from axionbloch.dependency import *
+from axionbloch.kits.DataAnalysis import Signal, Signals
 
 
 class Simu_Signal(Signal):
@@ -100,6 +100,7 @@ class Simu_Signal(Signal):
         assert self.TS_raw is not None, "Raw time-series data (TS_raw) is not loaded."
 
         return self.TS_raw[mask]
+
 
 @dataclass
 class Simu_SignalEntry:
