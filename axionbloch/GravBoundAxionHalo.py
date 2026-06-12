@@ -370,8 +370,8 @@ class GravBoundAxionHalo:
             Labels of eigenstates to include (e.g. ``['1s', '2p']``).
             Defaults to the lowest-energy state.
         station : Station, optional
-            Geographic location; its ``location`` (lat / lon / elevation) is
-            used as the direction.  Mutually exclusive with ``location``.
+            Geographic station whose latitude, longitude, and elevation define
+            the direction.
         truncRadius : Quantity
             Truncation radius for reducing computation and plotting time.
         """
@@ -380,7 +380,7 @@ class GravBoundAxionHalo:
             f"[{self.__class__.__name__}.{self.findGradientsAtDirection.__name__}]"
         )
 
-        # --- Resolve direction from station or EarthLocation ---
+        # --- Resolve direction from station ---
         assert station is not None, logPrefix + " Please provide a Station."
 
         if meas_time is None:

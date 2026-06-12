@@ -289,8 +289,8 @@ class MilkyWayAxionHalo:
             ------
             A float array of the axion lineshape
 
-            Reference
-            ---------
+            References
+            ----------
             A. Gramolin: https://github.com/gramolin/lineshape
 
             """

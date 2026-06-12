@@ -39,8 +39,8 @@ class SimuParams(TypedDict):
     Pass an instance of this dict to :class:`~axionbloch.SimuTools.Simulations`
     as one element of ``all_params``.
 
-    Keys
-    ----
+    Attributes
+    ----------
     key_info : dict
         Arbitrary metadata (e.g. ``{"nu_a": axion.nu_a}``), printed during
         verbose runs and stored alongside results.

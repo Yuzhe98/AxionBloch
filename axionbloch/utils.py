@@ -148,7 +148,7 @@ def Lorentzian(x, center, FWHM, area: float = 1.0, offset: float = 0.0):
     --------
     >>>
 
-    Reference
+    References
     ----------
     Null
 
@@ -190,7 +190,7 @@ def Lorentzian_0edge(x, center, FWHM, area: float = 1.0, offset: float = 0.0):
     --------
     >>>
 
-    Reference
+    References
     ----------
     Null
 
@@ -232,8 +232,8 @@ def estimateLorzfit(
     --------
     >>>
 
-    Reference
-    ---------
+    References
+    ----------
         scipy.optimize.curve_fit
         https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.curve_fit.html
 
@@ -383,8 +383,8 @@ def dualLorentzian(
     --------
     >>>
 
-    Reference
-    ---------
+    References
+    ----------
     Null
 
     """
@@ -426,8 +426,8 @@ def estimatedualLorzfit(
     --------
     >>>
 
-    Reference
-    ---------
+    References
+    ----------
         scipy.optimize.curve_fit
         https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.curve_fit.html
 
@@ -539,8 +539,8 @@ def tribLorentzian(
     --------
     >>>
 
-    Reference
-    ---------
+    References
+    ----------
     Null
 
     """
@@ -583,8 +583,8 @@ def estimatetribLorzfit(
     --------
     >>>
 
-    Reference
-    ---------
+    References
+    ----------
         scipy.optimize.curve_fit
         https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.curve_fit.html
 
@@ -698,8 +698,8 @@ def Gaussian(x, center, sigma, area, offset):
     --------
     >>>
 
-    Reference
-    ---------
+    References
+    ----------
     https://en.wikipedia.org/wiki/Gaussian_function
 
     """
@@ -763,8 +763,8 @@ def dualGaussian(
     --------
     >>>
 
-    Reference
-    ---------
+    References
+    ----------
     https://en.wikipedia.org/wiki/Gaussian_function
 
     """
@@ -819,8 +819,8 @@ def PolyEven(x, C0, C2, C4, C6, C8, C10, center, verbose=False):
     --------
     >>>
 
-    Reference
-    ---------
+    References
+    ----------
     Null
 
     """
@@ -857,8 +857,8 @@ def estimatePolyEvenfit(datax=None, datay=None, verbose=False):
     --------
     >>>
 
-    Reference
-    ---------
+    References
+    ----------
         scipy.optimize.curve_fit
         https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.curve_fit.html
 
@@ -1105,8 +1105,8 @@ def expdecaywindow(num: int, decayfactor: float = 0.003, verbose=False):
     --------
     >>>
 
-    Reference
-    --------
+    References
+    ----------
     http://sopnmr.blogspot.com/2016/01/processing-window-functions.html
     """
     if decayfactor <= 0:
@@ -1162,8 +1162,8 @@ def LIAFilterHomega(
     --------
     >>>
 
-    Reference
-    ---------
+    References
+    ----------
         Zurich Instruments, MFIA User Manual, Page 275, 6.4.1. Discrete-Time RC Filter
         https://docs.zhinst.com/pdf/ziMFIA_UserManual.pdf
 
@@ -1239,7 +1239,7 @@ def LIAFilterPSD(frequency=None, taun=None, order=None, verbose=False):
     --------
     >>>
 
-    Reference
+    References
     ----------
         Zurich Instruments, MFIJ User Manual, Page 275, 6.4.1. Discrete-Time RC Filter
         https://docs.zhinst.com/pdf/ziMFIA_UserManual.pdf
@@ -1298,8 +1298,8 @@ def stdPSD(
     --------
     >>>
 
-    Reference
-    ---------
+    References
+    ----------
 
     [1] FFT and PSD computed based on https://holometer.fnal.gov/GH_FFT.pdf
 
@@ -1430,8 +1430,8 @@ def stdLIAPSD(
     >>>
 
 
-    Reference
-    --------
+    References
+    ----------
     [1] FFT and PSD computed based on https://holometer.fnal.gov/GH_FFT.pdf
 
     [2] Zurich Instruments, MFIJ User Manual 500 kHz / 5 MHz Impedance Analyzer
@@ -1674,8 +1674,8 @@ def stdLIAFFT(
     >>>
 
 
-    Reference
-    --------
+    References
+    ----------
     [1] FFT and PSD computed based on https://holometer.fnal.gov/GH_FFT.pdf
 
     [2] Zurich Instruments, MFIJ User Manual 500 kHz / 5 MHz Impedance Analyzer
@@ -1828,8 +1828,8 @@ def DTRC_filter(
     """
     Discrete-Time RC Filter
 
-    Reference
-    --------
+    References
+    ----------
     [1] Zurich Instruments, MFIJ User Manual 500 kHz / 5 MHz Impedance Analyzer
         P185 6.4. Discrete-Time Filters
         https://docs.zhinst.com/pdf/ziMFIA_UserManual.pdf

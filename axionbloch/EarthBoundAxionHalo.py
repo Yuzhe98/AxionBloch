@@ -1,4 +1,3 @@
-from astropy.coordinates import EarthLocation
 from scipy.interpolate import interp1d
 from scipy.signal import correlate as correlate
 
@@ -412,18 +411,16 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         showPlot: bool = False,
         verbose: bool = False,
     ) -> tuple:
-        """Compute the wavefunction gradient along an arbitrary direction.
+        """Compute the wavefunction gradient toward a station at the Earth's surface.
 
-        A convenience wrapper around :meth:`findGradients` that accepts an
-        :class:`~astropy.coordinates.EarthLocation` directly, without requiring
-        a pre-defined :class:`~axionbloch.Station.Station`.
+        A convenience wrapper around :meth:`findGradientsAtDirection` with a
+        default truncation radius suited to ground-based experiments.
 
         Parameters
         ----------
-        location : EarthLocation
-            Geodetic latitude, longitude, and elevation of the direction.
-            For example: ``EarthLocation(lat=0*u.deg, lon=0*u.deg, height=0*u.m)``
-            points toward the equator on the prime meridian.
+        station : Station
+            Geographic station whose latitude, longitude, and elevation define
+            the direction.
         stateNames : list of str, optional
             Eigenstates to superimpose (e.g. ``['2p']``).  Defaults to the
             lowest-energy solved state.
@@ -438,17 +435,6 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         -------
         r, R_r, r_line, grad_r, grad_theta, grad_phi
             Same six arrays as :meth:`findGradients`.
-
-        Examples
-        --------
-        >>> from astropy.coordinates import EarthLocation
-        >>> from astropy import units as u
-        >>> # Direction toward the equator on the prime meridian
-        >>> r, R_r, r_line, gr, gt, gp = halo.findGradientsAtDirection(
-        ...     location=EarthLocation(lat=0*u.deg, lon=0*u.deg, height=0*u.m),
-        ...     stateNames=['2p'],
-        ...     truncRadius=2 * u.R_earth,
-        ... )
         """
         return self.findGradientsAtDirection(
             stateNames=stateNames,
@@ -462,22 +448,19 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         self,
         stateNames: list[str] | None = None,
         station: Station | None = None,
-        location: EarthLocation | None = None,
         truncRadius: Quantity | None = 3 * unit.earthRad,
         showPlot: bool = False,
         verbose: bool = False,
     ) -> tuple:
         """Compute the wavefunction gradient toward a geographic direction.
 
-        Accepts either a :class:`~axionbloch.Station.Station` or an
-        :class:`~astropy.coordinates.EarthLocation`.  Exactly one must be given;
-        raises :exc:`ValueError` when neither is provided.
+        The direction is specified by a :class:`~axionbloch.Station.Station`;
+        raises :exc:`ValueError` when none is provided.
 
         Parameters
         ----------
         stateNames : list of str, optional
         station : Station, optional
-        location : EarthLocation, optional
         truncRadius : Quantity, optional
         showPlot : bool
         verbose : bool
@@ -486,16 +469,13 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         -------
         r, R_r, r_line, grad_r, grad_theta, grad_phi
         """
-        if station is None and location is None:
+        if station is None:
             raise ValueError(
-                "[EarthBoundAxionHalo.findGradients] "
-                "Provide either station= or location=."
+                "[EarthBoundAxionHalo.findGradients] Provide station=."
             )
-        if station is not None:
-            location = station.location
         return self.findGradientsAtDirection(
             stateNames=stateNames,
-            location=location,
+            station=station,
             truncRadius=truncRadius,
             showPlot=showPlot,
             verbose=verbose,
