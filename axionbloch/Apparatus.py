@@ -70,7 +70,7 @@ class Magnet:
         assert nFWHM >= 0
         self.nFWHM = nFWHM
         if B0 is None or FWHM is None:
-            raise ValueError("B0 and FWHM must be provided")
+            raise ValueError(logPrefix + " B0 and FWHM must be provided")
 
         self.B0 = B0
         self.direction = direction
@@ -133,7 +133,7 @@ class Magnet:
                 offset=0,
             )
             if verbose:
-                print(logPrefix, f"self.numPt = {self.numPt}")
+                print(logPrefix, f"inhomogeneous field. self.numPt = {self.numPt}")
             # uniform sampling over [-1, 1]
             uni_samp = np.linspace(start=-1, stop=1, num=self.numPt, endpoint=True)
             # transform uniform sampling to the desired distribution
@@ -144,7 +144,7 @@ class Magnet:
                 print(logPrefix, f"B_spread.shape = {self.B_spread.shape}")
                 print(
                     f"{logPrefix} B_spread: {len(self.B_spread)} points  "
-                    f"range=[{self.B_spread.min():g}, {self.B_spread.max():g}]"
+                    f"range=[{self.B_spread.min():.6g}, {self.B_spread.max():.6g}]"
                 )
 
             if showPlot:
@@ -179,12 +179,6 @@ class Magnet:
             edges[0] = self.B_spread[0] - abs(edges[2] - edges[1]) / 2
             edges[-1] = self.B_spread[-1] + abs(edges[-2] - edges[-3]) / 2
 
-            if verbose:
-                print(
-                    f"{logPrefix} B_spread: {len(self.B_spread)} points  "
-                    f"range=[{self.B_spread.min():.6g}, {self.B_spread.max():.6g}]"
-                )
-
             self.ratios = np.zeros(self.B_spread.shape)
             for i in range(len(self.B_spread)):
                 a, b = edges[i], edges[i + 1]
@@ -193,8 +187,8 @@ class Magnet:
             # high-frequency spins can create wiggles in the magnetization signal
             # to suppress wiggles, add hamming window to decrease the ratio of high-frequency spins
             # this is not ideal or physical. However, in simulations, we cannot use extremely large nFWHM
-            # to account for the real magnetic field distribution. We truncate at edges, instead. 
-            self.ratios *= np.hamming(len(self.ratios))**2
+            # to account for the real magnetic field distribution. We truncate at edges, instead.
+            self.ratios *= np.hamming(len(self.ratios)) ** 2
             # normalize ratios to sum to 1
             self.ratios /= np.sum(self.ratios)
 
