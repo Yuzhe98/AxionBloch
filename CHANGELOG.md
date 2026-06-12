@@ -1,3 +1,9 @@
+v0.2.2 (2026-06-13)
+--------------
+
+- corrected requirement of python versions (3.10+). 
+- updated docs according to updates. 
+
 v0.2.1 (2026-06-12)
 --------------
 
