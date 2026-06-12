@@ -416,8 +416,8 @@ def test_Simulation(sample: Sample, magnet_kwargs: dict):
         "init_M_theta": 0 * unit.rad,
         "init_M_phi": 0 * unit.rad,
         # sampling rate and duration of the time series
-        "rate": 1 * unit.Hz,
-        "duration": 4000 * unit.s,
+        "rate": 30 * unit.Hz,
+        "duration": 3 * sample.T1,
     }
 
     # Create and execute the simulation job collection
