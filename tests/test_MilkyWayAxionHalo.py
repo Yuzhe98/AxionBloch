@@ -40,7 +40,9 @@ from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
 
 PRINT_RESULTS = os.getenv("PRINT_RESULTS", "0") == "1"
 SEED = int(os.getenv("SEED", "42"))
-NUM_FIELD = int(os.getenv("NUM_FIELD", "1000"))
+# the number of field should be larger than 100. 
+# Otherwise the mean of axion lineshape may deviate from 1.
+NUM_FIELD = int(os.getenv("NUM_FIELD", "1000"))  
 
 
 LXe = Sample(
@@ -87,14 +89,14 @@ ethanol = Sample(
     verbose=False,
 )
 
-samples = []
+# samples = []
 
-magnet_2ppm = Magnet(B0=1.5 * unit.T, FWHM=2.0 * ppm, nFWHM=100, verbose=PRINT_RESULTS)
-magnet_2ppb = Magnet(
-    B0=2.0 * unit.T, FWHM=5.0 * ppb, nFWHM=10, numPt=100, verbose=PRINT_RESULTS
-)
+# magnet_2ppm = Magnet(B0=1.5 * unit.T, FWHM=2.0 * ppm, nFWHM=10, verbose=PRINT_RESULTS)
+# magnet_2ppb = Magnet(
+#     B0=2.0 * unit.T, FWHM=5.0 * ppb, nFWHM=10, verbose=PRINT_RESULTS
+# )
 
-magnets = []
+# magnets = []
 
 
 def test_MilkyWayAxionHalo_initialization():
@@ -269,7 +271,7 @@ def test_getAmpSpectra_stochastic():
     nu_a = 1 * unit.MHz
     v_0 = 220.0 * unit.km / unit.s
     v_lab = 233.0 * unit.km / unit.s
-    frequencies = np.linspace(-10, 100, 2000) * unit.Hz + 1 * unit.MHz
+    frequencies = np.linspace(-10, 100, 1000) * unit.Hz + 1 * unit.MHz
 
     axion = MilkyWayAxionHalo(
         name="Milky Way Axion Halo",
@@ -367,9 +369,9 @@ def test_getAmpSpectra_deterministic():
 @pytest.mark.parametrize(
     "magnet_kwargs",
     [
-        {"FWHM": 1 * ppb, "numPt": 1},
-        {"FWHM": 2 * ppm, "numPt": 100},
-        {"FWHM": 10 * ppm, "numPt": 5000},
+        {"FWHM": 1 * ppb},
+        {"FWHM": 2 * ppm},
+        {"FWHM": 10 * ppm},
     ],
     ids=["1ppb", "2ppm", "10ppm"],
 )
@@ -391,14 +393,15 @@ def test_Simulation(sample: Sample, magnet_kwargs: dict):
     )
 
     # B0 is always determined by the sample's gamma and the axion frequency
-    B0 = (axion.nu_a_eff / (sample.gamma / (2 * np.pi * unit.rad))).to(unit.T)
+    B0 = (axion.nu_a_eff / (sample.gamma / (2 * PI))).to(unit.T)
     magnet = Magnet(
         B0=B0,
         direction=[0, 0, 1],
+        verbose=PRINT_RESULTS,
         **magnet_kwargs,
     )
 
-    B_a_rms = (axion.getRabiFreq() / (sample.gamma / (2 * np.pi * unit.rad))).to(unit.T)
+    B_a_rms = (axion.getRabiFreq() / (sample.gamma / (2 * PI))).to(unit.T)
 
     params: SimuParams = {
         "key_info": {"nu_a": axion.nu_a},
@@ -416,20 +419,23 @@ def test_Simulation(sample: Sample, magnet_kwargs: dict):
         "init_M_theta": 0 * unit.rad,
         "init_M_phi": 0 * unit.rad,
         # sampling rate and duration of the time series
-        "rate": 30 * unit.Hz,
+        "rate": None,
         "duration": 3 * sample.T1,
     }
 
     # Create and execute the simulation job collection
     simulations = Simulations(all_params=[params])
-
+    if PRINT_RESULTS:
+        for i, item in enumerate(simulations.pool):
+            print(item.simu.rate)
+            print(item.simu.duration)
     # run the simulation
     simulations.run(verbose=PRINT_RESULTS)
 
     assert len(simulations.pool) == 1
 
-    # Post-process results with summary stats and plotting
-    if PRINT_RESULTS:
-        for i, item in enumerate(simulations.pool):
-            item.simu.keepMeanStd()
-            item.simu.displayTrjries()
+    # # Post-process results with summary stats and plotting
+    # if PRINT_RESULTS:
+    #     for i, item in enumerate(simulations.pool):
+    #         item.simu.keepMeanStd()
+    #         item.simu.displayTrjries()
