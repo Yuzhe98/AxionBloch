@@ -39,7 +39,7 @@ if not on_rtd:
 
 setup(
     name="axionbloch",
-    version="0.2.0",
+    version="0.2.1",
     packages=find_namespace_packages(include=["axionbloch", "axionbloch.*"]),
     ext_modules=ext_modules,
     cmdclass={"build_ext": build_ext},

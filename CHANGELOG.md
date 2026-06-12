@@ -1,3 +1,9 @@
+v0.2.1 (2026-06-12)
+--------------
+
+- modifications for better simulation efficiency
+- format adjusted
+
 v0.2.0 (2026-06-11)
 --------------
 
