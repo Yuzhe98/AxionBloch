@@ -116,11 +116,11 @@ _NFWHM = 20.0  # half-width range for spin-packet sampling
 
 # Weak-drive condition: γ·B₁_eff·t_end = 5·TIP_ANGLE << 1 rad
 _TIP_ANGLE = 0.001 * unit.rad  # γ·B₁_eff·T₂*_analytic (rad)
-_CHI2_TOLERANCE = 1e-4  # ||Mxy − expected||² / ||expected||² over full trajectory
+_CHI2_TOLERANCE = 1e-5  # ||Mxy − expected||² / ||expected||² over full trajectory
 
 # Adaptive timing (same logic as free-decay calibration)
 _N_T2STAR = 10.0  # observe for 10 × T₂*_analytic
-_N_PER_T2STAR = 200  # RK4 samples per T₂*_analytic
+_N_PER_T2STAR = 500  # RK4 samples per T₂*_analytic
 
 # ---------------------------------------------------------------------------
 # Parametrisation
@@ -238,6 +238,7 @@ def _cw_expected_curve(
     fd = np.zeros(len(t_s), dtype=complex)
     for dnu, w in zip(delta_nu_i, simu.magnet.ratios):
         fd += w * np.exp(2j * np.pi * dnu * t_s - t_s / T2_s)
+    # fd = 1 - np.exp(- t_s / T2_s)
     return _GAMMA.to_value(unit.rad * unit.Hz / unit.T) * B1_eff_T * np.abs(np.cumsum(fd) * dt)
 
 

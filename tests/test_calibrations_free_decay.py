@@ -89,7 +89,7 @@ _CHI2_TOLERANCE = 1e-4
 
 # Adaptive timing
 _N_T2STAR = 10.0     # observe for 10 × T₂*_analytic
-_N_PER_T2STAR = 300  # RK4 samples per T₂*_analytic
+_N_PER_T2STAR = 500  # RK4 samples per T₂*_analytic
 
 # ---------------------------------------------------------------------------
 # Parametrisation

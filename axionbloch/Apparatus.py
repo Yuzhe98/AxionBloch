@@ -93,7 +93,7 @@ class Magnet:
 
         Discretises a Lorentzian field distribution into ``numPt`` spin packets
         using a non-uniform sampling scheme (density proportional to
-        ``|x|^(1/2)`` in normalised coordinates) to oversample the peak region.
+        ``|x|^(1/2)`` in normalized coordinates) to oversample the peak region.
         Each packet is assigned a weight ``ratio`` equal to its fraction of the
         total Lorentzian area so that weighted averages reproduce the continuous
         lineshape.

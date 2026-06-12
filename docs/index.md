@@ -39,4 +39,5 @@ installation
 theory
 usage
 api
+tests
 ```

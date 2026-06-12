@@ -192,7 +192,7 @@ magnetic field array.  Call one of its ``set*`` methods to fill
 | `setAxionFields` | Stochastic axion pseudomagnetic fields |
 
 **{class}`~axionbloch.SimuTools.Simulation`** wraps the C++ ``blochsimulation``
-RK4 kernel for a single run: generates field realisations, loops over spin
+RK4 kernel for a single run: generates field realizations, loops over spin
 packets, integrates the Bloch equations, and stores results in
 {attr}`~axionbloch.SimuTools.Simulation.trjries`.
 
