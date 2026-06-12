@@ -1045,10 +1045,12 @@ class Simulation(PhysicalObject):
         # -----------------------------set magnet--------------------------------------- #
         # estimate the necessary data points for sampling the inhomogeneity
         numPt = abs(
-            (self.duration * 8 * magnet.B0_nW * sample.gamma / (2 * PI)).to_value(
+            (self.duration * 2 * magnet.B0_nW * sample.gamma / (2 * PI)).to_value(
                 unit.one
             )
         )
+        if verbose:
+            print(logPrefix, f"numPt = {numPt}")
         # numPt = 500
         # TODO choose better numPt for magnet
         if numPt <= 1:
