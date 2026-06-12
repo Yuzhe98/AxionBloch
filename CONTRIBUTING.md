@@ -1,6 +1,6 @@
 # Contributing to this project
 
-Glad that you are considering contributing to **AxionBloch**!
+Glad that you are considering contributing!
 Contributions of all kinds are welcome: bug reports, documentation improvements,
 examples, and code contributions.
 
