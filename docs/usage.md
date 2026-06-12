@@ -12,7 +12,6 @@ modelling, and numerical integration.
 | `MagField` | Effective magnetic field — combines bias, excitation, and axion pseudomagnetic fields |
 | `MilkyWayAxionHalo` | Milky Way SHM axion-wind model |
 | `GravBoundAxionHalo` / `EarthBoundAxionHalo` | Gravitationally bound halo (TISE solver) |
-| `FineGrainedAxionStream` | Single fine-grained axion stream |
 | `Simulation` | Single simulation run |
 | `Simulations` | Collection of simulation runs; parallelized execution and I/O |
 

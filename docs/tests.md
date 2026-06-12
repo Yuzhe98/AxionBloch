@@ -205,22 +205,31 @@ Smoke tests for `axionbloch.constants`.  Running the file directly (`python
 tests/test_constants.py`) prints every constant with its type, shape, and
 value via {func}`~axionbloch.utils.check`; no assertions are made.
 
+### `test_EarthBoundAxionHalo.py`
+
+Tests the PREM data loader and the Earth gravitational-potential helpers used
+by the bound-axion Schrödinger solver.
+
+---
+
+## Integration tests
+
 ### `test_MilkyWayAxionHalo.py`
 
 Tests {class}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo` initialization,
 Rabi-frequency computation, and the end-to-end `Simulations` pipeline.
 Accepts `PRINT_RESULTS`, `SEED`, and `NUM_FIELD` environment variables.
 
-### `test_EarthBoundAxionHalo.py`
-
-Tests the PREM data loader and the Earth gravitational-potential helpers used
-by the bound-axion Schrödinger solver.
-
 ### `test_MilkyWay.py` · `test_findGradients_EarthLocation.py`
 
-Additional integration tests for the Milky Way axion-halo model and the
-`findGradients` routine that evaluates the axion field gradient at a
-geographic station.
+Integration tests for the Milky Way axion-halo model and the
+`findGradients` interface: the `Station.location` attribute
+(hemisphere sign conventions, elevation, colatitude conversion) and the
+`ValueError` raised when `findGradients` is called without a station.
+
+---
+
+## Performance benchmarks
 
 ### `test_numpy_unit_performance.py`
 

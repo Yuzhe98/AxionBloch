@@ -11,11 +11,16 @@ installed automatically as dependencies:
 | [SciPy](https://scipy.org/) | Sparse linear algebra, interpolation, signal processing |
 | [Matplotlib](https://matplotlib.org/) | Plotting |
 | [Astropy](https://www.astropy.org/) | Physical units and constants |
+| [h5py](https://www.h5py.org/) | HDF5 file I/O for simulation results |
 
-## Install from PyPI
+## Install from TestPyPI
+
+Development versions are published on
+[TestPyPI](https://test.pypi.org/project/axionbloch/).  Since TestPyPI does
+not host the dependencies, point pip at both indexes:
 
 ```bash
-pip install axionbloch
+pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ axionbloch
 ```
 
 ## Install from source

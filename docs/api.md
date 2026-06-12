@@ -21,7 +21,6 @@ automatically from source docstrings.
 | {class}`~axionbloch.SimuTools.MagField` | `SimuTools` | (Pseudo)magnetic field builder |
 | {class}`~axionbloch.SimuTools.Simulations` | `SimuTools` | Multi-run simulation manager |
 | {class}`~axionbloch.SimuTools.Simulation` | `SimuTools` | Single Bloch-equation simulation |
-| {class}`~axionbloch.FineGrainedAxionStream.FineGrainedAxionStream` | `FineGrainedAxionStream` | Single axion stream |
 
 ---
 
@@ -56,8 +55,11 @@ gravitationally bound to a compact body.  The solver:
 - Builds a 1-D radial finite-difference Hamiltonian {math}`H = T + V_\mathrm{eff}`.
 - Diagonalizes it with `scipy.linalg.eigh` for each angular-momentum channel *l*.
 - Stores eigen-energies and normalized reduced radial wavefunctions {math}`u_{n_r l}(r)`.
-- Computes the 3-D gradient of the total wavefunction at an experimental station
-  via {func}`~axionbloch.GravBoundAxionHalo.GravBoundAxionHalo.findGradients`.
+- Computes the 3-D gradient of the total wavefunction toward a geographic
+  {class}`~axionbloch.Station.Station` via
+  {func}`~axionbloch.GravBoundAxionHalo.GravBoundAxionHalo.findGradientsAtDirection`,
+  and its time evolution via
+  {func}`~axionbloch.GravBoundAxionHalo.GravBoundAxionHalo.findGradientsOverTime`.
 
 Sub-class {class}`~axionbloch.EarthBoundAxionHalo.EarthBoundAxionHalo` is
 pre-configured with the Earth's gravitational potential.
@@ -74,8 +76,14 @@ pre-configured with the Earth's gravitational potential.
 
 Sub-class of {class}`~axionbloch.GravBoundAxionHalo.GravBoundAxionHalo`
 pre-configured with Earth's gravitational potential from the Preliminary Earth
-Model (PEM) density profile.  Also exports helper functions used to build the
-potential:
+Model (PEM) density profile.  Adds Earth-specific gradient helpers:
+{func}`~axionbloch.EarthBoundAxionHalo.EarthBoundAxionHalo.findGradients`
+(takes a {class}`~axionbloch.Station.Station`),
+{func}`~axionbloch.EarthBoundAxionHalo.EarthBoundAxionHalo.findGradientsAtEarthSurface`,
+{func}`~axionbloch.EarthBoundAxionHalo.EarthBoundAxionHalo.findGradientsWithMilkyWay`,
+and the pseudomagnetic-field conversion
+{func}`~axionbloch.EarthBoundAxionHalo.EarthBoundAxionHalo.getBfield`.
+Also exports helper functions used to build the potential:
 
 | Function | Description |
 |----------|-------------|
@@ -99,6 +107,8 @@ potential:
 Defines {class}`~axionbloch.Station.Station`, which converts geographic
 coordinates (latitude, longitude, elevation) to spherical coordinates
 {math}`(\theta, \phi)` and the outward unit normal {math}`\hat{n}`.
+{func}`~axionbloch.Station.Station.in_solarZ_frame` expresses the station
+position in a solar-oriented frame at a given measurement time.
 
 Pre-built station instances exported from this module:
 
@@ -129,6 +139,7 @@ Key methods:
 |--------|-------------|
 | `getThermalPol` | Exact thermal polarization at a given field and temperature |
 | `getM0` | Magnetisation {math}`M_0` from a given polarization |
+| `getM0_SPN` | Magnetisation from polarization and spin number density |
 | `getM0eqb` | Equilibrium magnetization at a given field and temperature |
 
 ```{automodule} axionbloch.Sample
@@ -187,8 +198,8 @@ magnetic field array.  Call one of its ``set*`` methods to fill
 |--------|-----------|
 | `setXYPulse` | Continuous circularly-polarised excitation |
 | `set90DegPulse` | Calibrated 90° hard pulse |
-| `set180DegPulse` | Calibrated 180° refocusing pulse |
 | `setCPMGPulseTrain` | CPMG spin-echo pulse train |
+| `setNPulsesArbDelay` | N pulses with arbitrary delays |
 | `setAxionFields` | Stochastic axion pseudomagnetic fields |
 
 **{class}`~axionbloch.SimuTools.Simulation`** wraps the C++ ``blochsimulation``
@@ -202,23 +213,6 @@ execute all runs and {meth}`~axionbloch.SimuTools.Simulations.saveToPkl` to
 persist results.
 
 ```{automodule} axionbloch.SimuTools
-:members:
-:undoc-members:
-:show-inheritance:
-```
-
----
-
-## axionbloch.FineGrainedAxionStream
-
-Models a single coherent axion stream with a fixed laboratory velocity and a
-correspondingly narrow spectral width ({math}`Q_a = (c/v_\mathrm{lab})^2`).
-Unlike the diffuse SHM halo in
-{mod}`axionbloch.MilkyWayAxionHalo`, a fine-grained stream has a well-defined
-velocity direction and phase.  Multiple streams can be superimposed to
-approximate a realistic velocity substructure.
-
-```{automodule} axionbloch.FineGrainedAxionStream
 :members:
 :undoc-members:
 :show-inheritance:
@@ -257,8 +251,8 @@ General-purpose helpers shared across the package.
 | `PhysicalObject` | Base class with `useCommonUnits()` for consistent unit display |
 | `Lorentzian`, `Gaussian`, `ExpCos` | Common NMR lineshape functions |
 | `estimateLorzfit`, `estimateGaussfit` | Initial-parameter estimators for curve fits |
-| `giveDateAndTime()` | Compact timestamp string ``YYYYMMDD_HHMMSS`` |
-| `sci_fmt(x)` | Scientific-notation string formatter |
+| `getDateAndTime()` | Compact timestamp string ``YYYYMMDD_HHMMSS`` |
+| `sci_fmt(x, pos)` | Scientific-notation tick formatter for matplotlib |
 | `high_contrast_extended` | Colour palette for multi-line plots |
 
 ```{automodule} axionbloch.utils

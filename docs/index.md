@@ -21,8 +21,6 @@ axionbloch supports the following axion field configurations:
   Model, with analytical lineshapes and Monte-Carlo amplitude spectra.
 - **Earth-bound axion halo** — axions gravitationally trapped by the Earth,
   solved as bound states of the radial Schrödinger equation (TISE).
-- **Fine-grained axion streams** — single coherent streams with well-defined
-  velocity and phase.
 
 The package is also useful for general NMR simulations: pulse sequences,
 free decay, spin echoes, and CW excitation can all be configured and
