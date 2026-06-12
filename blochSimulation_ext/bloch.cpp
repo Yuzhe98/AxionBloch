@@ -1,6 +1,10 @@
 #include "bloch.h"
+#ifdef __AVX2__
 #include <immintrin.h>
+#endif
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>

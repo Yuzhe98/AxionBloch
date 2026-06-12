@@ -16,6 +16,9 @@ extra_link_args = []
 if not on_rtd:
     if sys.platform == "win32":
         extra_compile_args += ["/O2", "/openmp"]
+    elif sys.platform == "darwin":
+        # Apple Clang does not support -fopenmp
+        extra_compile_args += ["-O3"]
     else:
         extra_compile_args += ["-O3", "-fopenmp"]
         extra_link_args += ["-fopenmp"]
