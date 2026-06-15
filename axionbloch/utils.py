@@ -20,7 +20,7 @@ import warnings
 from functools import partial
 from typing import Sequence
 
-import h5py
+import h5py  # TODO make h5py an optional dependency
 from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d import proj3d
 
