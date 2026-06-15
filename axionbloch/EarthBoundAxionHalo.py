@@ -375,7 +375,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         g_aNN: Quantity[unit.GeV**-1] = 1e-9 * unit.GeV**-1,
         verbose: bool = False,
     ):
-        logPrefix = f"[{self.__class__.__name__}.__init__]"
+        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
         super().__init__(
             name=name,
             nu_a=nu_a,

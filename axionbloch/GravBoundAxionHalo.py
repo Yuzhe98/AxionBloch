@@ -83,10 +83,8 @@ class GravBoundAxionHalo:
             print(logPrefix, "axion Compton frequency =", self.nu_a)
             print(
                 logPrefix,
-                "axion mass =",
-                self.m_a.to(unit.kg),
-                " =",
-                self.m_a.to(unit.eV / const.c**2),
+                f"axion mass = {self.m_a.to(unit.kg)}",
+                f"= {self.m_a.to_value(unit.eV / const.c**2):g} eV/c^2",
             )
 
         self.N = N
@@ -784,6 +782,398 @@ class GravBoundAxionHalo:
             "grad_phi": np.array([v.value for v in grad_phi_vals])
             * grad_phi_vals[0].unit,
         }
+
+    def findGradientsOverStates(
+        self,
+        station: Station,
+        meas_time: Time,
+        stateNamesDict: dict,
+        truncRadius: Quantity | None = None,
+        showPlot: bool = True,
+        verbose: bool = False,
+    ) -> dict:
+        """Compute and plot gradient components for multiple state combinations.
+
+        Calls :meth:`findGradientsAtDirection` for each state combination in
+        ``stateNamesDict``, computes the three gradient components at a given
+        direction, and optionally plots them in a combined figure.
+
+        Parameters
+        ----------
+        station : :class:`~axionbloch.Station.Station`
+            Geographic location defining the direction.
+        meas_time : :class:`astropy.time.Time`
+            Measurement epoch.
+        stateNamesDict : dict
+            Dictionary mapping labels to state name lists. Example:
+            ``{"2p": ["2p"], "2p and 3p": ["2p", "3p"]}``.
+        truncRadius : Quantity, optional
+            Radial truncation passed through to :meth:`findGradientsAtDirection`.
+        showPlot : bool
+            If True, display the plot of gradient components (default: True).
+        verbose : bool
+            Print per-step progress.
+
+        Returns
+        -------
+        dict with keys:
+        * ``'state_labels'`` — list of state combination labels
+        * ``'grad_r'``     — dict of Quantity arrays for each state combination
+        * ``'grad_theta'`` — dict of Quantity arrays for each state combination
+        * ``'grad_phi'``   — dict of Quantity arrays for each state combination
+        * ``'r_line'``     — common radial grid for all combinations
+        """
+        logPrefix = (
+            f"[{self.__class__.__name__}.{self.findGradientsOverStates.__name__}]"
+        )
+
+        results = {
+            "state_labels": list(stateNamesDict.keys()),
+            "grad_r": {},
+            "grad_theta": {},
+            "grad_phi": {},
+        }
+
+        for label, stateNames in stateNamesDict.items():
+            if verbose:
+                print(logPrefix, f"Computing gradients for: {label}")
+
+            r, R_r, r_line, grad_r_line, grad_theta_line, grad_phi_line = (
+                self.findGradientsAtDirection(
+                    stateNames=stateNames,
+                    station=station,
+                    meas_time=meas_time,
+                    truncRadius=truncRadius,
+                    showPlot=False,
+                    verbose=verbose,
+                )
+            )
+
+            results["grad_r"][label] = grad_r_line
+            results["grad_theta"][label] = grad_theta_line
+            results["grad_phi"][label] = grad_phi_line
+
+        results["r_line"] = r_line
+
+        # Plot all gradients if requested
+        if showPlot:
+            self._plotGradientsOverStates(
+                station=station,
+                stateNamesDict=stateNamesDict,
+                results=results,
+            )
+
+        return results
+
+    def compareGradientsOverStates(
+        self,
+        station: Station,
+        meas_time: Time,
+        stateNamesDict: dict,
+        truncRadius: Quantity | None = None,
+        showPlot: bool = True,
+        verbose: bool = False,
+    ) -> dict:
+        """Compare gradient components across different eigenstate combinations.
+
+        Calls :meth:`findGradientsOverStates` and extracts gradient values at
+        the station's location. Plots the three gradient components as scatter
+        points for each state combination.
+
+        Parameters
+        ----------
+        station : :class:`~axionbloch.Station.Station`
+            Geographic location defining the direction and evaluation radius.
+        meas_time : :class:`astropy.time.Time`
+            Measurement epoch.
+        stateNamesDict : dict
+            Dictionary mapping labels to state name lists. Example:
+            ``{"2p": ["2p"], "2p and 3p": ["2p", "3p"]}``.
+        truncRadius : Quantity, optional
+            Radial truncation passed through to :meth:`findGradientsOverStates`.
+        showPlot : bool
+            If True, display the comparison plot (default: True).
+        verbose : bool
+            Print per-step progress.
+
+        Returns
+        -------
+        dict with keys:
+        * ``'state_labels'`` — list of state combination labels
+        * ``'grad_r'``       — Quantity array of grad_r values at station radius
+        * ``'grad_theta'``   — Quantity array of grad_theta values at station radius
+        * ``'grad_phi'``     — Quantity array of grad_phi values at station radius
+        * ``'r_eval'``       — station radius used for evaluation
+        """
+        logPrefix = (
+            f"[{self.__class__.__name__}.{self.compareGradientsOverStates.__name__}]"
+        )
+
+        # Get gradients over full radial range for all state combinations
+        results_full = self.findGradientsOverStates(
+            station=station,
+            meas_time=meas_time,
+            stateNamesDict=stateNamesDict,
+            truncRadius=truncRadius,
+            showPlot=False,
+            verbose=verbose,
+        )
+
+        # Extract values at specified radius
+        r_line = results_full["r_line"]
+
+        # Evaluate at station's radius
+        r_eval = (station.R).to(r_line.unit)
+        eval_idx = np.argmin(np.abs(r_line - r_eval))
+
+        state_labels = results_full["state_labels"]
+        grad_r_vals = []
+        grad_theta_vals = []
+        grad_phi_vals = []
+
+        for label in state_labels:
+            grad_r_vals.append(results_full["grad_r"][label][eval_idx])
+            grad_theta_vals.append(results_full["grad_theta"][label][eval_idx])
+            grad_phi_vals.append(results_full["grad_phi"][label][eval_idx])
+
+        comparison_results = {
+            "state_labels": state_labels,
+            "grad_r": np.array([v.value for v in grad_r_vals]) * grad_r_vals[0].unit,
+            "grad_theta": np.array([v.value for v in grad_theta_vals])
+            * grad_theta_vals[0].unit,
+            "grad_phi": np.array([v.value for v in grad_phi_vals])
+            * grad_phi_vals[0].unit,
+            "r_eval": r_eval,
+        }
+
+        if showPlot:
+            self._plotGradientsComparison(
+                station=station,
+                meas_time=meas_time,
+                r_eval=r_eval,
+                comparison_results=comparison_results,
+            )
+
+        return comparison_results
+
+    def _plotGradientsComparison(
+        self,
+        station: Station,
+        meas_time: Time,
+        r_eval: Quantity,
+        comparison_results: dict,
+    ):
+        """Plotting helper for :meth:`compareGradientsOverStates`.
+
+        Creates a figure with three subplots (one for each gradient component)
+        and plots scatter points for each state combination.
+
+        Parameters
+        ----------
+        station : Station
+            Used for the plot title.
+        meas_time : :class:`astropy.time.Time`
+            Measurement epoch, included in the plot title.
+        r_eval : Quantity
+            Evaluation radius, included in the plot title.
+        comparison_results : dict
+            Output from :meth:`compareGradientsOverStates`.
+        """
+
+        fig = plt.figure(figsize=(10 / 2.54, 8 / 2.54), dpi=300)
+        grid = gridspec.GridSpec(
+            nrows=3,
+            ncols=1,
+        )
+        left = 0.25
+        bottom = 0.1
+        right = 0.85
+        top = 0.93
+        wspace = 0.2
+        hspace = 0.45
+        fig.subplots_adjust(
+            left=left, top=top, right=right, bottom=bottom, wspace=wspace, hspace=hspace
+        )
+
+        grad_r_ax = fig.add_subplot(grid[0, 0])
+        grad_theta_ax = fig.add_subplot(grid[1, 0])
+        grad_phi_ax = fig.add_subplot(grid[2, 0])
+
+        axes = [grad_r_ax, grad_theta_ax, grad_phi_ax]
+        grad_arrays = [
+            comparison_results["grad_r"],
+            comparison_results["grad_theta"],
+            comparison_results["grad_phi"],
+        ]
+        state_labels = comparison_results["state_labels"]
+        x_positions = np.arange(len(state_labels))
+
+        # First pass: plot and find ylim range
+        bottom_min, top_max = 0, 0
+        for i, (ax, grad_vals) in enumerate(zip(axes, grad_arrays)):
+            ax.scatter(
+                x_positions,
+                grad_vals.real,
+                s=20,
+                color=colors[i % len(colors)],
+                alpha=1,
+                zorder=3,
+            )
+            ax.set_xticks(x_positions)
+            if i== len(axes) - 1:
+                ax.set_xticklabels(state_labels, rotation=15, ha="right")
+            else:
+                ax.set_xticklabels([])
+            ax.grid(True, alpha=0.3, axis="y")
+            bottom, top = ax.get_ylim()
+            bottom_min = min(bottom_min, bottom)
+            top_max = max(top_max, top)
+
+        # Set consistent ylim for all axes (symmetric around zero)
+        max_abs = max(abs(bottom_min), abs(top_max))
+        ylim = (-max_abs, max_abs)
+        for i, ax in enumerate(axes):
+            ax.set_ylim(ylim)
+
+            if i == len(axes) - 1:
+                ax.set_xlabel("Population distribution")
+
+            # Y-axis labels for gradients
+            ylabels = [
+                "$\\partial_r\\phi$",
+                "$\\frac{1}{r}\\partial_\\theta \\phi$",
+                "$\\frac{1}{r\\sin\\theta}\\partial_\\varphi\\phi$",
+            ]
+            ax.set_ylabel(
+                ylabels[i] + f"\n({grad_vals.unit.to_string('latex_inline')})",
+                rotation=0,
+                loc="center",
+                labelpad=30,
+            )
+
+        _station = station.name if station is not None else ""
+        _time = meas_time.iso if meas_time is not None else ""
+        r_unit = r_eval.unit.to_string("latex_inline")[1:-1] if r_eval is not None else ""
+        r_value = r_eval.value if r_eval is not None else ""
+        r_str = f"${r_value:g}\\,{r_unit}$" if r_eval is not None else "unknown"
+        fig.suptitle(f"Gradient Comparison at {_station} (r = {r_str})\n{_time}")
+        plt.tight_layout()
+        plt.show()
+
+    def _plotGradientsOverStates(
+        self,
+        station: Station,
+        stateNamesDict: dict,
+        results: dict,
+    ):
+        """Plotting helper for :meth:`findGradientsOverStates`.
+
+        Creates a figure with three subplots (one for each gradient component)
+        and overlays the gradient curves for each state combination.
+
+        Parameters
+        ----------
+        station : Station
+            Used for the plot title.
+        stateNamesDict : dict
+            Maps labels to state name lists.
+        results : dict
+            Output from :meth:`findGradientsOverStates`.
+        """
+
+        fig = plt.figure(figsize=(12 / 2.54, 8 / 2.54), dpi=300)
+        grid = gridspec.GridSpec(
+            nrows=3,
+            ncols=1,
+        )
+        left = 0.22
+        bottom = 0.1
+        right = 0.67
+        top = 0.93
+        wspace = 0.2
+        hspace = 0.4
+        fig.subplots_adjust(
+            left=left, top=top, right=right, bottom=bottom, wspace=wspace, hspace=hspace
+        )
+
+        grad_r_ax = fig.add_subplot(grid[0, 0])
+        grad_theta_ax = fig.add_subplot(grid[1, 0], sharex=grad_r_ax)
+        grad_phi_ax = fig.add_subplot(grid[2, 0], sharex=grad_r_ax)
+
+        axes = [grad_r_ax, grad_theta_ax, grad_phi_ax]
+
+        # Plot gradients for each state combination
+        for i, (label, stateNames) in enumerate(stateNamesDict.items()):
+            color = colors[i % len(colors)]
+
+            grad_r_line = results["grad_r"][label]
+            grad_theta_line = results["grad_theta"][label]
+            grad_phi_line = results["grad_phi"][label]
+            r_line = results["r_line"]
+
+            grad_r_ax.plot(
+                r_line,
+                grad_r_line.real,
+                label=f"{label}",
+                color=color,
+                linestyle="-",
+            )
+
+            grad_theta_ax.plot(
+                r_line,
+                grad_theta_line.real,
+                label=f"{label}",
+                color=color,
+                linestyle="-",
+            )
+
+            grad_phi_ax.plot(
+                r_line,
+                grad_phi_line.real,
+                label=f"{label}",
+                color=color,
+                linestyle="-",
+            )
+
+        grad_phi_ax.set_xlabel(
+            f"$r\\,({r_line.unit.to_string('latex_inline')[1:-1]})$"
+        )
+
+        ylabels = [
+            "$\\partial_r\\phi$\n"
+            + "$\\left("
+            + results["grad_r"][list(stateNamesDict.keys())[0]]
+            .unit.to_string("latex_inline")[1:-1]
+            + "\\right)$",
+            "$\\frac{1}{r}\\partial_\\theta \\phi$\n"
+            + "$\\left("
+            + results["grad_theta"][list(stateNamesDict.keys())[0]]
+            .unit.to_string("latex_inline")[1:-1]
+            + "\\right)$",
+            "$\\frac{1}{r\\sin\\theta}\\partial_\\varphi\\phi$\n"
+            + "$\\left("
+            + results["grad_phi"][list(stateNamesDict.keys())[0]]
+            .unit.to_string("latex_inline")[1:-1]
+            + "\\right)$",
+        ]
+
+        for i, ax in enumerate(axes):
+            ax.axvline(
+                x=(1 * unit.earthRad).to_value(r_line.unit),
+                color="red",
+                linestyle="dotted",
+                alpha=1,
+                label="Earth radius" if i == len(axes) - 1 else "",
+            )
+            ax.set_ylabel(ylabels[i], rotation=0, loc="center", labelpad=22)
+
+        # Add single legend to the bottom plot only
+        grad_phi_ax.legend(loc="upper left", bbox_to_anchor=(1.0, 1.0), fontsize=9)
+
+        _title = station.name if station is not None else ""
+        fig.suptitle(f"Gradients at {_title}")
+        plt.tight_layout()
+        plt.show()
 
     def plotEigenstate(
         self,

@@ -395,7 +395,7 @@ class MagField(PhysicalObject):
         self,
         # method: str,  # 'inverse-FFT'
         axion: MilkyWayAxionHalo | FineGrainedAxionStream,
-        timeStep_s: float,
+        timeStep_s: float,  # TODO use Quantity here
         timeLen: int,
         simuRate: Quantity,
         duration: Quantity,
