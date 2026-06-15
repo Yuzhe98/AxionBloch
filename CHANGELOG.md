@@ -1,3 +1,8 @@
+v0.2.3 (2026-06-15)
+--------------
+
+- preparations done for pypi publishing
+
 v0.2.2 (2026-06-13)
 --------------
 
