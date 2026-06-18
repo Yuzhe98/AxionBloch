@@ -414,6 +414,11 @@ class MagField(PhysicalObject):
         self.numFields = numFields
         numSteps = timeLen - 1
 
+        # set axion fields by time interference
+        def setByTimeIntf():
+            pass  # to be completed
+
+        # set axion fields by inverse fourier transform
         def setByInvFFT():
             """
             generate Bx, By, dBxdt, dBydt
@@ -510,6 +515,75 @@ class MagField(PhysicalObject):
                 )
 
         setByInvFFT()
+
+    def setAxionFieldByDiscreteFreqs(
+        self,
+        frequencies: np.ndarray | list,
+        amplitudes: np.ndarray | list,
+        timeStep_s: float,
+        timeLen: int,
+        phases: np.ndarray | list | None = None,
+        verbose: bool = False,
+    ):
+        """Generate axion field by interference of discrete frequency components.
+
+        Creates an axion pseudomagnetic field by coherent superposition of
+        sinusoidal waves at specified discrete frequencies. Each frequency
+        component can have independent amplitude and phase.
+
+        Parameters
+        ----------
+        frequencies : np.ndarray or list
+            Array of frequencies for each component (Hz). Shape: (numFreqs,)
+        amplitudes : np.ndarray or list
+            Amplitude for each frequency component (T). Shape: (numFreqs,)
+        timeStep_s : float
+            Simulation time step (s).
+        timeLen : int
+            Total number of time steps (including the final boundary point).
+        phases : np.ndarray, list, or None
+            Initial phase offset for each frequency component (rad).
+            If None, defaults to zero phases. Shape: (numFreqs,)
+        verbose : bool
+            Print diagnostic information.
+        """
+        logPrefix = f"[{self.__class__.__name__}.{self.setAxionFieldByDiscreteFreqs.__name__}]"
+
+        frequencies = np.asarray(frequencies)
+        amplitudes = np.asarray(amplitudes)
+
+        if phases is None:
+            phases = np.zeros(len(frequencies))
+        else:
+            phases = np.asarray(phases)
+
+        assert len(frequencies) == len(amplitudes), (
+            logPrefix + " frequencies and amplitudes must have the same length"
+        )
+        assert len(frequencies) == len(phases), (
+            logPrefix + " frequencies and phases must have the same length"
+        )
+
+        numSteps = timeLen - 1
+        timeStamp = timeStep_s * np.arange(numSteps)
+
+        Bx = np.zeros(numSteps)
+        By = np.zeros(numSteps)
+
+        for freq, amp, phase in zip(frequencies, amplitudes, phases):
+            phi_t = 2 * np.pi * freq * timeStamp + phase
+            Bx += amp * np.cos(phi_t)
+            By += amp * np.sin(phi_t)
+
+        self.B_vec = np.zeros((1, numSteps, 3))
+        self.B_vec[0, :, 0] = Bx
+        self.B_vec[0, :, 1] = By
+        self.B_vec[0, :, 2] = 0.0
+
+        if verbose:
+            print(logPrefix, f"Generated field with {len(frequencies)} frequency components")
+            for i, (f, a, p) in enumerate(zip(frequencies, amplitudes, phases)):
+                print(logPrefix, f"  Component {i}: freq={f:.6g} Hz, amp={a:.6e} T, phase={p:.6g} rad")
 
     # def plotField(self, demodfreq, samprate, showplt_opt):
     #     logPrefix = f"[{self.__class__.__name__}.{self.plotField.__name__}]"

@@ -719,7 +719,7 @@ class GravBoundAxionHalo:
         self,
         stateNames: list[str],
         station: Station,
-        meas_times,
+        meas_times:list[Time],
         truncRadius: Quantity | None = None,
         verbose: bool = False,
     ) -> dict:
@@ -781,6 +781,143 @@ class GravBoundAxionHalo:
             * grad_theta_vals[0].unit,
             "grad_phi": np.array([v.value for v in grad_phi_vals])
             * grad_phi_vals[0].unit,
+        }
+
+    def findOmega_aOverTime(
+        self,
+        stateNames: list[str],
+        station: Station,
+        meas_times,
+        truncRadius: Quantity | None = None,
+        g_aNN:Quantity[unit.GeV**(-1)]=1e-9 * unit.GeV**(-1),
+        verbose: bool = False,
+    ) -> dict:
+        """Axion-nucleon coupling frequency (Omega_a) evaluated over a list of epochs.
+
+        Calls :meth:`findGradientsOverTime` and computes Omega_a = g_aNN * gradient
+        (with gradient in units of m^-1, ignoring radian units).
+
+        Parameters
+        ----------
+        stateNames : list of str
+            Eigenstate labels to superimpose.
+        station : :class:`~axionbloch.Station.Station`
+            Geographic location.
+        meas_times : iterable of :class:`astropy.time.Time`
+            Epochs at which to evaluate Omega_a.
+        truncRadius : Quantity, optional
+            Radial truncation passed through to :meth:`findGradientsOverTime`.
+        verbose : bool
+            Print per-step progress.
+
+        Returns
+        -------
+        dict with keys:
+
+        * ``'times'``      — input time list
+        * ``'Omega_a_r'``     — Quantity array, shape ``(N_times,)``, Omega_a from radial gradient
+        * ``'Omega_a_theta'`` — Quantity array, shape ``(N_times,)``, Omega_a from theta gradient
+        * ``'Omega_a_phi'``   — Quantity array, shape ``(N_times,)``, Omega_a from phi gradient
+        """
+        logPrefix = f"[{self.__class__.__name__}.{self.findOmega_aOverTime.__name__}]"
+
+        if g_aNN is None:
+            raise ValueError(
+                logPrefix + " g_aNN is not set. Please provide g_aNN in the method input."
+            )
+
+        gradients = self.findGradientsOverTime(
+            stateNames=stateNames,
+            station=station,
+            meas_times=meas_times,
+            truncRadius=truncRadius,
+            verbose=verbose,
+        )
+
+        # Convert gradients to m^-1 (dropping radian dimension if present)
+        grad_r = gradients["grad_r"]
+        grad_theta = gradients["grad_theta"]
+        grad_phi = gradients["grad_phi"]
+
+        # Omega_a = c * g_aNN * sqrt(N_a hbar **3 * c / (2 m_a)) * |gradient|
+        factor = const.c * g_aNN * np.sqrt(self.N_a * const.hbar **3 * const.c / (2 * self.m_a))
+        Omega_a_r = factor * np.real(grad_r)
+        Omega_a_theta = factor * np.real(grad_theta)
+        Omega_a_phi = factor * np.real(grad_phi)
+
+        return {
+            "times": gradients["times"],
+            "Omega_a_r": Omega_a_r.to(unit.Hz, equivalencies=unit.dimensionless_angles()),
+            "Omega_a_theta": Omega_a_theta.to(unit.Hz, equivalencies=unit.dimensionless_angles()),
+            "Omega_a_phi": Omega_a_phi.to(unit.Hz, equivalencies=unit.dimensionless_angles()),
+        }
+
+    def findrmsOmega_aOverTime(
+        self,
+        stateNames: list[str],
+        station: Station,
+        meas_times,
+        truncRadius: Quantity | None = None,
+        g_aNN: Quantity[unit.GeV**(-1)] = 1e-9 * unit.GeV**(-1),
+        verbose: bool = False,
+    ) -> dict:
+        """RMS Omega_a over a list of epochs.
+
+        Calls :meth:`findOmega_aOverTime` and computes the root-mean-square
+        (RMS) value for each gradient component.
+
+        Parameters
+        ----------
+        stateNames : list of str
+            Eigenstate labels to superimpose.
+        station : :class:`~axionbloch.Station.Station`
+            Geographic location.
+        meas_times : iterable of :class:`astropy.time.Time`
+            Epochs at which to evaluate Omega_a.
+        truncRadius : Quantity, optional
+            Radial truncation passed through to :meth:`findOmega_aOverTime`.
+        g_aNN : Quantity, optional
+            Axion-nucleon coupling constant (default: 1e-9 GeV⁻¹).
+        verbose : bool
+            Print per-step progress.
+
+        Returns
+        -------
+        dict with keys:
+
+        * ``'rms_Omega_a_r'``     — RMS of Omega_a from radial gradient
+        * ``'rms_Omega_a_theta'`` — RMS of Omega_a from theta gradient
+        * ``'rms_Omega_a_phi'``   — RMS of Omega_a from phi gradient
+        """
+        logPrefix = f"[{self.__class__.__name__}.{self.findrmsOmega_aOverTime.__name__}]"
+
+        Omega_results = self.findOmega_aOverTime(
+            stateNames=stateNames,
+            station=station,
+            meas_times=meas_times,
+            truncRadius=truncRadius,
+            g_aNN=g_aNN,
+            verbose=verbose,
+        )
+
+        # Compute RMS for each component: RMS = sqrt(mean(x^2))
+        Omega_a_r = Omega_results["Omega_a_r"]
+        Omega_a_theta = Omega_results["Omega_a_theta"]
+        Omega_a_phi = Omega_results["Omega_a_phi"]
+
+        rms_r = np.sqrt(np.mean(Omega_a_r**2))
+        rms_theta = np.sqrt(np.mean(Omega_a_theta**2))
+        rms_phi = np.sqrt(np.mean(Omega_a_phi**2))
+
+        if verbose:
+            print(logPrefix, f"RMS Omega_a_r = {rms_r}")
+            print(logPrefix, f"RMS Omega_a_theta = {rms_theta}")
+            print(logPrefix, f"RMS Omega_a_phi = {rms_phi}")
+
+        return {
+            "rms_Omega_a_r": rms_r,
+            "rms_Omega_a_theta": rms_theta,
+            "rms_Omega_a_phi": rms_phi,
         }
 
     def findGradientsOverStates(

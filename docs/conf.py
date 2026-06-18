@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.abspath(".."))
 
 project = "axionbloch"
 author = "Yuzhe Zhang"
-release = "0.2.3"
+release = "0.2.4"
 
 
 extensions = [

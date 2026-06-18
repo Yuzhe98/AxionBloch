@@ -60,6 +60,10 @@ gravitationally bound to a compact body.  The solver:
   {func}`~axionbloch.GravBoundAxionHalo.GravBoundAxionHalo.findGradientsAtDirection`,
   and its time evolution via
   {func}`~axionbloch.GravBoundAxionHalo.GravBoundAxionHalo.findGradientsOverTime`.
+- Computes the axion-nucleon coupling frequency (Omega_a) from gradients via
+  {func}`~axionbloch.GravBoundAxionHalo.GravBoundAxionHalo.findOmega_aOverTime`,
+  with RMS value computation via
+  {func}`~axionbloch.GravBoundAxionHalo.GravBoundAxionHalo.findRmsOmega_aOverTime`.
 
 Sub-class {class}`~axionbloch.EarthBoundAxionHalo.EarthBoundAxionHalo` is
 pre-configured with the Earth's gravitational potential.

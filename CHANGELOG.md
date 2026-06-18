@@ -1,3 +1,8 @@
+v0.2.4 (2026-06-15)
+--------------
+
+- added Rabi frequency calculation in GravBoundAxionHalo. 
+
 v0.2.3 (2026-06-15)
 --------------
 

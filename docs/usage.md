@@ -261,6 +261,60 @@ spherical-coordinate gradient components
 {math}`(\partial_r\Psi,\; r^{-1}\partial_\theta\Psi,\; (r\sin\theta)^{-1}\partial_\phi\Psi)`
 evaluated along the radial line pointing toward the station.
 
+### Axion-nucleon coupling frequency (Omega_a) over time
+
+Computes the axion-nucleon coupling frequency from gradients at multiple
+measurement times:
+
+```python
+import numpy as np
+from astropy import units as unit
+from astropy.time import Time
+from axionbloch.Station import Baltimore
+
+# Generate time array (e.g., sidereal day)
+times = Time.now() + np.linspace(0, 1, 24) * unit.hour
+
+# Compute Omega_a over time
+omega_results = halo.findOmega_aOverTime(
+    stateNames=["2p"],
+    station=Baltimore,
+    meas_times=times,
+    g_aNN=1e-9 * unit.GeV**(-1),
+    truncRadius=2 * unit.R_earth,
+    verbose=True,
+)
+
+# Extract results
+omega_a_r = omega_results["Omega_a_r"]
+omega_a_theta = omega_results["Omega_a_theta"]
+omega_a_phi = omega_results["Omega_a_phi"]
+print(f"Radial component max: {np.max(np.abs(omega_a_r))}")
+```
+
+### RMS Omega_a over time
+
+Computes the root-mean-square Omega_a for each gradient component:
+
+```python
+rms_results = halo.findRmsOmega_aOverTime(
+    stateNames=["2p"],
+    station=Baltimore,
+    meas_times=times,
+    g_aNN=1e-9 * unit.GeV**(-1),
+    truncRadius=2 * unit.R_earth,
+    verbose=True,
+)
+
+# Extract RMS values
+rms_r = rms_results["rms_omega_a_r"]
+rms_theta = rms_results["rms_omega_a_theta"]
+rms_phi = rms_results["rms_omega_a_phi"]
+print(f"RMS Omega_a_r: {rms_r}")
+print(f"RMS Omega_a_theta: {rms_theta}")
+print(f"RMS Omega_a_phi: {rms_phi}")
+```
+
 ## Sample definition
 
 ```python
