@@ -27,11 +27,13 @@ import warnings
 import pytest
 
 from axionbloch.Apparatus import Magnet
+
 # Gyromagnetic ratio and magnetic dipole moment of Xe-129
-from axionbloch.constants import gamma_p, gamma_Xe129, mu_p, mu_Xe129
+from axionbloch.constants import gamma_H1, gamma_Xe129, mu_p, mu_Xe129
 from axionbloch.dependency import *
 from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
 from axionbloch.Sample import Sample
+
 # classes for simulations
 from axionbloch.SimuTools import MagField, Simulations
 from axionbloch.SimuTypes import SimuParams
@@ -61,7 +63,7 @@ LXe = Sample(
 # CH3OH
 methanol = Sample(
     name="C-12 Methanol",
-    gamma=gamma_p,
+    gamma=gamma_H1,
     massDensity=0.792 * unit.g * unit.cm ** (-3),
     molarMass=32.04 * unit.g / unit.mol,
     numOfSpinsPerMolecule=4 * unit.one,
@@ -76,7 +78,7 @@ methanol = Sample(
 # CH3CH2OH
 ethanol = Sample(
     name="Ethanol",
-    gamma=gamma_p,
+    gamma=gamma_H1,
     massDensity=0.78945 * unit.g * unit.cm ** (-3),
     molarMass=46.069 * unit.g / unit.mol,
     numOfSpinsPerMolecule=6 * unit.one,

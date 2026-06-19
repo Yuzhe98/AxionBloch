@@ -26,7 +26,7 @@ import numpy as np
 import pytest
 from astropy import units as unit
 
-from axionbloch.constants import gamma_p, gamma_Xe129, mu_p, mu_Xe129
+from axionbloch.constants import gamma_H1, gamma_Xe129, mu_p, mu_Xe129
 from axionbloch.Sample import Sample
 
 # def _to_angular_gamma(gamma: unit.Quantity) -> unit.Quantity:
@@ -36,7 +36,7 @@ from axionbloch.Sample import Sample
 SAMPLE_CASES = [
     {
         "name": "methanol",
-        "gamma": gamma_p,
+        "gamma": gamma_H1,
         "massDensity": 0.792 * unit.g * unit.cm ** (-3),
         "molarMass": 32.04 * unit.g / unit.mol,
         "numOfSpinsPerMolecule": 4 * unit.one,

@@ -16,7 +16,7 @@ def _print_constants():
     check(g_p)
     check(I_p)
     check(mu_p)
-    check(gamma_p)
+    check(gamma_H1)
     check(mu_Xe129)
     check(gamma_Xe129)
     a = u.Quantity(3.1, "g / cm**3 ")

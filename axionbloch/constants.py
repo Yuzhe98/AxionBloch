@@ -22,8 +22,8 @@ g_p = 5.585694713
 I_p = 0.5 * const.hbar
 mu_p = g_p * mu_N(const.m_p) * I_p / const.hbar
 
-# Gyromagnetic ratio of proton
-gamma_p = 2.6752218708e8 * unit.rad * unit.Hz / unit.T
+# Gyromagnetic ratio of H-1 nucleus (proton)
+gamma_H1 = 2.6752218708e8 * unit.rad * unit.Hz / unit.T
 
 # Magnetic dipole moment of Xe nucleus
 mu_Xe129 = -0.777969 * mu_N(const.m_p)
