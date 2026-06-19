@@ -3,10 +3,11 @@ import os
 import time
 
 from axionbloch.Apparatus import Magnet
-from axionbloch.constants import gamma_Xe129, mu_Xe129
+from axionbloch.constants import gamma_Xe129N, mu_Xe129N
 from axionbloch.dependency import *
 from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
 from axionbloch.Sample import Sample
+
 # from axionbloch.utils import check, dualLorentzian
 from axionbloch.SimuTools import MagField, Simulation, Simulations
 from axionbloch.SimuTypes import SimuParams
@@ -20,14 +21,14 @@ savedir = script_path
 # Xe-129
 sample = Sample(
     name="Liquid Xe-129",  # name of the sample
-    gamma=gamma_Xe129,  # [Hz/T]. Remember input it with 2 * np.pi
+    gamma=gamma_Xe129N,  # [Hz/T]. Remember input it with 2 * np.pi
     massDensity=3.1 * unit.g / unit.cm**3,  # mass density at STP
     molarMass=131.29 * unit.g / unit.mol,  # molar mass [g/mol]
     numOfSpinsPerMolecule=1 * unit.one,  # number of spins per molecule
     T2=355 * unit.s,  #
     T1=1800 * unit.s,  #
     vol=1 * unit.cm**3,
-    mu=mu_Xe129,  # magnetic dipole moment
+    mu=mu_Xe129N,  # magnetic dipole moment
     temp=300 * unit.K,  # room temperature
     pol=0.5 * unit.one,  # polarization
     verbose=False,

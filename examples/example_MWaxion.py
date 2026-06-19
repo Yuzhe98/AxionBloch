@@ -2,11 +2,13 @@
 
 # numpy, matplotlib, astropy dependency
 from axionbloch.Apparatus import Magnet
+
 # Gyromagnetic ratio and magnetic dipole moment of Xe-129
-from axionbloch.constants import gamma_Xe129, mu_Xe129
+from axionbloch.constants import gamma_Xe129N, mu_Xe129N
 from axionbloch.dependency import *
 from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
 from axionbloch.Sample import Sample
+
 # classes for simulations
 from axionbloch.SimuTools import MagField, Simulations
 from axionbloch.SimuTypes import SimuParams
@@ -17,14 +19,14 @@ from axionbloch.SimuTypes import SimuParams
 # temperature, and polarization.
 sample = Sample(
     name="Liquid Xe-129",
-    gamma=gamma_Xe129,
+    gamma=gamma_Xe129N,
     massDensity=3.1 * unit.g * unit.cm ** (-3),
     molarMass=131.29 * unit.g / unit.mol,
     numOfSpinsPerMolecule=1 * unit.one,
     T2=10 * unit.minute,
     T1=15 * unit.minute,
     vol=1 * unit.cm**3,
-    mu=mu_Xe129,  # magnetic dipole moment
+    mu=mu_Xe129N,  # magnetic dipole moment
     temp=163 * unit.K,
     pol=1 * unit.percent,
     verbose=False,

@@ -6,7 +6,7 @@
 import time
 
 from axionbloch.Apparatus import Magnet
-from axionbloch.constants import gamma_Xe129, mu_Xe129
+from axionbloch.constants import gamma_Xe129N, mu_Xe129N
 from axionbloch.dependency import *
 from axionbloch.Sample import Sample
 from axionbloch.SimuTools import MagField, Simulation
@@ -28,7 +28,7 @@ Tdelta = 1 * unit.ms  # dephasing time set by field inhomogeneity
 
 sample = Sample(
     name="Liquid Xe-129",
-    gamma=gamma_Xe129,  # negative for Xe-129
+    gamma=gamma_Xe129N,  # negative for Xe-129
     massDensity=3.1 * unit.g / unit.cm**3,
     molarMass=131.29 * unit.g / unit.mol,
     numOfSpinsPerMolecule=1 * unit.one,
@@ -36,7 +36,7 @@ sample = Sample(
     T1=T1,
     vol=1 * unit.cm**3 * 0.26,  # considering the natural abundance
     pol=1 * unit.percent,
-    mu=mu_Xe129,
+    mu=mu_Xe129N,
     temp=163 * unit.K,
     verbose=False,
 )

@@ -26,7 +26,7 @@ import numpy as np
 import pytest
 from astropy import units as unit
 
-from axionbloch.constants import gamma_H1, gamma_Xe129, mu_p, mu_Xe129
+from axionbloch.constants import gamma_p, gamma_Xe129N, mu_p, mu_Xe129N
 from axionbloch.Sample import Sample
 
 # def _to_angular_gamma(gamma: unit.Quantity) -> unit.Quantity:
@@ -36,7 +36,7 @@ from axionbloch.Sample import Sample
 SAMPLE_CASES = [
     {
         "name": "methanol",
-        "gamma": gamma_H1,
+        "gamma": gamma_p,
         "massDensity": 0.792 * unit.g * unit.cm ** (-3),
         "molarMass": 32.04 * unit.g / unit.mol,
         "numOfSpinsPerMolecule": 4 * unit.one,
@@ -49,27 +49,27 @@ SAMPLE_CASES = [
     },
     {
         "name": "liquid Xe-129",
-        "gamma": gamma_Xe129,
+        "gamma": gamma_Xe129N,
         "massDensity": 3.1 * unit.g * unit.cm ** (-3),
         "molarMass": 131.29 * unit.g / unit.mol,
         "numOfSpinsPerMolecule": 1 * unit.one,
         "T2": 10 * unit.minute,
         "T1": 15 * unit.minute,
         "vol": 1 * unit.cm**3,
-        "mu": mu_Xe129,
+        "mu": mu_Xe129N,
         "temp": 165.0 * unit.K,
         "pol": 1e-6 * unit.one,
     },
     {
         "name": "negative temperature Xe-129",
-        "gamma": gamma_Xe129,
+        "gamma": gamma_Xe129N,
         "massDensity": 3.1 * unit.g * unit.cm ** (-3),
         "molarMass": 131.29 * unit.g / unit.mol,
         "numOfSpinsPerMolecule": 1 * unit.one,
         "T2": 10 * unit.minute,
         "T1": 15 * unit.minute,
         "vol": 1 * unit.cm**3,
-        "mu": mu_Xe129,
+        "mu": mu_Xe129N,
         "temp": -300.0 * unit.K,
         "pol": 1e-6 * unit.one,
     },

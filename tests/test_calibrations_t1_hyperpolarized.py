@@ -76,7 +76,7 @@ Parametrisation
 import pytest
 
 from axionbloch.Apparatus import Magnet
-from axionbloch.constants import gamma_H1, mu_p
+from axionbloch.constants import gamma_p, mu_p
 from axionbloch.dependency import *
 from axionbloch.Sample import Sample
 from axionbloch.SimuTools import MagField, Simulation
@@ -103,7 +103,7 @@ _OVERPOL_CASES = [2.0, 10.0, 100.0, 1e4]  # overpolarization factor k
 _T1_CASES = [1e-3 * unit.s, 1.0 * unit.s, 1e3 * unit.s]
 _RCF_FREQS = [1.0 * unit.kHz, 1.0 * unit.MHz, 1.0 * unit.GHz]
 
-_GAMMA = gamma_H1
+_GAMMA = gamma_p
 
 
 # ---------------------------------------------------------------------------
@@ -138,7 +138,7 @@ def _build_hyperpol_simulation(
     # Create sample without polarization first, then set hyperpolarization
     sample = Sample(
         name="calibration_proton",
-        gamma=gamma_H1,
+        gamma=gamma_p,
         massDensity=0.789 * unit.g / unit.cm**3,
         molarMass=46.069 * unit.g / unit.mol,
         numOfSpinsPerMolecule=6 * unit.one,

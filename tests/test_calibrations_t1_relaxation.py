@@ -69,7 +69,7 @@ Parametrisation
 import pytest
 
 from axionbloch.Apparatus import Magnet
-from axionbloch.constants import gamma_H1, mu_p
+from axionbloch.constants import gamma_p, mu_p
 from axionbloch.dependency import *
 from axionbloch.Sample import Sample
 from axionbloch.SimuTools import MagField, Simulation
@@ -104,7 +104,7 @@ _N_PER_T1 = 500  # RK4 samples per T1 (sufficient for single-packet case)
 _T1_CASES = [1e-3 * unit.s, 1.0 * unit.s, 1e3 * unit.s]
 _RCF_FREQS = [1.0 * unit.kHz, 1.0 * unit.MHz, 1.0 * unit.GHz]
 
-_GAMMA = gamma_H1
+_GAMMA = gamma_p
 
 
 # ---------------------------------------------------------------------------
@@ -135,7 +135,7 @@ def _build_t1_simulation(
 
     sample = Sample(
         name="calibration_proton",
-        gamma=gamma_H1,
+        gamma=gamma_p,
         massDensity=0.789 * unit.g / unit.cm**3,
         molarMass=46.069 * unit.g / unit.mol,
         numOfSpinsPerMolecule=6 * unit.one,

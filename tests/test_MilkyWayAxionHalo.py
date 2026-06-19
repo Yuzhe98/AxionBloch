@@ -29,7 +29,7 @@ import pytest
 from axionbloch.Apparatus import Magnet
 
 # Gyromagnetic ratio and magnetic dipole moment of Xe-129
-from axionbloch.constants import gamma_H1, gamma_Xe129, mu_p, mu_Xe129
+from axionbloch.constants import gamma_p, gamma_Xe129N, mu_p, mu_Xe129N
 from axionbloch.dependency import *
 from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
 from axionbloch.Sample import Sample
@@ -48,14 +48,14 @@ NUM_FIELD = int(os.getenv("NUM_FIELD", "1000"))
 
 LXe = Sample(
     name="Liquid Xe-129",
-    gamma=gamma_Xe129,
+    gamma=gamma_Xe129N,
     massDensity=3.1 * unit.g * unit.cm ** (-3),
     molarMass=131.29 * unit.g / unit.mol,
     numOfSpinsPerMolecule=1 * unit.one,
     T2=10 * unit.minute,
     T1=15 * unit.minute,
     vol=1 * unit.cm**3,
-    mu=mu_Xe129,
+    mu=mu_Xe129N,
     temp=163 * unit.K,
     verbose=False,
 )
@@ -63,7 +63,7 @@ LXe = Sample(
 # CH3OH
 methanol = Sample(
     name="C-12 Methanol",
-    gamma=gamma_H1,
+    gamma=gamma_p,
     massDensity=0.792 * unit.g * unit.cm ** (-3),
     molarMass=32.04 * unit.g / unit.mol,
     numOfSpinsPerMolecule=4 * unit.one,
@@ -78,7 +78,7 @@ methanol = Sample(
 # CH3CH2OH
 ethanol = Sample(
     name="Ethanol",
-    gamma=gamma_H1,
+    gamma=gamma_p,
     massDensity=0.78945 * unit.g * unit.cm ** (-3),
     molarMass=46.069 * unit.g / unit.mol,
     numOfSpinsPerMolecule=6 * unit.one,

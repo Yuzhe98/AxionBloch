@@ -6,7 +6,7 @@
 import time
 
 from axionbloch.Apparatus import Magnet
-from axionbloch.constants import gamma_H1, mu_p
+from axionbloch.constants import gamma_p, mu_p
 from axionbloch.dependency import *
 from axionbloch.Sample import Sample
 from axionbloch.SimuTools import MagField, Simulation
@@ -37,7 +37,7 @@ duration = 0.1 * unit.s
 # CH3CH2OH sample
 sample = Sample(
     name="Ethanol",
-    gamma=gamma_H1,
+    gamma=gamma_p,
     massDensity=0.78945 * unit.g / unit.cm**3,
     molarMass=46.069 * unit.g / unit.mol,
     numOfSpinsPerMolecule=6 * unit.one,

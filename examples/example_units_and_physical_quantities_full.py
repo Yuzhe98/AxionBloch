@@ -1,4 +1,4 @@
-from axionbloch.constants import gamma_H1
+from axionbloch.constants import gamma_p
 from axionbloch.dependency import *
 from axionbloch.utils import Lorentzian
 
@@ -45,7 +45,7 @@ print("magnetic flux:", mag_flux)
 print("magnetic flux.to(unit.Wb):", mag_flux.to(unit.Wb))
 
 # find the 90 degree pulse duration
-t90 = 0.5 * np.pi * unit.radian / (gamma_H1 * B)
+t90 = 0.5 * np.pi * unit.radian / (gamma_p * B)
 print("90 degree pulse duration converted to microseconds:", t90.to(unit.microsecond))
 # 58.71648792722992 us
 
@@ -64,7 +64,7 @@ print("min_rate =", min_rate)
 print("\n# ------------- numpy operations ------------- #")
 # sine of an array of angles
 tStamps = np.array([0, 1 / 3, 1]) * t90
-phases = gamma_H1 * B * tStamps
+phases = gamma_p * B * tStamps
 print("phases at different time stamps:", np.sin(phases))
 # [0.  0.5 1. ]
 
