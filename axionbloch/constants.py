@@ -28,5 +28,5 @@ gamma_p = 2.6752218708e8 * unit.rad * unit.Hz / unit.T
 # Magnetic dipole moment of Xe nucleus
 mu_Xe129N = -0.777969 * mu_N(const.m_p)
 
-# Gyromagnetic ratio of Xe129
+# Gyromagnetic ratio of Xe129 nucleus
 gamma_Xe129N = -7.441e7 * unit.rad * unit.Hz / unit.T

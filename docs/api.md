@@ -234,8 +234,8 @@ supported.
 |--------|-------------|
 | `gamma_p` | Proton gyromagnetic ratio (rad Hz T⁻¹) |
 | `mu_p` | Proton magnetic dipole moment |
-| `gamma_Xe129` | ¹²⁹Xe gyromagnetic ratio (rad Hz T⁻¹) |
-| `mu_Xe129` | ¹²⁹Xe magnetic dipole moment |
+| `gamma_Xe129N` | ¹²⁹Xe gyromagnetic ratio (rad Hz T⁻¹) |
+| `mu_Xe129N` | ¹²⁹Xe magnetic dipole moment |
 
 ```{automodule} axionbloch.constants
 :members:

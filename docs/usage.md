@@ -27,7 +27,7 @@ simulation.
 
 ```python
 from axionbloch.dependency import *        # numpy, astropy units/constants
-from axionbloch.constants import gamma_Xe129, mu_Xe129
+from axionbloch.constants import gamma_Xe129N, mu_Xe129N
 from axionbloch.SimuTools import MagField, Simulations
 from axionbloch.SimuTypes import SimuParams
 from axionbloch.Sample import Sample
@@ -37,14 +37,14 @@ from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
 # --- 1. NMR sample (Xe-129, 50 % hyperpolarised) ---
 sample = Sample(
     name="Liquid Xe-129",
-    gamma=gamma_Xe129,
+    gamma=gamma_Xe129N,
     massDensity=3.1 * unit.g * unit.cm**(-3),
     molarMass=131.29 * unit.g / unit.mol,
     numOfSpinsPerMolecule=1 * unit.one,
     T2=10 * unit.minute,
     T1=15 * unit.minute,
     vol=1 * unit.cm**3,
-    mu=mu_Xe129,
+    mu=mu_Xe129N,
     temp=163 * unit.K,
     pol=0.5 * unit.one,            # initial hyperpolarization
 )
@@ -319,19 +319,19 @@ print(f"RMS Omega_a_phi: {rms_phi}")
 
 ```python
 from astropy import units as unit
-from axionbloch.constants import gamma_Xe129, mu_Xe129
+from axionbloch.constants import gamma_Xe129N, mu_Xe129N
 from axionbloch.Sample import Sample
 
 sample = Sample(
     name="Liquid Xe-129",
-    gamma=gamma_Xe129,
+    gamma=gamma_Xe129N,
     massDensity=3.1 * unit.g / unit.cm**3,
     molarMass=131.29 * unit.g / unit.mol,
     numOfSpinsPerMolecule=1 * unit.one,
     T2=10 * unit.minute,
     T1=15 * unit.minute,
     vol=1 * unit.cm**3,
-    mu=mu_Xe129,
+    mu=mu_Xe129N,
     temp=163 * unit.K,
 )
 
