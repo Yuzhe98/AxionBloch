@@ -1,5 +1,4 @@
 # Example script to run axion NMR simulations
-
 # numpy, matplotlib, astropy dependency
 from axionbloch.Apparatus import Magnet
 
@@ -31,7 +30,6 @@ sample = Sample(
     pol=1 * unit.percent,
     verbose=False,
 )
-
 # Define the axion field with axion Compton frequency
 # and axion-nucleon coupling strength
 axion = MilkyWayAxionHalo(
@@ -40,16 +38,14 @@ axion = MilkyWayAxionHalo(
     g_aNN=1.0e-9 * unit.GeV ** (-1),
     verbose=False,
 )
-
 # Set the bias field strength, direction, and homogeneity
 magnet = Magnet(
     B0=axion.nu_a_eff / (sample.gamma / (2 * PI)),
     FWHM=2 * ppm,
 )
-
 # rms amplitude of pseudomagnetic field
-B_a_rms = (axion.getRabiFreq() / (sample.gamma / (2 * PI))).to(unit.T)
-
+B_a_rms = (axion.getRabiFreq() / \
+           (sample.gamma / (2 * PI))).to(unit.T)
 # Bundle all inputs into one dictionary
 params: SimuParams = {
     "key_info": {"nu_a": axion.nu_a},
@@ -70,16 +66,12 @@ params: SimuParams = {
     "rate": 1 * unit.Hz,
     "duration": 4000 * unit.s,
 }
-
 # Create and execute the simulation job collection
 simulations = Simulations(all_params=[params])
-
 # run the simulation
 simulations.run(verbose=True)
-
 # Post-process results with summary stats and plotting
 for i, item in enumerate(simulations.pool):
     item.simu.displayTrjries()
-
 # Save to .pkl file for later analysis
 simulations.saveToPkl(dir="path_to_save")
