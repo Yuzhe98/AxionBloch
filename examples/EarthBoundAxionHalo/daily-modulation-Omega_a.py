@@ -27,7 +27,7 @@ rhoE_DM = 0.3 * unit.GeV / unit.cm**3
 states_to_check = ["2p"]
 measurement_times = []
 halo = EarthBoundAxionHalo(
-    nu_a=1.348 * unit.MHz,  # axion Compton frequency in Hz
+    nu_a=1.348585 * unit.MHz,  # axion Compton frequency in Hz
     N=int(2**12),  # number of grid points
     extent=128.0 * unit.R_earth,  # spatial extent of the grid in units of earth radius
     g_aNN=1e-9 * unit.GeV**-1,  # axion-nucleon coupling
@@ -55,6 +55,11 @@ from zoneinfo import ZoneInfo
 t0 = Time(datetime(2022, 12, 13, 7, 0, tzinfo=ZoneInfo("Europe/Berlin")))
 t_hours = np.linspace(0, 72, 72) * unit.hour
 meas_times = t0 + t_hours  # every 1 hour
+
+highlight_period = [
+    Time(datetime(2022, 12, 14, 13, 0, tzinfo=ZoneInfo("Europe/Berlin"))),
+    Time(datetime(2022, 12, 14, 23, 0, tzinfo=ZoneInfo("Europe/Berlin"))),
+]
 
 rms = halo.findrmsOmega_aOverTime(
     stateNames=states_to_check,
@@ -91,39 +96,39 @@ ax_theta.plot(t_hours, result["Omega_a_theta"], color="tab:green")
 ax_phi.plot(t_hours, result["Omega_a_phi"], color="tab:brown")
 # ax_phi.plot(t_hours, result["grad_phi"].imag, color="tab:orange", ls="--")
 
-ax_phi.set_xlabel("time (hour)")
+ax_phi.set_xlabel("Time (hour) from 2022-12-13 07:00 CET")
 
 
 def _ylabel(label, q):
-    u_str = q.unit.to_string("latex_inline")[1:-1]
-    return f"${label}$\n$\\left({u_str}\\right)$"
+    u_str = q.to(unit.mHz).unit.to_string("latex_inline")[1:-1]
+    return f"${label} \\left({u_str}\\right)$"
 
 
 ax_r.set_ylabel(
     _ylabel("\\Omega_a^r", result["Omega_a_r"]),
-    rotation=0,
-    loc="center",
-    labelpad=22,
+    # rotation=0,
+    # loc="center",
+    # labelpad=22,
 )
 ax_theta.set_ylabel(
     _ylabel("\\Omega_a^\\theta", result["Omega_a_theta"]),
-    rotation=0,
-    loc="center",
-    labelpad=22,
+    # rotation=0,
+    # loc="center",
+    # labelpad=22,
 )
 ax_phi.set_ylabel(
     _ylabel("\\Omega_a^\\phi", result["Omega_a_phi"]),
-    rotation=0,
-    loc="center",
-    labelpad=22,
+    # rotation=0,
+    # loc="center",
+    # labelpad=22,
 )
 
 for ax in [ax_r, ax_theta]:
     plt.setp(ax.get_xticklabels(), visible=False)
 
-# ax_r.legend(loc="upper left", bbox_to_anchor=(1.0, 1.0), fontsize=7)
+# ax_r.legend(loc="upper left", bbox_to_anchor=(1.0, 1.0))
 fig.suptitle(
-    f"Mainz  ·  {states_to_check[0]}  ·  $\\nu_a={halo.nu_a.to_value(unit.MHz):.3f}$ MHz\nstart from {t0}"
+    f"{states_to_check[0]} state"
 )
 ylim_abs = 0
 for ax in [ax_r, ax_phi, ax_theta]:
@@ -131,5 +136,8 @@ for ax in [ax_r, ax_phi, ax_theta]:
     ylim_abs = np.amax(np.abs([ylim_abs, (_ylim_upper), (_ylim_bottom)]))
 
 ax_r.set_ylim(-1 * ylim_abs, ylim_abs)
+
+
+
 plt.tight_layout()
 plt.show()

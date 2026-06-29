@@ -760,10 +760,10 @@ class MilkyWay:
         ax.text2D(
             0.03,
             0.03,
-            "★ Not to scale",
+            "* Not to scale",
             transform=ax.transAxes,
             color="gray",
-            fontsize=7,
+            fontsize=8,
         )
 
         # ---- style ----
@@ -773,7 +773,7 @@ class MilkyWay:
         ax.set_xlabel("x (kpc)", color="white", fontsize=8, labelpad=1)
         ax.set_ylabel("y (kpc)", color="white", fontsize=8, labelpad=1)
         ax.set_zlabel("z (kpc)", color="white", fontsize=8, labelpad=1)
-        ax.set_title("Milky Way", color="white", fontsize=9, pad=6)
+        ax.set_title("Milky Way", color="white", fontsize=8, pad=6)
         ax.set_facecolor("#0d0d0d")
         for pane in [ax.xaxis.pane, ax.yaxis.pane, ax.zaxis.pane]:
             pane.fill = False
@@ -782,7 +782,7 @@ class MilkyWay:
         ax.view_init(elev=28, azim=200)
         ax.legend(
             loc="upper right",
-            fontsize=7,
+            fontsize=8,
             labelcolor="white",
             facecolor="#1a1a1a",
             edgecolor="#404040",
@@ -970,10 +970,10 @@ class MilkyWay:
         ax.text2D(
             0.02,
             0.02,
-            "★ Not to scale",
+            "* Not to scale",
             transform=ax.transAxes,
             color="gray",
-            fontsize=7,
+            fontsize=8,
         )
 
         # ---- style ----
@@ -983,7 +983,7 @@ class MilkyWay:
         ax.set_xlabel("x (Astro. Unit)", color="white", fontsize=8, labelpad=1)
         ax.set_ylabel("y (Astro. Unit)", color="white", fontsize=8, labelpad=1)
         ax.set_zlabel("z (Astro. Unit)", color="white", fontsize=8, labelpad=1)
-        ax.set_title("Solar System", color="white", fontsize=9, pad=6)
+        ax.set_title("Solar System", color="white", fontsize=8, pad=6)
         ax.set_facecolor("#0d0d0d")
         for pane in [ax.xaxis.pane, ax.yaxis.pane, ax.zaxis.pane]:
             pane.fill = False
@@ -993,7 +993,7 @@ class MilkyWay:
         ax.view_init(elev=28, azim=50)
         ax.legend(
             loc="upper right",
-            fontsize=7,
+            fontsize=8,
             labelcolor="white",
             facecolor="#1a1a1a",
             edgecolor="#404040",
