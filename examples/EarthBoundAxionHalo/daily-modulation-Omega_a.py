@@ -101,7 +101,7 @@ ax_phi.set_xlabel("Time (hour) from 2022-12-13 07:00 CET")
 
 def _ylabel(label, q):
     u_str = q.to(unit.mHz).unit.to_string("latex_inline")[1:-1]
-    return f"${label} \\left({u_str}\\right)$"
+    return f"${label}\\, \\left({u_str}\\right)$"
 
 
 ax_r.set_ylabel(
