@@ -1,5 +1,7 @@
 import warnings
 
+import astropy.coordinates as coord
+
 from axionbloch.dependency import *
 from axionbloch.utils import check_norm
 
@@ -37,6 +39,7 @@ class MilkyWayAxionHalo:
     # A commonly-used value: 0.4
     # Refined standard halo model (SHM++) / Particle Data Group 2024: 0.55
     rho_E_DM: Quantity[unit.GeV / unit.cm**3] = 0.3 * unit.GeV / unit.cm**3
+    windAngle: Quantity[unit.rad] | None = None
     nu_a_eff: Quantity[unit.Hz]
     tau_a_est: Quantity[unit.s]
 
@@ -88,6 +91,7 @@ class MilkyWayAxionHalo:
         self.name = name
         self.v_0 = v_0
         self.v_lab = v_lab
+        self.windAngle = windAngle
 
         self.rho_E_DM = rho_E_DM
 
@@ -97,37 +101,594 @@ class MilkyWayAxionHalo:
 
         if nu_a is not None and m_a is not None:
             # check consistency
-            nu_a_from_m_a = m_a * const.c**2 / const.hbar
-            if not np.isclose(nu_a.value, nu_a_from_m_a.value, rtol=1e-6):
+            nu_a_from_m_a = m_a * const.c**2 / const.h
+            if not np.isclose(
+                nu_a.value, nu_a_from_m_a.to_value(nu_a.unit), rtol=1e-6
+            ):
                 raise ValueError(
                     f"Inconsistent nu_a and m_a: nu_a from m_a = {nu_a_from_m_a}, provided nu_a = {nu_a}"
                 )
         elif nu_a is not None and m_a is None:
             self.nu_a = nu_a
-            self.m_a = nu_a * const.hbar / const.c**2
+            self.m_a = nu_a * const.h / const.c**2
         elif nu_a is None and m_a is not None:
             self.m_a = m_a
-            self.nu_a = m_a * const.c**2 / const.hbar
+            self.nu_a = m_a * const.c**2 / const.h
 
         self.g_aNN = g_aNN
 
         if Qa is None:
-            self.Qa = (const.c / self.v_lab) ** 2.0
+            self.Qa = (const.c / self.v_0) ** 2.0
+        else:
+            self.Qa = Qa
 
         self.FWHM = 1.0 / self.Qa
 
         # effective axion frequency considering second-order Doppler effect
-        self.nu_a_eff = self.nu_a * (1 + self.v_lab**2 / const.c**2)
+        self.nu_a_eff = self.nu_a * (1 + 0.5 * self.v_lab**2 / const.c**2)
         self.nu_a_eff = self.nu_a_eff
 
         # coherence time (estimated)
         self.tau_a_est = 1.0 / (np.pi * self.FWHM * self.nu_a_eff)
         self.tau_a_est = self.tau_a_est
 
+    @staticmethod
+    def _cartesian_xyz(cartesian, xyz_unit: unit.Unit) -> Quantity:
+        """Return astropy Cartesian components as ``(..., 3)`` Quantity arrays."""
+        xyz = (
+            cartesian.d_xyz.to(xyz_unit)
+            if hasattr(cartesian, "d_xyz")
+            else cartesian.xyz.to(xyz_unit)
+        )
+        if xyz.ndim == 1:
+            return xyz
+        return np.moveaxis(xyz.value, 0, -1) * xyz_unit
+
+    @staticmethod
+    def _normalize_vectors(vectors: Quantity | np.ndarray) -> Quantity | np.ndarray:
+        """Normalize a vector or vector stack with the vector axis last."""
+        norm = np.sqrt(np.sum(vectors**2, axis=-1))
+        return vectors / np.expand_dims(norm, axis=-1)
+
+    @staticmethod
+    def _station_basis_itrs(station) -> dict[str, np.ndarray]:
+        """Local north/east/up unit vectors in the station's ITRS frame."""
+        lat = station.location.lat.to_value(unit.rad)
+        lon = station.location.lon.to_value(unit.rad)
+
+        east = np.array([-np.sin(lon), np.cos(lon), 0.0])
+        north = np.array(
+            [
+                -np.sin(lat) * np.cos(lon),
+                -np.sin(lat) * np.sin(lon),
+                np.cos(lat),
+            ]
+        )
+        up = np.array(
+            [np.cos(lat) * np.cos(lon), np.cos(lat) * np.sin(lon), np.sin(lat)]
+        )
+        return {"north": north, "east": east, "west": -east, "up": up, "zenith": up}
+
+    @staticmethod
+    def _galcen_to_icrs_rotation() -> np.ndarray:
+        """Rotation matrix from Galactocentric Cartesian axes to ICRS/GCRS axes."""
+
+        def _icrs_hat(l_deg, b_deg):
+            sc = coord.SkyCoord(
+                l=l_deg * unit.deg, b=b_deg * unit.deg, frame="galactic"
+            ).icrs
+            return np.array(
+                [sc.cartesian.x.value, sc.cartesian.y.value, sc.cartesian.z.value]
+            )
+
+        return np.column_stack(
+            [_icrs_hat(180, 0), _icrs_hat(90, 0), _icrs_hat(0, 90)]
+        )
+
+    @staticmethod
+    def getHaloVelocity(
+        time: Time | None = None,
+        station=None,
+        galcen_frame: coord.Galactocentric | None = None,
+        as_wind: bool = True,
+    ) -> Quantity:
+        """Compute the lab/halo relative velocity using astropy coordinates.
+
+        This is the astropy-based integration of the TASSLE ``get_halo_vel``
+        idea.  When ``station`` is provided, the station's GCRS state is
+        transformed into the Galactocentric frame, so Earth's surface rotation
+        is included.  Without a station, the Earth-centre velocity from
+        :class:`~axionbloch.MilkyWay.MilkyWay` is used.
+
+        Parameters
+        ----------
+        time : astropy.time.Time, optional
+            Observation epoch; defaults to ``Time.now()``.
+        station : axionbloch.Station.Station, optional
+            Lab location.  Provide this to include daily rotation.
+        galcen_frame : astropy.coordinates.Galactocentric, optional
+            Custom galactocentric frame.
+        as_wind : bool
+            If ``True`` return the axion-wind velocity (halo relative to lab),
+            i.e. the negative of the lab velocity in the halo frame.
+
+        Returns
+        -------
+        Quantity
+            Velocity vector in km/s.  Shape is ``(3,)`` for scalar time and
+            ``(N, 3)`` for vector time.
+        """
+        if time is None:
+            time = Time.now()
+        if galcen_frame is None:
+            galcen_frame = coord.Galactocentric()
+
+        if station is None:
+            from axionbloch.MilkyWay import MilkyWay
+
+            lab_velocity = MilkyWay(time=time, galcen_frame=galcen_frame).get_v_lab()
+        else:
+            gcrs = station.location.get_gcrs(time)
+            galcen = coord.SkyCoord(gcrs).transform_to(galcen_frame)
+            diff = galcen.cartesian.differentials["s"]
+            lab_velocity = MilkyWayAxionHalo._cartesian_xyz(
+                diff, unit.km / unit.s
+            )
+
+        return -lab_velocity if as_wind else lab_velocity
+
+    @staticmethod
+    def getLabBasis(
+        time: Time | None = None,
+        station=None,
+        galcen_frame: coord.Galactocentric | None = None,
+    ) -> dict[str, np.ndarray]:
+        """Return local north/east/up unit vectors in Galactocentric axes.
+
+        The basis vectors are constructed as small ITRS displacements at the
+        station and transformed with astropy to the Galactocentric frame.  This
+        follows the spirit of TASSLE's ``get_CASPEr_vect`` while using the
+        package's :class:`~axionbloch.Station.Station` objects.
+        """
+        if station is None:
+            raise ValueError("station must be set to compute the lab basis")
+        if time is None:
+            time = Time.now()
+        if galcen_frame is None:
+            galcen_frame = coord.Galactocentric()
+
+        from astropy.coordinates import GCRS
+
+        loc_itrs = station.location.get_itrs(obstime=time)
+        origin_gcrs = loc_itrs.transform_to(GCRS(obstime=time)).cartesian.xyz.to(
+            unit.m
+        )
+        gcrs_to_galcen = MilkyWayAxionHalo._galcen_to_icrs_rotation().T
+
+        basis_itrs = MilkyWayAxionHalo._station_basis_itrs(station)
+        basis_galcen = {}
+        for name, direction in basis_itrs.items():
+            displacement = 1.0e3 * unit.m
+            displaced = coord.ITRS(
+                x=loc_itrs.cartesian.x + direction[0] * displacement,
+                y=loc_itrs.cartesian.y + direction[1] * displacement,
+                z=loc_itrs.cartesian.z + direction[2] * displacement,
+                obstime=time,
+            )
+            displaced_gcrs = displaced.transform_to(GCRS(obstime=time))
+            vec = (displaced_gcrs.cartesian.xyz.to(unit.m) - origin_gcrs).value
+            if vec.ndim == 1:
+                vec = vec / np.linalg.norm(vec)
+                basis_galcen[name] = gcrs_to_galcen @ vec
+            else:
+                vec = np.moveaxis(vec, 0, -1)
+                vec = MilkyWayAxionHalo._normalize_vectors(vec)
+                basis_galcen[name] = vec @ gcrs_to_galcen.T
+        return basis_galcen
+
+    @staticmethod
+    def projectHaloVelocity(
+        time: Time | None = None,
+        station=None,
+        axis: str | np.ndarray | Quantity = "up",
+        galcen_frame: coord.Galactocentric | None = None,
+    ) -> Quantity:
+        """Project the astropy halo wind onto a local sensitive axis.
+
+        ``axis`` may be ``'up'``/``'zenith'``, ``'north'``, ``'east'``,
+        ``'west'``, ``'parallel'``/
+        ``'z'`` (alias for ``'up'``), ``'perp'`` (magnitude perpendicular to
+        local up), ``'magnitude'``, or an explicit unit vector in Galactocentric
+        Cartesian coordinates.
+        """
+        wind = MilkyWayAxionHalo.getHaloVelocity(
+            time=time,
+            station=station,
+            galcen_frame=galcen_frame,
+            as_wind=True,
+        )
+
+        if isinstance(axis, str):
+            axis_key = axis.lower()
+            if axis_key in {"magnitude", "speed"}:
+                return np.sqrt(np.sum(wind**2, axis=-1)).to(unit.km / unit.s)
+
+            basis = MilkyWayAxionHalo.getLabBasis(
+                time=time, station=station, galcen_frame=galcen_frame
+            )
+            if axis_key in {"parallel", "z"}:
+                axis_key = "up"
+            if axis_key in {"perp", "perpendicular"}:
+                up = basis["up"]
+                parallel = np.sum(wind * up, axis=-1)
+                return np.sqrt(np.sum(wind**2, axis=-1) - parallel**2).to(
+                    unit.km / unit.s
+                )
+            if axis_key not in basis:
+                raise ValueError(
+                    "axis must be 'up'/'zenith', 'north', 'east', 'west', "
+                    "'perp', 'magnitude', or an explicit vector"
+                )
+            axis_vec = basis[axis_key]
+        else:
+            axis_vec = axis.to_value(unit.one) if isinstance(axis, Quantity) else axis
+            axis_vec = MilkyWayAxionHalo._normalize_vectors(np.asarray(axis_vec))
+
+        return np.sum(wind * axis_vec, axis=-1).to(unit.km / unit.s)
+
+    @staticmethod
+    def gradientPowerCoefficient(
+        v_0: Quantity,
+        v_lab: Quantity,
+        alpha: Quantity,
+        case: str = "grad_perp",
+    ) -> Quantity:
+        """Return the Gramolin gradient-power coefficient ``C``.
+
+        The paper's total gradient signal powers are proportional to
+        ``C_parallel = v_0**2 / 2 + v_lab**2 cos(alpha)**2`` and
+        ``C_perp = v_0**2 + v_lab**2 sin(alpha)**2``.  Coupling constants and
+        the common ``rho_DM / c**2`` factor are intentionally omitted here so
+        this can be used as a relative modulation coefficient.
+        """
+        v_0 = v_0.to(unit.km / unit.s)
+        v_lab = v_lab.to(unit.km / unit.s)
+        if case == "grad_par":
+            return (v_0**2 / 2 + v_lab**2 * np.cos(alpha) ** 2).to(
+                (unit.km / unit.s) ** 2
+            )
+        if case == "grad_perp":
+            return (v_0**2 + v_lab**2 * np.sin(alpha) ** 2).to(
+                (unit.km / unit.s) ** 2
+            )
+        if case == "non-grad":
+            return np.ones_like(np.atleast_1d(v_lab.value)) * unit.one
+        raise ValueError("case must be 'non-grad', 'grad_par', or 'grad_perp'")
+
+    def setKinematicsWithMilkyWay(self, mw, verbose: bool = False) -> None:
+        """Update ``v_lab``, ``windAngle``, ``nu_a_eff`` and ``tau_a_est`` from MilkyWay.
+
+        This mirrors the convenience style used by
+        :meth:`axionbloch.EarthBoundAxionHalo.EarthBoundAxionHalo.findGradientsWithMilkyWay`:
+        a prepared :class:`~axionbloch.MilkyWay.MilkyWay` object supplies the
+        astropy kinematic context, while this class keeps the axion-field
+        quantities.
+        """
+        self.v_lab = mw.get_v_lab_magnitude()
+        if mw.station is not None:
+            self.windAngle = mw.get_wind_angle()
+        self.Qa = (const.c / self.v_0) ** 2.0
+        self.FWHM = 1.0 / self.Qa
+        self.nu_a_eff = self.nu_a * (1 + 0.5 * self.v_lab**2 / const.c**2)
+        self.tau_a_est = 1.0 / (np.pi * self.FWHM * self.nu_a_eff)
+
+        if verbose:
+            print(f"[{self.__class__.__name__}.setKinematicsWithMilkyWay]")
+            print(f"v_lab     = {self.v_lab.to(unit.km / unit.s):.3f}")
+            if self.windAngle is not None:
+                print(f"windAngle = {self.windAngle.to(unit.deg):.2f}")
+
+    def setKinematicsFromAstropy(
+        self,
+        time: Time | None = None,
+        station=None,
+        galcen_frame: coord.Galactocentric | None = None,
+        verbose: bool = False,
+    ) -> None:
+        """Update halo kinematics from astropy time/station inputs."""
+        from axionbloch.MilkyWay import MilkyWay
+
+        mw = MilkyWay(
+            time=time if time is not None else Time.now(),
+            station=station,
+            galcen_frame=galcen_frame,
+        )
+        self.setKinematicsWithMilkyWay(mw, verbose=verbose)
+
+    def findKinematicsOverTime(
+        self,
+        station,
+        meas_times: list[Time] | Time,
+        sensitive_axis: str | np.ndarray | Quantity = "up",
+        include_rotation: bool = True,
+        galcen_frame: coord.Galactocentric | None = None,
+        verbose: bool = False,
+    ) -> dict:
+        """Milky-Way halo kinematics over a list of epochs.
+
+        This is the time-domain companion to the static SHM parameters.  It
+        exposes the daily/annual modulation ingredients entering the gradient
+        lineshape: lab speed, angle to the sensitive axis, and parallel /
+        perpendicular wind projections.
+
+        Parameters
+        ----------
+        station : axionbloch.Station.Station
+            Lab location and default sensitive-axis orientation.
+        meas_times : list of astropy.time.Time or astropy.time.Time
+            Epochs at which to evaluate the kinematics.
+        sensitive_axis : str or vector
+            ``'up'`` by default.  String axes are interpreted by
+            :meth:`projectHaloVelocity`.
+        include_rotation : bool
+            If ``True`` use the station GCRS state and include Earth's surface
+            rotation.  If ``False`` use the Earth-centre velocity supplied by
+            :class:`~axionbloch.MilkyWay.MilkyWay`.
+        galcen_frame : astropy.coordinates.Galactocentric, optional
+            Custom galactocentric frame.
+        verbose : bool
+            Print per-step progress.
+
+        Returns
+        -------
+        dict
+            Keys include ``times``, ``v_lab_magnitude``, ``wind_angle``,
+            ``wind_parallel``, ``wind_perp``, and ``nu_a_eff``.
+        """
+        from axionbloch.MilkyWay import MilkyWay
+
+        if isinstance(meas_times, Time):
+            if meas_times.isscalar:
+                iter_times = [meas_times]
+                times = Time(iter_times)
+            else:
+                times = meas_times.reshape(-1)
+                iter_times = list(times)
+        else:
+            iter_times = list(meas_times)
+            times = Time(iter_times)
+
+        speeds, angles, parallel_vals, perp_vals = [], [], [], []
+        cos_alpha_vals = []
+
+        for i, meas_time in enumerate(iter_times):
+            if verbose:
+                print(
+                    f"[{self.__class__.__name__}.findKinematicsOverTime] "
+                    f"step {i + 1}/{len(iter_times)}  t={meas_time.iso}"
+                )
+
+            if include_rotation:
+                speed = self.projectHaloVelocity(
+                    time=meas_time,
+                    station=station,
+                    axis="magnitude",
+                    galcen_frame=galcen_frame,
+                )
+                parallel = self.projectHaloVelocity(
+                    time=meas_time,
+                    station=station,
+                    axis=sensitive_axis,
+                    galcen_frame=galcen_frame,
+                )
+                perp = np.sqrt(speed**2 - parallel**2).to(unit.km / unit.s)
+                cos_alpha = np.clip(
+                    (parallel / speed).to_value(unit.one), -1.0, 1.0
+                )
+                angle = np.arccos(np.abs(cos_alpha)) * unit.rad
+            else:
+                mw = MilkyWay(
+                    time=meas_time, station=station, galcen_frame=galcen_frame
+                )
+                speed = mw.get_v_lab_magnitude()
+                angle = mw.get_wind_angle()
+                parallel = speed * np.cos(angle)
+                perp = speed * np.sin(angle)
+                cos_alpha = np.cos(angle).to_value(unit.one)
+
+            speeds.append(speed.to(unit.km / unit.s))
+            angles.append(angle.to(unit.rad))
+            parallel_vals.append(parallel.to(unit.km / unit.s))
+            perp_vals.append(perp.to(unit.km / unit.s))
+            cos_alpha_vals.append(cos_alpha)
+
+        v_lab = np.array([v.value for v in speeds]) * speeds[0].unit
+        wind_angle = np.array([a.value for a in angles]) * angles[0].unit
+        wind_parallel = (
+            np.array([v.value for v in parallel_vals]) * parallel_vals[0].unit
+        )
+        wind_perp = np.array([v.value for v in perp_vals]) * perp_vals[0].unit
+        nu_a_eff = self.nu_a * (1 + 0.5 * v_lab**2 / const.c**2)
+
+        return {
+            "times": times,
+            "v_lab_magnitude": v_lab,
+            "wind_angle": wind_angle,
+            "cos_alpha": np.array(cos_alpha_vals),
+            "wind_parallel": wind_parallel,
+            "wind_perp": wind_perp,
+            "nu_a_eff": nu_a_eff.to(self.nu_a.unit),
+        }
+
+    def findLineshapeOverTime(
+        self,
+        frequencies: Quantity,
+        station,
+        meas_times: list[Time] | Time,
+        case: str = "grad_perp",
+        sensitive_axis: str | np.ndarray | Quantity = "up",
+        include_rotation: bool = True,
+        galcen_frame: coord.Galactocentric | None = None,
+        verbose: bool = False,
+    ) -> dict:
+        """Evaluate the SHM axion lineshape over a sequence of epochs.
+
+        The modulation comes from the astropy-derived lab speed and the
+        time-dependent wind angle.  For gradient cases this captures the daily
+        orientation modulation; over longer spans it also captures annual speed
+        modulation.
+        """
+        kinematics = self.findKinematicsOverTime(
+            station=station,
+            meas_times=meas_times,
+            sensitive_axis=sensitive_axis,
+            include_rotation=include_rotation,
+            galcen_frame=galcen_frame,
+            verbose=verbose,
+        )
+
+        lineshapes = []
+        power_coefficients = []
+        for speed, alpha in zip(
+            kinematics["v_lab_magnitude"], kinematics["wind_angle"]
+        ):
+            lineshapes.append(
+                self.axion_lineshape(
+                    v_0=self.v_0,
+                    v_lab=speed,
+                    nu_a=self.nu_a,
+                    nu=frequencies,
+                    case=case,
+                    alpha=alpha,
+                    verbose=False,
+                )
+            )
+            power_coefficients.append(
+                self.gradientPowerCoefficient(
+                    v_0=self.v_0, v_lab=speed, alpha=alpha, case=case
+                )
+            )
+
+        psd = np.array([line.to_value(lineshapes[0].unit) for line in lineshapes])
+        psd = psd * lineshapes[0].unit
+        power_coefficient = (
+            np.array([c.to_value(power_coefficients[0].unit) for c in power_coefficients])
+            * power_coefficients[0].unit
+        )
+        power_spectrum = power_coefficient[:, np.newaxis] * psd
+        relative_power = (
+            power_coefficient / np.max(power_coefficient)
+            if power_coefficient.unit != unit.one
+            else power_coefficient
+        )
+
+        return {
+            **kinematics,
+            "frequencies": frequencies,
+            "case": case,
+            "lineshape": psd,
+            "power_coefficient": power_coefficient,
+            "relative_power": relative_power.to(unit.one),
+            "power_spectrum_shape": power_spectrum,
+        }
+
+    def plotPeriodicModulation(
+        self,
+        station,
+        meas_times: list[Time] | Time,
+        frequencies: Quantity | None = None,
+        case: str = "grad_perp",
+        sensitive_axis: str | np.ndarray | Quantity = "up",
+        include_rotation: bool = True,
+        frequency_indices: list[int] | None = None,
+        showPlot: bool = True,
+        verbose: bool = False,
+    ) -> tuple:
+        """Plot Milky-Way axion-wind periodic modulation.
+
+        Returns the matplotlib figure and the same result dictionary produced
+        by :meth:`findLineshapeOverTime` when ``frequencies`` is supplied, or
+        :meth:`findKinematicsOverTime` otherwise.
+        """
+        if frequencies is None:
+            result = self.findKinematicsOverTime(
+                station=station,
+                meas_times=meas_times,
+                sensitive_axis=sensitive_axis,
+                include_rotation=include_rotation,
+                verbose=verbose,
+            )
+            has_lineshape = False
+        else:
+            result = self.findLineshapeOverTime(
+                frequencies=frequencies,
+                station=station,
+                meas_times=meas_times,
+                case=case,
+                sensitive_axis=sensitive_axis,
+                include_rotation=include_rotation,
+                verbose=verbose,
+            )
+            has_lineshape = True
+
+        times = result["times"]
+        t0 = times[0]
+        t_hours = (times - t0).to_value(unit.hour)
+        nrows = 4 if has_lineshape else 2
+
+        fig = plt.figure(figsize=(12 / 2.54, (3.0 * nrows) / 2.54), dpi=300)
+        grid = gridspec.GridSpec(nrows=nrows, ncols=1)
+        axes = [fig.add_subplot(grid[i, 0]) for i in range(nrows)]
+
+        axes[0].plot(t_hours, result["v_lab_magnitude"].to_value(unit.km / unit.s))
+        axes[0].set_ylabel(r"$|v_\mathrm{lab}|$ (km/s)")
+
+        axes[1].plot(t_hours, result["wind_angle"].to_value(unit.deg))
+        axes[1].set_ylabel(r"$\alpha$ (deg)")
+
+        if has_lineshape:
+            axes[2].plot(t_hours, result["relative_power"].to_value(unit.one))
+            axes[2].set_ylabel("relative power")
+
+            psd = result["lineshape"]
+            power_spectrum = result["power_spectrum_shape"]
+            freqs = result["frequencies"]
+            if frequency_indices is None:
+                frequency_indices = [
+                    int(
+                        np.argmax(
+                            np.mean(power_spectrum.to_value(power_spectrum.unit), axis=0)
+                        )
+                    )
+                ]
+            for idx in frequency_indices:
+                axes[3].plot(
+                    t_hours,
+                    power_spectrum[:, idx].to_value(power_spectrum.unit),
+                    label=f"{freqs[idx]:.6g}",
+                )
+            axes[3].set_ylabel(f"PSD shape ({power_spectrum.unit})")
+            axes[3].legend(loc="best", fontsize=7)
+
+        for ax in axes:
+            ax.grid(True, alpha=0.3)
+        axes[-1].set_xlabel(f"Hours since {t0.iso}")
+
+        title = f"{self.name} modulation"
+        if station is not None:
+            title += f" at {station.name}"
+        fig.suptitle(title)
+        plt.tight_layout()
+
+        if showPlot:
+            plt.show()
+        return fig, result
+
     def getRabiFreq(
         self,
         g_aNN: Quantity[unit.GeV ** (-1)] | None = None,
         case="grad_perp",
+        alpha: Quantity | None = None,
         verbose=False,
     ) -> Quantity:
         """
@@ -149,17 +710,25 @@ class MilkyWayAxionHalo:
         #         1 / 2
         #     ) * self.v_lab * np.cos(self.windAngle) * self.FWHM**(1 / 2)
         # el
-        if case == "grad_perp":
+        if alpha is None:
+            alpha = self.windAngle if self.windAngle is not None else 0.0 * unit.rad
+
+        if case in {"grad_par", "grad_perp"}:
+            velocity_rms = np.sqrt(
+                self.gradientPowerCoefficient(
+                    v_0=self.v_0, v_lab=self.v_lab, alpha=alpha, case=case
+                )
+            )
             Omega_rms = (
                 0.5
                 * g_aNN
                 * (2 * const.hbar * const.c * self.rho_E_DM) ** (1 / 2)
-                * self.v_lab
+                * velocity_rms
             ).to(unit.Hz)
         else:
             raise ValueError(
-                f"case {case} not recognized, should be 'grad_perp'"
-            )  #  'non-grad', 'grad_par' or
+                f"case {case} not recognized, should be 'grad_par' or 'grad_perp'"
+            )
         if verbose:
             print(
                 logPrefix,
@@ -421,6 +990,7 @@ class MilkyWayAxionHalo:
         self,
         frequencies: np.ndarray,
         case: str = "grad_perp",
+        alpha: Quantity | None = None,
         numSpectra: int = 1,
         rand_seed: int = None,
         use_stoch: bool = True,
@@ -459,6 +1029,8 @@ class MilkyWayAxionHalo:
         """
 
         logPrefix = f"[{self.__class__.__name__}.{self.getAmpSpectra.__name__}]"
+        if alpha is None:
+            alpha = self.windAngle if self.windAngle is not None else 0.0 * unit.rad
 
         PSD_lineshape = MilkyWayAxionHalo.axion_lineshape(
             v_0=self.v_0,
@@ -466,7 +1038,7 @@ class MilkyWayAxionHalo:
             nu_a=self.nu_a,
             nu=frequencies,
             case=case,
-            alpha=0.0 * unit.rad,
+            alpha=alpha,
         )
 
         shape = (numSpectra, len(frequencies))

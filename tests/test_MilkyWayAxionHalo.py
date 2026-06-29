@@ -33,6 +33,7 @@ from axionbloch.constants import gamma_p, gamma_Xe129N, mu_p, mu_Xe129N
 from axionbloch.dependency import *
 from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
 from axionbloch.Sample import Sample
+from axionbloch.Station import Mainz
 
 # classes for simulations
 from axionbloch.SimuTools import MagField, Simulations
@@ -186,6 +187,60 @@ def test_getRabiFreq():
     assert np.isfinite(
         rabi_freq.value
     ), f"Expected Rabi frequency to be finite, but got {rabi_freq.value}"
+
+    rabi_perp_min = axion.getRabiFreq(case="grad_perp", alpha=0 * unit.rad)
+    rabi_perp_max = axion.getRabiFreq(case="grad_perp", alpha=90 * unit.deg)
+    assert rabi_perp_max > rabi_perp_min
+
+
+def test_frequency_mass_conversion_and_explicit_Qa():
+    """Compton frequency uses h, and explicit Qa is preserved."""
+    nu_a = 1 * unit.MHz
+    axion = MilkyWayAxionHalo(nu_a=nu_a, Qa=1e5 * unit.one)
+    assert axion.Qa == 1e5 * unit.one
+    assert np.isclose(
+        axion.m_a.to_value(unit.kg),
+        (nu_a * const.h / const.c**2).to_value(unit.kg),
+    )
+
+    from_mass = MilkyWayAxionHalo(m_a=axion.m_a)
+    assert np.isclose(from_mass.nu_a.to_value(unit.Hz), nu_a.to_value(unit.Hz))
+
+    default_axion = MilkyWayAxionHalo(nu_a=nu_a)
+    assert np.isclose(
+        default_axion.Qa.to_value(unit.one),
+        ((const.c / default_axion.v_0) ** 2).to_value(unit.one),
+    )
+    assert np.isclose(
+        default_axion.nu_a_eff.to_value(unit.Hz),
+        (nu_a * (1 + 0.5 * default_axion.v_lab**2 / const.c**2)).to_value(unit.Hz),
+    )
+
+
+def test_gradient_power_coefficients_match_gramolin_eq_19():
+    """Eq. (19): C_parallel and C_perp carry the Fig. 3 power modulation."""
+    v_0 = 220 * unit.km / unit.s
+    v_lab = 233 * unit.km / unit.s
+
+    c_par_0 = MilkyWayAxionHalo.gradientPowerCoefficient(
+        v_0, v_lab, 0 * unit.rad, case="grad_par"
+    )
+    c_par_90 = MilkyWayAxionHalo.gradientPowerCoefficient(
+        v_0, v_lab, 90 * unit.deg, case="grad_par"
+    )
+    c_perp_0 = MilkyWayAxionHalo.gradientPowerCoefficient(
+        v_0, v_lab, 0 * unit.rad, case="grad_perp"
+    )
+    c_perp_90 = MilkyWayAxionHalo.gradientPowerCoefficient(
+        v_0, v_lab, 90 * unit.deg, case="grad_perp"
+    )
+
+    assert np.isclose(c_par_0.to_value(v_0.unit**2), (v_0**2 / 2 + v_lab**2).value)
+    assert np.isclose(c_par_90.to_value(v_0.unit**2), (v_0**2 / 2).value)
+    assert np.isclose(c_perp_0.to_value(v_0.unit**2), (v_0**2).value)
+    assert np.isclose(c_perp_90.to_value(v_0.unit**2), (v_0**2 + v_lab**2).value)
+    assert 3.0 < (c_par_0 / c_par_90).to_value(unit.one) < 3.5
+    assert 2.0 < (c_perp_90 / c_perp_0).to_value(unit.one) < 2.2
 
 
 def test_check_norm_with_quantities():
@@ -362,6 +417,91 @@ def test_getAmpSpectra_deterministic():
 
     # Assert integral is close to 1 with reasonable tolerance
     assert np.isclose(integral.to_value(unit.one), 1.0, rtol=1e-3)
+
+
+def test_astropy_halo_wind_helpers():
+    """TASSLE-style astropy halo-wind helpers return sane vectors/projections."""
+    from astropy.time import Time
+
+    t = Time("2024-06-21T12:00:00", scale="utc")
+    wind = MilkyWayAxionHalo.getHaloVelocity(time=t, station=Mainz)
+    basis = MilkyWayAxionHalo.getLabBasis(time=t, station=Mainz)
+
+    assert wind.shape == (3,)
+    assert wind.unit.is_equivalent(unit.km / unit.s)
+    assert 200 < np.linalg.norm(wind.to_value(unit.km / unit.s)) < 320
+
+    for axis in ("north", "east", "up"):
+        assert basis[axis].shape == (3,)
+        assert np.isclose(np.linalg.norm(basis[axis]), 1.0, rtol=1e-6)
+    assert np.allclose(basis["west"], -basis["east"])
+    assert np.allclose(basis["zenith"], basis["up"])
+
+    parallel = MilkyWayAxionHalo.projectHaloVelocity(time=t, station=Mainz, axis="up")
+    perpendicular = MilkyWayAxionHalo.projectHaloVelocity(
+        time=t, station=Mainz, axis="perp"
+    )
+    speed = MilkyWayAxionHalo.projectHaloVelocity(
+        time=t, station=Mainz, axis="magnitude"
+    )
+    assert np.isclose(
+        (parallel**2 + perpendicular**2).to_value((unit.km / unit.s) ** 2),
+        (speed**2).to_value((unit.km / unit.s) ** 2),
+        rtol=1e-6,
+    )
+
+    axion = MilkyWayAxionHalo(nu_a=1 * unit.MHz)
+    axion.setKinematicsFromAstropy(time=t, station=Mainz)
+    assert axion.v_lab.unit.is_equivalent(unit.km / unit.s)
+    assert axion.windAngle.unit.is_equivalent(unit.rad)
+    assert 0 <= axion.windAngle.to_value(unit.rad) <= np.pi
+
+
+def test_milky_way_lineshape_periodic_modulation():
+    """Daily wind-angle modulation should alter the gradient lineshape."""
+    from astropy.time import Time
+
+    axion = MilkyWayAxionHalo(nu_a=1 * unit.MHz)
+    times = Time("2024-06-21T00:00:00", scale="utc") + np.arange(0, 24, 3) * unit.hour
+    frequencies = axion.nu_a + np.linspace(-0.2, 4.0, 100) * unit.Hz
+
+    result = axion.findLineshapeOverTime(
+        frequencies=frequencies,
+        station=Mainz,
+        meas_times=times,
+        case="grad_perp",
+    )
+
+    angle_span = np.ptp(result["wind_angle"].to_value(unit.deg))
+    assert angle_span > 30.0
+
+    psd = result["lineshape"].to_value(result["lineshape"].unit)
+    peak_idx = int(np.argmax(np.mean(psd, axis=0)))
+    peak_trace = psd[:, peak_idx]
+    assert np.ptp(peak_trace) / np.mean(peak_trace) > 1e-3
+    assert np.ptp(result["relative_power"].to_value(unit.one)) > 0.1
+    assert result["power_spectrum_shape"].shape == result["lineshape"].shape
+
+
+def test_plot_periodic_modulation_smoke():
+    """Plot helper returns a figure and modulation result without displaying."""
+    from astropy.time import Time
+    from matplotlib.figure import Figure
+
+    axion = MilkyWayAxionHalo(nu_a=1 * unit.MHz)
+    times = Time("2024-06-21T00:00:00", scale="utc") + np.arange(0, 12, 6) * unit.hour
+    frequencies = axion.nu_a + np.linspace(-0.2, 2.0, 60) * unit.Hz
+
+    fig, result = axion.plotPeriodicModulation(
+        station=Mainz,
+        meas_times=times,
+        frequencies=frequencies,
+        case="grad_perp",
+        showPlot=False,
+    )
+
+    assert isinstance(fig, Figure)
+    assert result["lineshape"].shape == (len(times), len(frequencies))
 
 
 @pytest.mark.parametrize(
