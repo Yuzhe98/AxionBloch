@@ -349,6 +349,8 @@ class GravBoundAxionHalo:
         station: Station | None = None,
         meas_time: Time | None = None,
         truncRadius: Quantity | None = None,
+        include_lorentz_boost: bool = True,
+        relative_velocity: Quantity | None = None,
         showPlot: bool = True,
         verbose: bool = False,
     ):
@@ -372,6 +374,16 @@ class GravBoundAxionHalo:
             the direction.
         truncRadius : Quantity
             Truncation radius for reducing computation and plotting time.
+        include_lorentz_boost : bool
+            Add the laboratory-frame gradient induced by motion through the
+            halo. For a complex field amplitude this contribution is
+            ``-1j * (omega_a / c**2) * v_rel * Psi``.
+        relative_velocity : Quantity, shape (3,), optional
+            Laboratory velocity relative to the halo, expressed in the
+            solar-Z Cartesian frame. If omitted, use the station's velocity
+            from Earth's rotation, corresponding to a nonrotating
+            geocentric halo. Pass an explicit zero vector for a corotating
+            halo.
         """
 
         logPrefix = (
@@ -461,6 +473,102 @@ class GravBoundAxionHalo:
         grad_theta = dWF_dtheta / R_grid
         # small regularization prevents division by zero at theta=0 and π
         grad_phi = dWF_dphi / (R_grid * np.sin(Theta_grid) + 1e-12 * R_grid.unit)
+
+        if include_lorentz_boost:
+            if relative_velocity is None:
+                # vx, vy, vz in solar-Z frame. z axis points along the Earth-Sun line
+                # x follows Earth heliocentric velocity, orthogonalized against ẑ
+                # ŷ = ẑ × x̂
+                relative_velocity = station.rotation_velocity_in_solarZ_frame(
+                    meas_time
+                )
+            if not isinstance(relative_velocity, Quantity):
+                raise TypeError(
+                    logPrefix
+                    + " relative_velocity must be an astropy Quantity with velocity units."
+                )
+            if (
+                relative_velocity.shape != (3,)
+                or not relative_velocity.unit.is_equivalent(unit.m / unit.s)
+            ):
+                raise ValueError(
+                    logPrefix
+                    + " relative_velocity must have shape (3,) and velocity units."
+                )
+
+            velocity = relative_velocity
+            speed = np.sqrt(np.sum(velocity**2))
+            beta = (speed / const.c).to_value(unit.one)
+            if beta >= 1.0:
+                raise ValueError(logPrefix + " relative_velocity must be below c.")
+            gamma = 1.0 / np.sqrt(1.0 - beta**2)
+
+            # here Theta_grid and Phi_grid are grid of the space
+            theta_values = Theta_grid.to_value(unit.rad)
+            phi_values = Phi_grid.to_value(unit.rad)
+            sin_theta, cos_theta = np.sin(theta_values), np.cos(theta_values)
+            sin_phi, cos_phi = np.sin(phi_values), np.cos(phi_values)
+
+            velocity_values = velocity.to_value(unit.m / unit.s)
+            velocity_r = (
+                velocity_values[0] * sin_theta * cos_phi
+                + velocity_values[1] * sin_theta * sin_phi
+                + velocity_values[2] * cos_theta
+            ) * unit.m / unit.s
+            velocity_theta = (
+                velocity_values[0] * cos_theta * cos_phi
+                + velocity_values[1] * cos_theta * sin_phi
+                - velocity_values[2] * sin_theta
+            ) * unit.m / unit.s
+            velocity_phi = (
+                -velocity_values[0] * sin_phi + velocity_values[1] * cos_phi
+            ) * unit.m / unit.s
+
+            # Convert angular components to the radial-gradient unit before
+            # combining them; radians are dimensionless here.
+            grad_unit = grad_r.unit
+            grad_theta_compatible = grad_theta.to(
+                grad_unit, equivalencies=unit.dimensionless_angles()
+            )
+            grad_phi_compatible = grad_phi.to(
+                grad_unit, equivalencies=unit.dimensionless_angles()
+            )
+            velocity_dot_gradient = (
+                velocity_r * grad_r
+                + velocity_theta * grad_theta_compatible
+                + velocity_phi * grad_phi_compatible
+            )
+
+            # Exact spatial part of the Lorentz transformation. The
+            # (gamma - 1) term is negligible for terrestrial speeds but is
+            # inexpensive and keeps the transformation explicit.
+            if speed.to_value(unit.m / unit.s) > 0.0:
+                correction_scale = (gamma - 1.0) * velocity_dot_gradient / speed**2
+            else:
+                correction_scale = (
+                    0.0 * velocity_dot_gradient / (unit.m / unit.s) ** 2
+                )
+
+            omega_a = 2.0 * np.pi * self.nu_a
+            boost_scale = -1j * gamma * omega_a / const.c**2 * WF_total
+
+            grad_r = (
+                grad_r + correction_scale * velocity_r + boost_scale * velocity_r
+            )
+            grad_theta = (
+                grad_theta_compatible
+                + correction_scale * velocity_theta
+                + boost_scale * velocity_theta
+            )
+            grad_phi = (
+                grad_phi_compatible
+                + correction_scale * velocity_phi
+                + boost_scale * velocity_phi
+            )
+
+            if verbose:
+                print(logPrefix, "relative velocity =", velocity)
+                print(logPrefix, "Lorentz gamma =", gamma)
 
         if verbose:
             print(
@@ -721,6 +829,8 @@ class GravBoundAxionHalo:
         station: Station,
         meas_times:list[Time],
         truncRadius: Quantity | None = None,
+        include_lorentz_boost: bool = True,
+        relative_velocity: Quantity | None = None,
         verbose: bool = False,
     ) -> dict:
         """Gradient components at a station evaluated over a list of epochs.
@@ -738,6 +848,12 @@ class GravBoundAxionHalo:
             Epochs at which to evaluate the gradients.
         truncRadius : Quantity, optional
             Radial truncation passed through to :meth:`findGradientsAtDirection`.
+        include_lorentz_boost : bool
+            Include the velocity-induced laboratory-frame gradient.
+        relative_velocity : Quantity, shape (3,), optional
+            Fixed laboratory velocity relative to the halo in the solar-Z
+            frame. If omitted, determine Earth's rotation velocity separately
+            at each epoch.
         verbose : bool
             Print per-step progress.
 
@@ -763,6 +879,8 @@ class GravBoundAxionHalo:
                     station=station,
                     meas_time=meas_time,
                     truncRadius=truncRadius,
+                    include_lorentz_boost=include_lorentz_boost,
+                    relative_velocity=relative_velocity,
                     showPlot=False,
                     verbose=False,
                 )
@@ -790,6 +908,8 @@ class GravBoundAxionHalo:
         meas_times,
         truncRadius: Quantity | None = None,
         g_aNN:Quantity[unit.GeV**(-1)]=1e-9 * unit.GeV**(-1),
+        include_lorentz_boost: bool = True,
+        relative_velocity: Quantity | None = None,
         verbose: bool = False,
     ) -> dict:
         """Axion-nucleon coupling frequency (Omega_a) evaluated over a list of epochs.
@@ -831,6 +951,8 @@ class GravBoundAxionHalo:
             station=station,
             meas_times=meas_times,
             truncRadius=truncRadius,
+            include_lorentz_boost=include_lorentz_boost,
+            relative_velocity=relative_velocity,
             verbose=verbose,
         )
 
@@ -839,11 +961,13 @@ class GravBoundAxionHalo:
         grad_theta = gradients["grad_theta"]
         grad_phi = gradients["grad_phi"]
 
-        # Omega_a = c * g_aNN * sqrt(N_a hbar **3 * c / (2 m_a)) * |gradient|
+        # Omega_a is the amplitude of the complex gradient phasor. Taking
+        # abs() retains both the intrinsic (real) and boost-induced
+        # (quadrature) components.
         factor = const.c * g_aNN * np.sqrt(self.N_a * const.hbar **3 * const.c / (2 * self.m_a))
-        Omega_a_r = factor * np.real(grad_r)
-        Omega_a_theta = factor * np.real(grad_theta)
-        Omega_a_phi = factor * np.real(grad_phi)
+        Omega_a_r = factor * np.abs(grad_r)
+        Omega_a_theta = factor * np.abs(grad_theta)
+        Omega_a_phi = factor * np.abs(grad_phi)
 
         return {
             "times": gradients["times"],
@@ -859,6 +983,8 @@ class GravBoundAxionHalo:
         meas_times,
         truncRadius: Quantity | None = None,
         g_aNN: Quantity[unit.GeV**(-1)] = 1e-9 * unit.GeV**(-1),
+        include_lorentz_boost: bool = True,
+        relative_velocity: Quantity | None = None,
         verbose: bool = False,
     ) -> dict:
         """RMS Omega_a over a list of epochs.
@@ -897,6 +1023,8 @@ class GravBoundAxionHalo:
             meas_times=meas_times,
             truncRadius=truncRadius,
             g_aNN=g_aNN,
+            include_lorentz_boost=include_lorentz_boost,
+            relative_velocity=relative_velocity,
             verbose=verbose,
         )
 
@@ -926,6 +1054,8 @@ class GravBoundAxionHalo:
         meas_time: Time,
         stateNamesDict: dict,
         truncRadius: Quantity | None = None,
+        include_lorentz_boost: bool = True,
+        relative_velocity: Quantity | None = None,
         showPlot: bool = True,
         verbose: bool = False,
     ) -> dict:
@@ -981,6 +1111,8 @@ class GravBoundAxionHalo:
                     station=station,
                     meas_time=meas_time,
                     truncRadius=truncRadius,
+                    include_lorentz_boost=include_lorentz_boost,
+                    relative_velocity=relative_velocity,
                     showPlot=False,
                     verbose=verbose,
                 )

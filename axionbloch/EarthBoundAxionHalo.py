@@ -407,7 +407,10 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         self,
         station: Station,
         stateNames: list[str] | None = None,
+        meas_time: Time | None = None,
         truncRadius: Quantity | None = 3 * unit.earthRad,
+        include_lorentz_boost: bool = True,
+        relative_velocity: Quantity | None = None,
         showPlot: bool = False,
         verbose: bool = False,
     ) -> tuple:
@@ -424,6 +427,8 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         stateNames : list of str, optional
             Eigenstates to superimpose (e.g. ``['2p']``).  Defaults to the
             lowest-energy solved state.
+        meas_time : Time, optional
+            Measurement epoch. Uses :meth:`astropy.time.Time.now` if omitted.
         truncRadius : Quantity, optional
             Radial cutoff for the interpolation grid.
         showPlot : bool
@@ -436,10 +441,15 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         r, R_r, r_line, grad_r, grad_theta, grad_phi
             Same six arrays as :meth:`findGradients`.
         """
+        if meas_time is None:
+            meas_time = Time.now()
         return self.findGradientsAtDirection(
             stateNames=stateNames,
             station=station,
+            meas_time=meas_time,
             truncRadius=truncRadius,
+            include_lorentz_boost=include_lorentz_boost,
+            relative_velocity=relative_velocity,
             showPlot=showPlot,
             verbose=verbose,
         )
@@ -448,7 +458,10 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         self,
         stateNames: list[str] | None = None,
         station: Station | None = None,
+        meas_time: Time | None = None,
         truncRadius: Quantity | None = 3 * unit.earthRad,
+        include_lorentz_boost: bool = True,
+        relative_velocity: Quantity | None = None,
         showPlot: bool = False,
         verbose: bool = False,
     ) -> tuple:
@@ -461,6 +474,8 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         ----------
         stateNames : list of str, optional
         station : Station, optional
+        meas_time : Time, optional
+            Measurement epoch. Uses :meth:`astropy.time.Time.now` if omitted.
         truncRadius : Quantity, optional
         showPlot : bool
         verbose : bool
@@ -473,10 +488,15 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
             raise ValueError(
                 "[EarthBoundAxionHalo.findGradients] Provide station=."
             )
+        if meas_time is None:
+            meas_time = Time.now()
         return self.findGradientsAtDirection(
             stateNames=stateNames,
             station=station,
+            meas_time=meas_time,
             truncRadius=truncRadius,
+            include_lorentz_boost=include_lorentz_boost,
+            relative_velocity=relative_velocity,
             showPlot=showPlot,
             verbose=verbose,
         )
@@ -559,6 +579,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         r, R_r, r_line, grad_r, grad_theta, grad_phi = self.findGradientsAtDirection(
             stateNames=stateNames,
             station=station,
+            meas_time=mw.time,
             truncRadius=truncRadius,
             showPlot=showPlot,
             verbose=verbose,

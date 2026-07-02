@@ -36,6 +36,83 @@ Q_a = \left(\frac{c}{v_\mathrm{lab}}\right)^2 \approx 10^6,
 where {math}`v_\mathrm{lab} \approx 233\,\mathrm{km\,s^{-1}}` is the speed of
 the laboratory in the galactic rest frame.
 
+### Laboratory-frame gradients
+
+The axion is a Lorentz scalar, but its time and spatial derivatives mix under
+a boost. If the laboratory moves with velocity {math}`\mathbf{v}_\mathrm{rel}`
+relative to the halo, its gradient is
+
+```{math}
+\nabla_\mathrm{lab} a
+= \nabla_\mathrm{halo} a
++(\gamma-1)\hat{\mathbf v}
+  \left(\hat{\mathbf v}\cdot\nabla_\mathrm{halo}a\right)
++\gamma\frac{\mathbf v_\mathrm{rel}}{c^2}\,\partial_t a .
+```
+
+For a complex axion-field amplitude
+{math}`a\propto\operatorname{Re}[\Psi(\mathbf{x})e^{-i\omega_a t}]`,
+this becomes
+
+```{math}
+\mathbf{G}_\mathrm{lab}
+\simeq \nabla\Psi
+-i\frac{\omega_a}{c^2}\mathbf{v}_\mathrm{rel}\Psi ,
+\qquad \omega_a=2\pi\nu_a .
+```
+
+The units of the two terms are consistent. In a convention-independent form,
+
+```{math}
+[\nabla\Psi]=\frac{[\Psi]}{L},
+```
+
+while the boost term has units
+
+```{math}
+\left[
+i\frac{\omega_a}{c^2}\mathbf{v}_\mathrm{rel}\Psi
+\right]
+=
+\frac{T^{-1}}{L^2T^{-2}}\,
+\frac{L}{T}\,[\Psi]
+=\frac{[\Psi]}{L}.
+```
+
+Here {math}`i` is dimensionless,
+{math}`[\omega_a]=T^{-1}`, {math}`[c]=LT^{-1}`, and
+{math}`[\mathbf{v}_\mathrm{rel}]=LT^{-1}`. Therefore,
+
+```{math}
+[\mathbf{G}_\mathrm{lab}]
+=[\nabla\Psi]
+=\left[
+i\frac{\omega_a}{c^2}\mathbf{v}_\mathrm{rel}\Psi
+\right]
+=\frac{[\Psi]}{L}.
+```
+
+The normalized three-dimensional wavefunctions used by
+`GravBoundAxionHalo` satisfy {math}`[\Psi]=L^{-3/2}`. In SI units, all three
+quantities consequently have units
+
+```{math}
+[\mathbf{G}_\mathrm{lab}]
+=[\nabla\Psi]
+=\left[
+i\frac{\omega_a}{c^2}\mathbf{v}_\mathrm{rel}\Psi
+\right]
+=L^{-5/2}=\mathrm{m}^{-5/2}.
+```
+
+The first term is the intrinsic halo-profile gradient. The second is the
+motion-induced gradient and is in phase quadrature with the first. For a
+nonrotating Earth-bound halo, {math}`\mathbf{v}_\mathrm{rel}` is the station's
+velocity from Earth's rotation (about {math}`0.30\,\mathrm{km\,s^{-1}}` at
+Mainz), rather than the approximately {math}`240\,\mathrm{km\,s^{-1}}`
+Galactic laboratory velocity. A corotating Earth halo has a smaller relative
+velocity.
+
 ## Axion–spin interaction
 
 Axion field gradients couple to fermionic spins through a pseudoscalar

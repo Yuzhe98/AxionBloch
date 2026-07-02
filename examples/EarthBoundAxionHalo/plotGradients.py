@@ -5,6 +5,7 @@ from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo
 from axionbloch.Station import Baltimore
 
 station = Baltimore
+meas_time = Time("2024-06-21T14:00:00")
 rhoE_DM = 0.3 * unit.GeV / unit.cm**3
 
 halo = EarthBoundAxionHalo(
@@ -32,6 +33,7 @@ r, R_r, r_line, grad_r_line, grad_theta_line, grad_phi_line = (
     halo.findGradientsAtDirection(
         stateNames=["2p"],
         station=station,
+        meas_time=meas_time,
         truncRadius=2 * unit.earthRad,
         verbose=True,
         showPlot=False,

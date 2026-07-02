@@ -234,13 +234,16 @@ solved before calling `findGradients`.
 ```python
 import numpy as np
 from astropy import units as unit
+from astropy.time import Time
 from axionbloch.Station import Baltimore
 
 station = Baltimore
+meas_time = Time("2024-06-21T14:00:00")
 
 r, R_r, r_line, grad_r, grad_theta, grad_phi = halo.findGradients(
     stateNames=["2p"],
     station=station,
+    meas_time=meas_time,
     truncRadius=2 * unit.R_earth,
     showPlot=True,
     verbose=True,
@@ -259,7 +262,13 @@ print("a_0 * grad_phi   =", (halo.a_0 * grad_phi[earthRad_idx]).si)
 wavefunction `R_r`, the interpolation line `r_line`, and the three
 spherical-coordinate gradient components
 {math}`(\partial_r\Psi,\; r^{-1}\partial_\theta\Psi,\; (r\sin\theta)^{-1}\partial_\phi\Psi)`
-evaluated along the radial line pointing toward the station.
+evaluated along the radial line pointing toward the station. By default these
+include the Lorentz-boost contribution from the station's rotation through a
+nonrotating Earth halo. Use `include_lorentz_boost=False` for the intrinsic
+profile gradient alone, or pass a three-component `relative_velocity` in the
+solar-Z Cartesian frame to model a different halo velocity. An explicit zero
+velocity represents a corotating halo. If `meas_time` is omitted,
+`Time.now()` is used.
 
 ### Axion-nucleon coupling frequency (Omega_a) over time
 

@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 from astropy import units as unit
 from astropy.coordinates import EarthLocation
+from astropy.time import Time
 
 from axionbloch.Station import Mainz, Station
 
@@ -42,6 +43,23 @@ def test_station_location_elevation_matches():
         Mainz.location.height.to_value(unit.m),
         Mainz.elevation.to_value(unit.m),
         rtol=1e-9,
+    )
+
+
+def test_station_rotation_velocity_uses_solarZ_frame():
+    """Mainz rotation speed is physical and tangent to its geocentric radius."""
+    meas_time = Time("2022-12-14T12:00:00")
+    position = unit.Quantity(
+        Mainz.in_solarZ_frame(meas_time, output="cartesian")
+    )
+    velocity = Mainz.rotation_velocity_in_solarZ_frame(meas_time)
+
+    speed = np.linalg.norm(velocity)
+    assert np.isclose(speed.to_value(unit.m / unit.s), 299.6, rtol=2e-3)
+    assert np.isclose(
+        np.dot(position, velocity).to_value(unit.m**2 / unit.s),
+        0.0,
+        atol=1e3,
     )
 
 
@@ -93,3 +111,107 @@ def test_findGradients_raises_without_location(solved_halo):
     """findGradients raises ValueError when no station is given."""
     with pytest.raises(ValueError):
         solved_halo.findGradients(stateNames=["2p"], showPlot=False)
+
+
+def test_findGradients_resolves_default_measurement_time(monkeypatch):
+    """The Earth-bound wrapper resolves meas_time=None before delegation."""
+    from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo
+
+    halo = object.__new__(EarthBoundAxionHalo)
+    captured = {}
+
+    def fake_find_gradients_at_direction(**kwargs):
+        captured.update(kwargs)
+        return (None,) * 6
+
+    monkeypatch.setattr(
+        halo, "findGradientsAtDirection", fake_find_gradients_at_direction
+    )
+    before = Time.now()
+    halo.findGradients(stateNames=["2p"], station=Mainz, meas_time=None)
+    after = Time.now()
+
+    assert isinstance(captured["meas_time"], Time)
+    assert before <= captured["meas_time"] <= after
+
+
+def test_lorentz_boost_zero_velocity_matches_intrinsic_gradient(solved_halo):
+    """An explicit zero relative velocity leaves the gradient unchanged."""
+    kwargs = {
+        "stateNames": ["2p"],
+        "station": Mainz,
+        "meas_time": Time("2022-12-14T12:00:00"),
+        "truncRadius": 2 * unit.R_earth,
+        "showPlot": False,
+    }
+    intrinsic = solved_halo.findGradients(
+        **kwargs,
+        include_lorentz_boost=False,
+    )
+    zero_boost = solved_halo.findGradients(
+        **kwargs,
+        include_lorentz_boost=True,
+        relative_velocity=np.zeros(3) * unit.m / unit.s,
+    )
+
+    for intrinsic_component, boosted_component in zip(
+        intrinsic[3:], zero_boost[3:]
+    ):
+        boosted_compatible = boosted_component.to(
+            intrinsic_component.unit,
+            equivalencies=unit.dimensionless_angles(),
+        )
+        assert np.allclose(
+            boosted_compatible.value,
+            intrinsic_component.value,
+            rtol=1e-12,
+            atol=1e-12,
+        )
+
+
+def test_lorentz_boost_scales_linearly_with_relative_velocity(solved_halo):
+    """At terrestrial speeds, the boost contribution is linear in v_rel."""
+    kwargs = {
+        "stateNames": ["2p"],
+        "station": Mainz,
+        "meas_time": Time("2022-12-14T12:00:00"),
+        "truncRadius": 2 * unit.R_earth,
+        "showPlot": False,
+    }
+    intrinsic = solved_halo.findGradients(
+        **kwargs,
+        include_lorentz_boost=False,
+    )
+    velocity = np.array([100.0, 0.0, 0.0]) * unit.m / unit.s
+    boosted_once = solved_halo.findGradients(
+        **kwargs,
+        relative_velocity=velocity,
+    )
+    boosted_twice = solved_halo.findGradients(
+        **kwargs,
+        relative_velocity=2.0 * velocity,
+    )
+
+    nonzero_boost_found = False
+    for intrinsic_component, once_component, twice_component in zip(
+        intrinsic[3:], boosted_once[3:], boosted_twice[3:]
+    ):
+        once = once_component.to(
+            intrinsic_component.unit,
+            equivalencies=unit.dimensionless_angles(),
+        )
+        twice = twice_component.to(
+            intrinsic_component.unit,
+            equivalencies=unit.dimensionless_angles(),
+        )
+        delta_once = once - intrinsic_component
+        delta_twice = twice - intrinsic_component
+        nonzero_boost_found |= np.any(np.abs(delta_once.value) > 0.0)
+        assert np.allclose(
+            delta_twice.value,
+            2.0 * delta_once.value,
+            rtol=1e-9,
+            atol=1e-18,
+        )
+
+    assert nonzero_boost_found

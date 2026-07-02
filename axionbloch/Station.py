@@ -150,23 +150,7 @@ class Station:
         tuple of Quantity
         """
 
-        earth_pos, earth_vel = get_body_barycentric_posvel("earth", meas_time)
-        sun_pos, _ = get_body_barycentric_posvel("sun", meas_time)
-
-        # ẑ: Earth → Sun
-        earth_to_sun = (sun_pos.xyz - earth_pos.xyz).to(unit.m).value
-        z_hat = earth_to_sun / np.linalg.norm(earth_to_sun)
-
-        # x̂: Earth heliocentric velocity, orthogonalized against ẑ
-        v = earth_vel.xyz.to(unit.m / unit.s).value
-        v_perp = v - np.dot(v, z_hat) * z_hat
-        x_hat = v_perp / np.linalg.norm(v_perp)
-
-        # ŷ = ẑ × x̂
-        y_hat = np.cross(z_hat, x_hat)
-
-        # rotation matrix whose columns are x̂, ŷ, ẑ in ICRS
-        R = np.column_stack([x_hat, y_hat, z_hat])
+        R = self._solarZ_basis(meas_time)
 
         # station geocentric position in GCRS (inertial, aligned with ICRS)
         gcrs = self.location.get_itrs(obstime=meas_time).transform_to(
@@ -192,6 +176,48 @@ class Station:
         )
         phi = np.arctan2(xyz[1].value, xyz[0].value) * unit.rad
         return r, theta, phi
+
+    @staticmethod
+    def _solarZ_basis(meas_time) -> np.ndarray:
+        """Return solar-Z basis vectors as columns in GCRS/ICRS orientation."""
+        earth_pos, earth_vel = get_body_barycentric_posvel("earth", meas_time)
+        sun_pos, _ = get_body_barycentric_posvel("sun", meas_time)
+
+        # ẑ: Earth → Sun
+        earth_to_sun = (sun_pos.xyz - earth_pos.xyz).to(unit.m).value
+        z_hat = earth_to_sun / np.linalg.norm(earth_to_sun)
+
+        # x̂: Earth heliocentric velocity, orthogonalized against ẑ
+        v = earth_vel.xyz.to(unit.m / unit.s).value
+        v_perp = v - np.dot(v, z_hat) * z_hat
+        x_hat = v_perp / np.linalg.norm(v_perp)
+
+        # ŷ = ẑ × x̂; columns express the solar-Z basis in GCRS/ICRS.
+        y_hat = np.cross(z_hat, x_hat)
+        return np.column_stack([x_hat, y_hat, z_hat])
+
+    def rotation_velocity_in_solarZ_frame(self, meas_time) -> Quantity:
+        """Station velocity relative to a nonrotating geocentric halo.
+
+        Astropy supplies the velocity caused by Earth's rotation in GCRS.
+        This method projects it into the same solar-Z Cartesian basis used by
+        :meth:`in_solarZ_frame`.
+
+        Parameters
+        ----------
+        meas_time : :class:`astropy.time.Time`
+            Observation epoch.
+
+        Returns
+        -------
+        Quantity, shape (3,) [m/s]
+            Cartesian velocity ``(v_x, v_y, v_z)`` in the solar-Z frame.
+        """
+        _, velocity_gcrs = self.location.get_gcrs_posvel(meas_time)
+        rotation = self._solarZ_basis(meas_time)
+        return (
+            rotation.T @ velocity_gcrs.xyz.to_value(unit.m / unit.s)
+        ) * unit.m / unit.s
 
     @staticmethod
     def direction_to_spherical(direction) -> tuple[Quantity, Quantity]:
