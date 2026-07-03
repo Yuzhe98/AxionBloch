@@ -270,10 +270,10 @@ class GravBoundAxionHalo:
                 "n_r": (i),
                 "l": (l),
                 "eigenE": energies[_n_r],
-                "T_eV": T_expect,
-                "V_eV": V_expect,
-                "Veff_eV": Veff_expect,
-                "E_eV": (T_expect + Veff_expect),
+                "T_expect": T_expect,
+                "V_expect": V_expect,
+                "Veff_expect": Veff_expect,
+                "eigenE_expect": (T_expect + Veff_expect),  # TODO check if this is consistent with eigenE
                 "u_r": u_r,
                 "R_r": R_r,
                 "R_reduced": R_reduced,
@@ -376,9 +376,10 @@ class GravBoundAxionHalo:
         truncRadius : Quantity
             Truncation radius for reducing computation and plotting time.
         include_lorentz_boost : bool
-            Add the laboratory-frame gradient induced by motion through the
-            halo. For a complex field amplitude this contribution is
-            ``-1j * (omega_a / c**2) * v_rel * Psi``.
+            Add the first-order laboratory-frame gradient induced by motion
+            through the halo. For each mode, this contribution is
+            ``-1j * (omega_n / c**2) * v_rel * psi_n``, where
+            ``omega_n = (m_a * c**2 + E_n) / hbar``.
         relative_velocity : Quantity, shape (3,), optional
             Laboratory velocity relative to the halo, expressed in the
             solar-Z Cartesian frame. If omitted, use the station's velocity
@@ -449,19 +450,30 @@ class GravBoundAxionHalo:
             np.zeros(R_grid.shape, dtype=complex)
             * self.states[stateNames[0]]["R_r"].unit
         )
+        angular_frequency_WF_total = (
+            np.zeros(R_grid.shape, dtype=complex) * WF_total.unit / unit.s
+        )
 
         for name in stateNames:
             state = self.states[name]
             n_r, l, m = state["n_r"], state["l"], 0
             c = 1.0  # equal weight. This can be modified to account for different distributions
-            E_eV = state["E_eV"]
+            eigenE_expect = state["eigenE_expect"]
             # radial part broadcast over angular axes
             R_nl = state["R_r"][start_index:stop_index, None, None]
             # angular part: Y_lm(theta, phi) — note argument order for sph_harm_y
             # Y_lm = sph_harm_y(m, l, Phi_grid, Theta_grid) wrong!
             Y_lm = sph_harm_y(l, m, Theta_grid, Phi_grid)
             # wavefunction
-            WF_total += c * R_nl * Y_lm  # * np.exp(-1j * E * t)
+            mode_WF = c * R_nl * Y_lm  # * np.exp(-1j * E * t)
+            WF_total += mode_WF
+            mode_angular_frequency = (
+                (self.m_a * const.c**2 + eigenE_expect) / const.hbar
+            ).to(
+                1 / unit.s,
+                equivalencies=unit.dimensionless_angles(),
+            )
+            angular_frequency_WF_total += mode_angular_frequency * mode_WF
 
         # radial derivative ∂Ψ/∂r
         dphi_dr = np.gradient(WF_total, dr, axis=0)
@@ -499,7 +511,6 @@ class GravBoundAxionHalo:
             beta = (speed / const.c).to_value(unit.one)
             if beta >= 1.0:
                 raise ValueError(logPrefix + " relative_velocity must be below c.")
-            gamma = 1.0 / np.sqrt(1.0 - beta**2)
 
             # here Theta_grid and Phi_grid are grid of the space
             theta_values = Theta_grid.to_value(unit.rad)
@@ -532,8 +543,9 @@ class GravBoundAxionHalo:
                 / unit.s
             )
 
-            # Convert angular components to the radial-gradient unit before
-            # combining them; radians are dimensionless here.
+            # First order in v/c: the (gamma - 1) spatial correction is
+            # O(v^2/c^2) and is omitted. The time-derivative term remains
+            # because omega_n contains the rapid ALP Compton oscillation.
             grad_unit = grad_r.unit
             grad_theta_compatible = grad_theta.to(
                 grad_unit, equivalencies=unit.dimensionless_angles()
@@ -541,39 +553,15 @@ class GravBoundAxionHalo:
             grad_phi_compatible = grad_phi.to(
                 grad_unit, equivalencies=unit.dimensionless_angles()
             )
-            velocity_dot_gradient = (
-                velocity_r * grad_r
-                + velocity_theta * grad_theta_compatible
-                + velocity_phi * grad_phi_compatible
-            )
+            boost_scale = -1j * angular_frequency_WF_total / const.c**2
 
-            # Exact spatial part of the Lorentz transformation. The
-            # (gamma - 1) term is negligible for terrestrial speeds but is
-            # inexpensive and keeps the transformation explicit.
-            if speed.to_value(unit.m / unit.s) > 0.0:
-                # correction_scale is approximately (v/c)² for non-relativistic speeds (v/c << 1)
-                correction_scale = (gamma - 1.0) * velocity_dot_gradient / speed**2
-            else:
-                correction_scale = 0.0 * velocity_dot_gradient / (unit.m / unit.s) ** 2
-
-            omega_a = 2.0 * np.pi * self.nu_a
-            boost_scale = -1j * gamma * omega_a / const.c**2 * WF_total
-
-            grad_r = grad_r + correction_scale * velocity_r + boost_scale * velocity_r
-            grad_theta = (
-                grad_theta_compatible
-                + correction_scale * velocity_theta
-                + boost_scale * velocity_theta
-            )
-            grad_phi = (
-                grad_phi_compatible
-                + correction_scale * velocity_phi
-                + boost_scale * velocity_phi
-            )
+            grad_r = grad_r + boost_scale * velocity_r
+            grad_theta = grad_theta_compatible + boost_scale * velocity_theta
+            grad_phi = grad_phi_compatible + boost_scale * velocity_phi
 
             if verbose:
                 print(logPrefix, "relative velocity =", velocity)
-                print(logPrefix, "Lorentz gamma =", gamma)
+                print(logPrefix, "v/c = beta =", beta)
 
         if verbose:
             print(
@@ -724,7 +712,7 @@ class GravBoundAxionHalo:
 
         # for name, state in list(self.states.items())[:1]:
         for name in stateNames:
-            # print(name, state["E_eV"], "eV")
+            # print(name, state["eigenE_expect"], "eV")
             state = self.states[name]
             axion_ax.plot(
                 r,
@@ -917,10 +905,12 @@ class GravBoundAxionHalo:
         relative_velocity: Quantity | None = None,
         verbose: bool = False,
     ) -> dict:
-        """Axion-nucleon coupling frequency (Omega_a) evaluated over a list of epochs.
+        """Real axion-induced Rabi frequency over a list of epochs.
 
-        Calls :meth:`findGradientsOverTime` and computes Omega_a = g_aNN * gradient
-        (with gradient in units of m^-1, ignoring radian units).
+        Calls :meth:`findGradientsOverTime` and converts each complex
+        wavefunction gradient to its real field-gradient quadrature,
+        ``Omega_a = factor * real(gradient)``. Radian units are treated as
+        dimensionless during conversion.
 
         Parameters
         ----------
@@ -967,17 +957,16 @@ class GravBoundAxionHalo:
         grad_theta = gradients["grad_theta"]
         grad_phi = gradients["grad_phi"]
 
-        # Omega_a is the amplitude of the complex gradient phasor. Taking
-        # abs() retains both the intrinsic (real) and boost-induced
-        # (quadrature) components.
+        # The physical axion field and its gradient are real. Keep the real
+        # quadrature of the numerical complex wavefunction gradient.
         factor = (
             const.c
             * g_aNN
             * np.sqrt(self.N_a * const.hbar**3 * const.c / (2 * self.m_a))
         )
-        Omega_a_r = factor * (grad_r)
-        Omega_a_theta = factor * (grad_theta)
-        Omega_a_phi = factor * (grad_phi)
+        Omega_a_r = factor * grad_r.real
+        Omega_a_theta = factor * grad_theta.real
+        Omega_a_phi = factor * grad_phi.real
 
         return {
             "times": gradients["times"],
@@ -1603,10 +1592,10 @@ class GravBoundAxionHalo:
             l_val = eigenstate["n_r_l"][1]
             principal_n = n_r + l_val + 1
             name = eigenstate["name"]
-            T_eV = eigenstate["T_eV"]
-            v_m_s_mean = c_m_s * np.sqrt(2 * T_eV / mass_eV_c2)
+            T_expect = eigenstate["T_expect"]
+            v_m_s_mean = c_m_s * np.sqrt(2 * T_expect / mass_eV_c2)
             # print(
-            #     f"{n_r:<6} {l_val:<4} {principal_n:<14} {name:<6} {eigenstate['eigenE']:1.3e} {T_eV:15.3e} {v_m_s_mean:15.3e}"
+            #     f"{n_r:<6} {l_val:<4} {principal_n:<14} {name:<6} {eigenstate['eigenE']:1.3e} {T_expect:15.3e} {v_m_s_mean:15.3e}"
             # )
             ax = fig.add_subplot(gs[numStates - i - 1, 0])
             ax.plot(
@@ -1907,8 +1896,8 @@ class GravBoundAxionHalo:
             l_val = eigenstate["n_r_l"][1]
             principal_n = n_r + l_val + 1
             name = eigenstate["name"]
-            T_eV = eigenstate["T_eV"]
-            v_m_s_mean = c_m_s * np.sqrt(2 * T_eV / mass_eV_c2)
+            T_expect = eigenstate["T_expect"]
+            v_m_s_mean = c_m_s * np.sqrt(2 * T_expect / mass_eV_c2)
             print(
-                f"{n_r:<6} {l_val:<4} {principal_n:<14} {name:<6} {eigenstate['eigenE']:1.3e} {T_eV:15.3e} {v_m_s_mean:15.3e}"
+                f"{n_r:<6} {l_val:<4} {principal_n:<14} {name:<6} {eigenstate['eigenE']:1.3e} {T_expect:15.3e} {v_m_s_mean:15.3e}"
             )
