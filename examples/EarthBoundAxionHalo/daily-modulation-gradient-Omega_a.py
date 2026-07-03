@@ -93,10 +93,10 @@ for gradient_ax, Omega_ax, component in zip(
     gradient_no_boost = gradient_result_no_boost[gradient_key]
     gradient_with_boost = gradient_result_with_boost[gradient_key]
     Omega_no_boost = (
-        Omega_factor * gradient_no_boost.real
+        Omega_factor * np.abs(gradient_no_boost)
     ).to(unit.mHz, equivalencies=unit.dimensionless_angles())
     Omega_with_boost = (
-        Omega_factor * gradient_with_boost.real
+        Omega_factor * np.abs(gradient_with_boost)
     ).to(unit.mHz, equivalencies=unit.dimensionless_angles())
 
     gradient_ax.plot(
@@ -112,6 +112,7 @@ for gradient_ax, Omega_ax, component in zip(
         color="tab:blue",
         linestyle="--",
         label="Without Lorentz boost",
+        zorder=3,
     )
     Omega_ax.plot(
         t_hours,
@@ -119,6 +120,7 @@ for gradient_ax, Omega_ax, component in zip(
         color="tab:green",
         linestyle="-",
         label="With Lorentz boost",
+        zorder=2,
     )
 
     gradient_unit = gradient_no_boost.unit.to_string("latex_inline")[1:-1]
@@ -128,7 +130,7 @@ for gradient_ax, Omega_ax, component in zip(
         color="black",
         # rotation=0,
         loc="center",
-        labelpad=22,
+        labelpad=10,
     )
     Omega_ax.set_ylabel(
         f"${Omega_label}\\, \\left(\\mathrm{{mHz}}\\right)$",
@@ -137,8 +139,8 @@ for gradient_ax, Omega_ax, component in zip(
     gradient_ax.tick_params(axis="y", colors="black")
     Omega_ax.tick_params(axis="y", colors="black")
 
-gradient_axes[0].set_title("Spatial wavefunction gradient")
-Omega_axes[0].set_title("$\\Omega_a$")
+# gradient_axes[0].set_title("Spatial wavefunction gradient")
+# Omega_axes[0].set_title("$\\Omega_a$")
 Omega_axes[0].legend(
     loc="lower center",
     bbox_to_anchor=(0.5, 1.16),
@@ -164,19 +166,12 @@ for ax in gradient_axes:
 for ax in gradient_axes:
     ax.set_ylim(-gradient_ylim_abs, gradient_ylim_abs)
 
-Omega_ylim_abs = 0
-for ax in Omega_axes:
-    ylim_bottom, ylim_top = ax.get_ylim()
-    Omega_ylim_abs = np.amax(np.abs([Omega_ylim_abs, ylim_bottom, ylim_top]))
-for ax in Omega_axes:
-    ax.set_ylim(-Omega_ylim_abs, Omega_ylim_abs)
+# Omega_ylim_abs = 0
+# for ax in Omega_axes:
+#     ylim_bottom, ylim_top = ax.get_ylim()
+#     Omega_ylim_abs = np.amax(np.abs([Omega_ylim_abs, ylim_bottom, ylim_top]))
+# for ax in Omega_axes:
+#     ax.set_ylim(top=Omega_ylim_abs)
 
-fig.subplots_adjust(
-    left=0.12,
-    bottom=0.15,
-    right=0.97,
-    top=0.82,
-    hspace=0.12,
-    wspace=0.32,
-)
+fig.tight_layout()
 plt.show()

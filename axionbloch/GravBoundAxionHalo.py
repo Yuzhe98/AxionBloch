@@ -507,9 +507,9 @@ class GravBoundAxionHalo:
                 )
 
             velocity = relative_velocity.to(unit.m / unit.s)
-            speed = np.sqrt(np.sum(velocity**2))
-            beta = (speed / const.c).to_value(unit.one)
-            if beta >= 1.0:
+            speed = np.linalg.norm(velocity)
+            beta = (speed / const.c).to(unit.one)
+            if beta >= 1 * unit.one:
                 raise ValueError(logPrefix + " relative_velocity must be below c.")
 
             # here Theta_grid and Phi_grid are grid of the space
@@ -518,46 +518,29 @@ class GravBoundAxionHalo:
             sin_theta, cos_theta = np.sin(theta_values), np.cos(theta_values)
             sin_phi, cos_phi = np.sin(phi_values), np.cos(phi_values)
 
-            velocity_values = velocity.to_value(unit.m / unit.s)
             velocity_r = (
-                (
-                    velocity_values[0] * sin_theta * cos_phi
-                    + velocity_values[1] * sin_theta * sin_phi
-                    + velocity_values[2] * cos_theta
-                )
-                * unit.m
-                / unit.s
+                velocity[0] * sin_theta * cos_phi
+                + velocity[1] * sin_theta * sin_phi
+                + velocity[2] * cos_theta
             )
             velocity_theta = (
-                (
-                    velocity_values[0] * cos_theta * cos_phi
-                    + velocity_values[1] * cos_theta * sin_phi
-                    - velocity_values[2] * sin_theta
-                )
-                * unit.m
-                / unit.s
+                velocity[0] * cos_theta * cos_phi
+                + velocity[1] * cos_theta * sin_phi
+                - velocity[2] * sin_theta
             )
             velocity_phi = (
-                (-velocity_values[0] * sin_phi + velocity_values[1] * cos_phi)
-                * unit.m
-                / unit.s
+                -velocity[0] * sin_phi + velocity[1] * cos_phi
             )
 
             # First order in v/c: the (gamma - 1) spatial correction is
             # O(v^2/c^2) and is omitted. The time-derivative term remains
             # because omega_n contains the rapid ALP Compton oscillation.
-            grad_unit = grad_r.unit
-            grad_theta_compatible = grad_theta.to(
-                grad_unit, equivalencies=unit.dimensionless_angles()
-            )
-            grad_phi_compatible = grad_phi.to(
-                grad_unit, equivalencies=unit.dimensionless_angles()
-            )
             boost_scale = -1j * angular_frequency_WF_total / const.c**2
 
-            grad_r = grad_r + boost_scale * velocity_r
-            grad_theta = grad_theta_compatible + boost_scale * velocity_theta
-            grad_phi = grad_phi_compatible + boost_scale * velocity_phi
+            with unit.add_enabled_equivalencies(unit.dimensionless_angles()):
+                grad_r = grad_r + boost_scale * velocity_r
+                grad_theta = grad_theta + boost_scale * velocity_theta
+                grad_phi = grad_phi + boost_scale * velocity_phi
 
             if verbose:
                 print(logPrefix, "relative velocity =", velocity)
@@ -905,11 +888,11 @@ class GravBoundAxionHalo:
         relative_velocity: Quantity | None = None,
         verbose: bool = False,
     ) -> dict:
-        """Real axion-induced Rabi frequency over a list of epochs.
+        """Axion-induced Rabi-frequency amplitude over a list of epochs.
 
         Calls :meth:`findGradientsOverTime` and converts each complex
-        wavefunction gradient to its real field-gradient quadrature,
-        ``Omega_a = factor * real(gradient)``. Radian units are treated as
+        wavefunction-gradient phasor to its real oscillation amplitude,
+        ``Omega_a = factor * abs(gradient)``. Radian units are treated as
         dimensionless during conversion.
 
         Parameters
@@ -957,16 +940,17 @@ class GravBoundAxionHalo:
         grad_theta = gradients["grad_theta"]
         grad_phi = gradients["grad_phi"]
 
-        # The physical axion field and its gradient are real. Keep the real
-        # quadrature of the numerical complex wavefunction gradient.
+        # The physical axion field gradient is the real oscillation generated
+        # by this complex phasor. Its peak amplitude is the phasor magnitude,
+        # retaining both cosine and sine quadratures.
         factor = (
             const.c
             * g_aNN
             * np.sqrt(self.N_a * const.hbar**3 * const.c / (2 * self.m_a))
         )
-        Omega_a_r = factor * grad_r.real
-        Omega_a_theta = factor * grad_theta.real
-        Omega_a_phi = factor * grad_phi.real
+        Omega_a_r = factor * np.abs(grad_r)
+        Omega_a_theta = factor * np.abs(grad_theta)
+        Omega_a_phi = factor * np.abs(grad_phi)
 
         return {
             "times": gradients["times"],
