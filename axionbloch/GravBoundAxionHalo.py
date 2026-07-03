@@ -13,6 +13,7 @@ import time
 from scipy.interpolate import RegularGridInterpolator
 from scipy.linalg import eigh
 from scipy.sparse import diags
+
 # for wavefunction construction
 from scipy.special import sph_harm_y
 
@@ -479,24 +480,21 @@ class GravBoundAxionHalo:
                 # vx, vy, vz in solar-Z frame. z axis points along the Earth-Sun line
                 # x follows Earth heliocentric velocity, orthogonalized against ẑ
                 # ŷ = ẑ × x̂
-                relative_velocity = station.rotation_velocity_in_solarZ_frame(
-                    meas_time
-                )
+                relative_velocity = station.rotation_velocity_in_solarZ_frame(meas_time)
             if not isinstance(relative_velocity, Quantity):
                 raise TypeError(
                     logPrefix
                     + " relative_velocity must be an astropy Quantity with velocity units."
                 )
-            if (
-                relative_velocity.shape != (3,)
-                or not relative_velocity.unit.is_equivalent(unit.m / unit.s)
-            ):
+            if relative_velocity.shape != (
+                3,
+            ) or not relative_velocity.unit.is_equivalent(unit.m / unit.s):
                 raise ValueError(
                     logPrefix
                     + " relative_velocity must have shape (3,) and velocity units."
                 )
 
-            velocity = relative_velocity
+            velocity = relative_velocity.to(unit.m / unit.s)
             speed = np.sqrt(np.sum(velocity**2))
             beta = (speed / const.c).to_value(unit.one)
             if beta >= 1.0:
@@ -511,18 +509,28 @@ class GravBoundAxionHalo:
 
             velocity_values = velocity.to_value(unit.m / unit.s)
             velocity_r = (
-                velocity_values[0] * sin_theta * cos_phi
-                + velocity_values[1] * sin_theta * sin_phi
-                + velocity_values[2] * cos_theta
-            ) * unit.m / unit.s
+                (
+                    velocity_values[0] * sin_theta * cos_phi
+                    + velocity_values[1] * sin_theta * sin_phi
+                    + velocity_values[2] * cos_theta
+                )
+                * unit.m
+                / unit.s
+            )
             velocity_theta = (
-                velocity_values[0] * cos_theta * cos_phi
-                + velocity_values[1] * cos_theta * sin_phi
-                - velocity_values[2] * sin_theta
-            ) * unit.m / unit.s
+                (
+                    velocity_values[0] * cos_theta * cos_phi
+                    + velocity_values[1] * cos_theta * sin_phi
+                    - velocity_values[2] * sin_theta
+                )
+                * unit.m
+                / unit.s
+            )
             velocity_phi = (
-                -velocity_values[0] * sin_phi + velocity_values[1] * cos_phi
-            ) * unit.m / unit.s
+                (-velocity_values[0] * sin_phi + velocity_values[1] * cos_phi)
+                * unit.m
+                / unit.s
+            )
 
             # Convert angular components to the radial-gradient unit before
             # combining them; radians are dimensionless here.
@@ -543,18 +551,15 @@ class GravBoundAxionHalo:
             # (gamma - 1) term is negligible for terrestrial speeds but is
             # inexpensive and keeps the transformation explicit.
             if speed.to_value(unit.m / unit.s) > 0.0:
+                # correction_scale is approximately (v/c)² for non-relativistic speeds (v/c << 1)
                 correction_scale = (gamma - 1.0) * velocity_dot_gradient / speed**2
             else:
-                correction_scale = (
-                    0.0 * velocity_dot_gradient / (unit.m / unit.s) ** 2
-                )
+                correction_scale = 0.0 * velocity_dot_gradient / (unit.m / unit.s) ** 2
 
             omega_a = 2.0 * np.pi * self.nu_a
             boost_scale = -1j * gamma * omega_a / const.c**2 * WF_total
 
-            grad_r = (
-                grad_r + correction_scale * velocity_r + boost_scale * velocity_r
-            )
+            grad_r = grad_r + correction_scale * velocity_r + boost_scale * velocity_r
             grad_theta = (
                 grad_theta_compatible
                 + correction_scale * velocity_theta
@@ -827,7 +832,7 @@ class GravBoundAxionHalo:
         self,
         stateNames: list[str],
         station: Station,
-        meas_times:list[Time],
+        meas_times: list[Time],
         truncRadius: Quantity | None = None,
         include_lorentz_boost: bool = True,
         relative_velocity: Quantity | None = None,
@@ -907,7 +912,7 @@ class GravBoundAxionHalo:
         station: Station,
         meas_times,
         truncRadius: Quantity | None = None,
-        g_aNN:Quantity[unit.GeV**(-1)]=1e-9 * unit.GeV**(-1),
+        g_aNN: Quantity[unit.GeV ** (-1)] = 1e-9 * unit.GeV ** (-1),
         include_lorentz_boost: bool = True,
         relative_velocity: Quantity | None = None,
         verbose: bool = False,
@@ -943,7 +948,8 @@ class GravBoundAxionHalo:
 
         if g_aNN is None:
             raise ValueError(
-                logPrefix + " g_aNN is not set. Please provide g_aNN in the method input."
+                logPrefix
+                + " g_aNN is not set. Please provide g_aNN in the method input."
             )
 
         gradients = self.findGradientsOverTime(
@@ -964,16 +970,26 @@ class GravBoundAxionHalo:
         # Omega_a is the amplitude of the complex gradient phasor. Taking
         # abs() retains both the intrinsic (real) and boost-induced
         # (quadrature) components.
-        factor = const.c * g_aNN * np.sqrt(self.N_a * const.hbar **3 * const.c / (2 * self.m_a))
-        Omega_a_r = factor * np.abs(grad_r)
-        Omega_a_theta = factor * np.abs(grad_theta)
-        Omega_a_phi = factor * np.abs(grad_phi)
+        factor = (
+            const.c
+            * g_aNN
+            * np.sqrt(self.N_a * const.hbar**3 * const.c / (2 * self.m_a))
+        )
+        Omega_a_r = factor * (grad_r)
+        Omega_a_theta = factor * (grad_theta)
+        Omega_a_phi = factor * (grad_phi)
 
         return {
             "times": gradients["times"],
-            "Omega_a_r": Omega_a_r.to(unit.Hz, equivalencies=unit.dimensionless_angles()),
-            "Omega_a_theta": Omega_a_theta.to(unit.Hz, equivalencies=unit.dimensionless_angles()),
-            "Omega_a_phi": Omega_a_phi.to(unit.Hz, equivalencies=unit.dimensionless_angles()),
+            "Omega_a_r": Omega_a_r.to(
+                unit.Hz, equivalencies=unit.dimensionless_angles()
+            ),
+            "Omega_a_theta": Omega_a_theta.to(
+                unit.Hz, equivalencies=unit.dimensionless_angles()
+            ),
+            "Omega_a_phi": Omega_a_phi.to(
+                unit.Hz, equivalencies=unit.dimensionless_angles()
+            ),
         }
 
     def findrmsOmega_aOverTime(
@@ -982,7 +998,7 @@ class GravBoundAxionHalo:
         station: Station,
         meas_times,
         truncRadius: Quantity | None = None,
-        g_aNN: Quantity[unit.GeV**(-1)] = 1e-9 * unit.GeV**(-1),
+        g_aNN: Quantity[unit.GeV ** (-1)] = 1e-9 * unit.GeV ** (-1),
         include_lorentz_boost: bool = True,
         relative_velocity: Quantity | None = None,
         verbose: bool = False,
@@ -1015,7 +1031,9 @@ class GravBoundAxionHalo:
         * ``'rms_Omega_a_theta'`` — RMS of Omega_a from theta gradient
         * ``'rms_Omega_a_phi'``   — RMS of Omega_a from phi gradient
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.findrmsOmega_aOverTime.__name__}]"
+        logPrefix = (
+            f"[{self.__class__.__name__}.{self.findrmsOmega_aOverTime.__name__}]"
+        )
 
         Omega_results = self.findOmega_aOverTime(
             stateNames=stateNames,
@@ -1289,7 +1307,7 @@ class GravBoundAxionHalo:
                 zorder=3,
             )
             ax.set_xticks(x_positions)
-            if i== len(axes) - 1:
+            if i == len(axes) - 1:
                 ax.set_xticklabels(state_labels, rotation=15, ha="right")
             else:
                 ax.set_xticklabels([])
@@ -1322,7 +1340,9 @@ class GravBoundAxionHalo:
 
         _station = station.name if station is not None else ""
         _time = meas_time.iso if meas_time is not None else ""
-        r_unit = r_eval.unit.to_string("latex_inline")[1:-1] if r_eval is not None else ""
+        r_unit = (
+            r_eval.unit.to_string("latex_inline")[1:-1] if r_eval is not None else ""
+        )
         r_value = r_eval.value if r_eval is not None else ""
         r_str = f"${r_value:g}\\,{r_unit}$" if r_eval is not None else "unknown"
         fig.suptitle(f"Gradient Comparison at {_station} (r = {r_str})\n{_time}")
@@ -1404,25 +1424,26 @@ class GravBoundAxionHalo:
                 linestyle="-",
             )
 
-        grad_phi_ax.set_xlabel(
-            f"$r\\,({r_line.unit.to_string('latex_inline')[1:-1]})$"
-        )
+        grad_phi_ax.set_xlabel(f"$r\\,({r_line.unit.to_string('latex_inline')[1:-1]})$")
 
         ylabels = [
             "$\\partial_r\\phi$\n"
             + "$\\left("
-            + results["grad_r"][list(stateNamesDict.keys())[0]]
-            .unit.to_string("latex_inline")[1:-1]
+            + results["grad_r"][list(stateNamesDict.keys())[0]].unit.to_string(
+                "latex_inline"
+            )[1:-1]
             + "\\right)$",
             "$\\frac{1}{r}\\partial_\\theta \\phi$\n"
             + "$\\left("
-            + results["grad_theta"][list(stateNamesDict.keys())[0]]
-            .unit.to_string("latex_inline")[1:-1]
+            + results["grad_theta"][list(stateNamesDict.keys())[0]].unit.to_string(
+                "latex_inline"
+            )[1:-1]
             + "\\right)$",
             "$\\frac{1}{r\\sin\\theta}\\partial_\\varphi\\phi$\n"
             + "$\\left("
-            + results["grad_phi"][list(stateNamesDict.keys())[0]]
-            .unit.to_string("latex_inline")[1:-1]
+            + results["grad_phi"][list(stateNamesDict.keys())[0]].unit.to_string(
+                "latex_inline"
+            )[1:-1]
             + "\\right)$",
         ]
 
