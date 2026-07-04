@@ -52,7 +52,7 @@ for stateName in states_to_check:
     for station in stations:
         r, R_r, r_line, grad_r_line, grad_theta_line, grad_phi_line = (
             halo.findGradientsAtDirection(
-                stateNames=[stateName],
+                stateCoefficients={stateName: 1.0},
                 station=station,
                 truncRadius=2 * unit.earthRad,
                 showPlot=False,

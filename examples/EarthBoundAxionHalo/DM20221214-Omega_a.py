@@ -58,7 +58,7 @@ meas_starts = t0 + t_hours  # every 1 hour
 
 for meas_start in meas_starts:
     rms = halo.findrmsOmega_aOverTime(
-        stateNames=states_to_check,
+        stateCoefficients={name: 1.0 for name in states_to_check},
         station=Mainz,
         meas_times=meas_start + np.linspace(0, 60, 12) * unit.minute,
         truncRadius=3 * unit.R_earth,

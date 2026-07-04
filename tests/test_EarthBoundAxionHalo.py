@@ -78,8 +78,8 @@ def test_findGradientsOverStates_returns_correct_structure():
     )
 
     state_combinations = {
-        "2p": ["2p"],
-        "2p + 3p": ["2p", "3p"],
+        "2p": {"2p": 1.0},
+        "2p + 3p": {"2p": 1.0, "3p": 1.0},
     }
 
     results = halo.findGradientsOverStates(

@@ -29,10 +29,10 @@ halo.solve_TISE_3D(
 
 # Define state combinations to compare
 state_combinations = {
-    "2p": ["2p"],
-    "2p + 3p": ["2p", "3p"],
-    "2p + 3p + 3d": ["2p", "3p", "3d"],
-    "all p-states": ["2p", "3p", "4p"],
+    "2p": {"2p": 1.0},
+    "2p + 3p": {"2p": 1.0, "3p": 1.0},
+    "2p + 3p + 3d": {"2p": 1.0, "3p": 1.0, "3d": 1.0},
+    "all p-states": {"2p": 1.0, "3p": 1.0, "4p": 1.0},
 }
 
 # Compare gradients across state combinations at station location

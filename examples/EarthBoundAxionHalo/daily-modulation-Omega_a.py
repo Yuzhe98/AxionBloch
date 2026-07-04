@@ -62,7 +62,7 @@ highlight_period = [
 ]
 
 rms = halo.findrmsOmega_aOverTime(
-    stateNames=states_to_check,
+    stateCoefficients={name: 1.0 for name in states_to_check},
     station=Mainz,
     meas_times=meas_times[0:2],
     truncRadius=3 * unit.R_earth,
@@ -72,7 +72,7 @@ rms = halo.findrmsOmega_aOverTime(
 print("rms =", rms)
 
 result = halo.findOmega_aOverTime(
-    stateNames=states_to_check,
+    stateCoefficients={name: 1.0 for name in states_to_check},
     station=Mainz,
     meas_times=meas_times,
     truncRadius=3 * unit.R_earth,

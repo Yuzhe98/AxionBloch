@@ -57,7 +57,7 @@ t_hours = np.linspace(0, 72, 72) * unit.hour
 meas_times = t0 + t_hours  # every 1 hour
 
 result = halo.findGradientsOverTime(
-    stateNames=states_to_check,
+    stateCoefficients={name: 1.0 for name in states_to_check},
     station=Mainz,
     meas_times=meas_times,
     truncRadius=5 * unit.R_earth,

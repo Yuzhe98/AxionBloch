@@ -31,7 +31,7 @@ halo.solve_TISE_3D(
 
 r, R_r, r_line, grad_r_line, grad_theta_line, grad_phi_line = (
     halo.findGradientsAtDirection(
-        stateNames=["2p"],
+        stateCoefficients={"2p": 1.0},
         station=station,
         meas_time=meas_time,
         truncRadius=2 * unit.earthRad,
@@ -40,7 +40,6 @@ r, R_r, r_line, grad_r_line, grad_theta_line, grad_phi_line = (
     )
 )
 halo.plotGradients(
-    stateNames=["2p"],
     station=station,
     r=r,
     R_r=R_r,
@@ -54,18 +53,27 @@ logPrefix = os.path.abspath(__file__)
 
 earthRad_idx = np.argmin(np.abs(r_line - 1 * unit.earthRad))
 print(logPrefix, "r_line index @ station =", earthRad_idx)
+
+
+def _field_gradient_in_eV_per_m(gradient):
+    return (halo.a_0_reduced * gradient).to(
+        unit.eV / unit.m,
+        equivalencies=unit.dimensionless_angles(),
+    )
+
+
 print(
     logPrefix,
     "a_0_reduced * grad_r @ station =",
-    (halo.a_0_reduced * grad_r_line[earthRad_idx]).to(unit.eV / unit.m),
+    _field_gradient_in_eV_per_m(grad_r_line[earthRad_idx]),
 )
 print(
     logPrefix,
     "a_0_reduced * grad_theta @ station =",
-    (halo.a_0_reduced * grad_theta_line[earthRad_idx]).to(unit.eV / unit.m),
+    _field_gradient_in_eV_per_m(grad_theta_line[earthRad_idx]),
 )
 print(
     logPrefix,
     "a_0_reduced * grad_phi @ station =",
-    (halo.a_0_reduced * grad_phi_line[earthRad_idx]).to(unit.eV / unit.m),
+    _field_gradient_in_eV_per_m(grad_phi_line[earthRad_idx]),
 )

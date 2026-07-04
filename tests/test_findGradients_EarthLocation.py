@@ -7,6 +7,7 @@ Run with::
 
 import numpy as np
 import pytest
+from astropy import constants as const
 from astropy import units as unit
 from astropy.coordinates import EarthLocation
 from astropy.time import Time
@@ -110,7 +111,10 @@ def solved_halo():
 def test_findGradients_raises_without_location(solved_halo):
     """findGradients raises ValueError when no station is given."""
     with pytest.raises(ValueError):
-        solved_halo.findGradients(stateNames=["2p"], showPlot=False)
+        solved_halo.findGradients(
+            stateCoefficients={"2p": 1.0},
+            showPlot=False,
+        )
 
 
 def test_findGradients_resolves_default_measurement_time(monkeypatch):
@@ -128,7 +132,11 @@ def test_findGradients_resolves_default_measurement_time(monkeypatch):
         halo, "findGradientsAtDirection", fake_find_gradients_at_direction
     )
     before = Time.now()
-    halo.findGradients(stateNames=["2p"], station=Mainz, meas_time=None)
+    halo.findGradients(
+        stateCoefficients={"2p": 1.0},
+        station=Mainz,
+        meas_time=None,
+    )
     after = Time.now()
 
     assert isinstance(captured["meas_time"], Time)
@@ -138,7 +146,7 @@ def test_findGradients_resolves_default_measurement_time(monkeypatch):
 def test_lorentz_boost_zero_velocity_matches_intrinsic_gradient(solved_halo):
     """An explicit zero relative velocity leaves the gradient unchanged."""
     kwargs = {
-        "stateNames": ["2p"],
+        "stateCoefficients": {"2p": 1.0},
         "station": Mainz,
         "meas_time": Time("2022-12-14T12:00:00"),
         "truncRadius": 2 * unit.R_earth,
@@ -172,7 +180,7 @@ def test_lorentz_boost_zero_velocity_matches_intrinsic_gradient(solved_halo):
 def test_lorentz_boost_scales_linearly_with_relative_velocity(solved_halo):
     """At terrestrial speeds, the boost contribution is linear in v_rel."""
     kwargs = {
-        "stateNames": ["2p"],
+        "stateCoefficients": {"2p": 1.0},
         "station": Mainz,
         "meas_time": Time("2022-12-14T12:00:00"),
         "truncRadius": 2 * unit.R_earth,
@@ -215,3 +223,124 @@ def test_lorentz_boost_scales_linearly_with_relative_velocity(solved_halo):
         )
 
     assert nonzero_boost_found
+
+
+def test_gradient_superposition_uses_complex_state_coefficients(solved_halo):
+    """The total wavefunction and gradient are linear in the supplied c_nlm."""
+    kwargs = {
+        "station": Mainz,
+        "meas_time": Time("2022-12-14T12:00:00"),
+        "truncRadius": 2 * unit.R_earth,
+        "include_lorentz_boost": True,
+        "showPlot": False,
+    }
+    coefficient_2p = 0.4 + 0.2j
+    coefficient_3p = -0.7j
+    coefficient_norm = np.sqrt(
+        np.abs(coefficient_2p) ** 2 + np.abs(coefficient_3p) ** 2
+    )
+
+    result_2p = solved_halo.findGradients(
+        **kwargs,
+        stateCoefficients={"2p": 1.0},
+    )
+    result_3p = solved_halo.findGradients(
+        **kwargs,
+        stateCoefficients={"3p": 1.0},
+    )
+    result_combined = solved_halo.findGradients(
+        **kwargs,
+        stateCoefficients={
+            "2p": coefficient_2p,
+            "3p": coefficient_3p,
+        },
+    )
+
+    for result_index in (1, 3, 4, 5):
+        expected = (
+            coefficient_2p * result_2p[result_index]
+            + coefficient_3p * result_3p[result_index]
+        ) / coefficient_norm
+        actual = result_combined[result_index].to(
+            expected.unit,
+            equivalencies=unit.dimensionless_angles(),
+        )
+        assert np.allclose(actual.value, expected.value, rtol=2e-10, atol=1e-18)
+
+
+def test_Omega_a_uses_magnitude_of_combined_gradient(solved_halo):
+    """Omega_a is derived after coherently summing the selected states."""
+    meas_times = Time(["2022-12-14T12:00:00"])
+    coefficients = {"2p": 0.4 + 0.2j, "3p": -0.7j}
+    gradient_result = solved_halo.findGradientsOverTime(
+        stateCoefficients=coefficients,
+        station=Mainz,
+        meas_times=meas_times,
+        truncRadius=2 * unit.R_earth,
+        include_lorentz_boost=True,
+    )
+    Omega_result = solved_halo.findOmega_aOverTime(
+        stateCoefficients=coefficients,
+        station=Mainz,
+        meas_times=meas_times,
+        truncRadius=2 * unit.R_earth,
+        include_lorentz_boost=True,
+    )
+    factor = (
+        const.c
+        * (1e-9 * unit.GeV**-1)
+        * np.sqrt(
+            solved_halo.N_a
+            * const.hbar**3
+            * const.c
+            / (2 * solved_halo.m_a)
+        )
+    )
+
+    for gradient_key, Omega_key in (
+        ("grad_r", "Omega_a_r"),
+        ("grad_theta", "Omega_a_theta"),
+        ("grad_phi", "Omega_a_phi"),
+    ):
+        expected = (factor * np.abs(gradient_result[gradient_key])).to(
+            unit.Hz,
+            equivalencies=unit.dimensionless_angles(),
+        )
+        assert np.allclose(
+            Omega_result[Omega_key].value,
+            expected.value,
+            rtol=2e-10,
+            atol=1e-18,
+        )
+
+
+def test_state_coefficients_are_normalized(solved_halo):
+    coefficients = solved_halo._resolveStateCoefficients(
+        stateCoefficients={"2p": 3.0, "3p": 4.0j},
+    )
+
+    assert np.isclose(sum(np.abs(c) ** 2 for c in coefficients.values()), 1.0)
+    assert coefficients["2p"] == pytest.approx(0.6)
+    assert coefficients["3p"] == pytest.approx(0.8j)
+
+
+@pytest.mark.parametrize(
+    ("state_coefficients", "error_type"),
+    [
+        (None, ValueError),
+        ({}, ValueError),
+        (["2p", 1.0], TypeError),
+        ({"not-a-state": 1.0}, KeyError),
+        ({"2p": np.inf}, ValueError),
+        ({"2p": 0.0, "3p": 0.0}, ValueError),
+    ],
+)
+def test_state_coefficient_validation(
+    solved_halo,
+    state_coefficients,
+    error_type,
+):
+    with pytest.raises(error_type):
+        solved_halo._resolveStateCoefficients(
+            stateCoefficients=state_coefficients,
+        )

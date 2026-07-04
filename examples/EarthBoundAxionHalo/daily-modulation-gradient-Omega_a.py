@@ -34,7 +34,7 @@ t_hours = np.linspace(0, 72, 72) * unit.hour
 meas_times = t0 + t_hours
 
 gradient_result_no_boost = halo.findGradientsOverTime(
-    stateNames=states_to_check,
+    stateCoefficients={name: 1.0 for name in states_to_check},
     station=Mainz,
     meas_times=meas_times,
     truncRadius=3 * unit.R_earth,
@@ -43,7 +43,7 @@ gradient_result_no_boost = halo.findGradientsOverTime(
 )
 
 gradient_result_with_boost = halo.findGradientsOverTime(
-    stateNames=states_to_check,
+    stateCoefficients={name: 1.0 for name in states_to_check},
     station=Mainz,
     meas_times=meas_times,
     truncRadius=3 * unit.R_earth,
