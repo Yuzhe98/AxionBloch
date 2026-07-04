@@ -406,7 +406,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
     def findGradientsAtEarthSurface(
         self,
         station: Station,
-        stateNames: list[str] | None = None,
+        stateCoefficients: dict[str, complex],
         meas_time: Time | None = None,
         truncRadius: Quantity | None = 3 * unit.earthRad,
         include_lorentz_boost: bool = True,
@@ -424,9 +424,9 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         station : Station
             Geographic station whose latitude, longitude, and elevation define
             the direction.
-        stateNames : list of str, optional
-            Eigenstates to superimpose (e.g. ``['2p']``).  Defaults to the
-            lowest-energy solved state.
+        stateCoefficients : dict of str to complex
+            Mapping from eigenstate names to coefficients.
+            Coefficients are normalized automatically.
         meas_time : Time, optional
             Measurement epoch. Uses :meth:`astropy.time.Time.now` if omitted.
         truncRadius : Quantity, optional
@@ -444,7 +444,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         if meas_time is None:
             meas_time = Time.now()
         return self.findGradientsAtDirection(
-            stateNames=stateNames,
+            stateCoefficients=stateCoefficients,
             station=station,
             meas_time=meas_time,
             truncRadius=truncRadius,
@@ -456,7 +456,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
 
     def findGradients(
         self,
-        stateNames: list[str] | None = None,
+        stateCoefficients: dict[str, complex],
         station: Station | None = None,
         meas_time: Time | None = None,
         truncRadius: Quantity | None = 3 * unit.earthRad,
@@ -472,7 +472,9 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
 
         Parameters
         ----------
-        stateNames : list of str, optional
+        stateCoefficients : dict of str to complex
+            Mapping from eigenstate names to coefficients.
+            Coefficients are normalized automatically.
         station : Station, optional
         meas_time : Time, optional
             Measurement epoch. Uses :meth:`astropy.time.Time.now` if omitted.
@@ -491,7 +493,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         if meas_time is None:
             meas_time = Time.now()
         return self.findGradientsAtDirection(
-            stateNames=stateNames,
+            stateCoefficients=stateCoefficients,
             station=station,
             meas_time=meas_time,
             truncRadius=truncRadius,
@@ -504,7 +506,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
     def findGradientsWithMilkyWay(
         self,
         mw,
-        stateNames: list[str] | None = None,
+        stateCoefficients: dict[str, complex],
         truncRadius: Quantity | None = None,
         showPlot: bool = False,
         verbose: bool = False,
@@ -526,8 +528,9 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         ----------
         mw : :class:`~axionbloch.MilkyWay.MilkyWay`
             Must have :attr:`~axionbloch.MilkyWay.MilkyWay.station` set.
-        stateNames : list of str, optional
-            Eigenstates to include (e.g. ``['2p']``).
+        stateCoefficients : dict of str to complex
+            Mapping from eigenstate names to coefficients.
+            Coefficients are normalized automatically.
         truncRadius : Quantity, optional
             Radial cutoff.
         showPlot : bool
@@ -563,7 +566,9 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         >>> from axionbloch.Station import Baltimore
         >>> mw = MilkyWay(time=Time('2024-06-21T14:00:00'), station=Baltimore)
         >>> result = halo.findGradientsWithMilkyWay(
-        ...     mw, stateNames=['2p'], truncRadius=2 * unit.R_earth
+        ...     mw,
+        ...     stateCoefficients={"2p": 1},
+        ...     truncRadius=2 * unit.R_earth,
         ... )
         >>> print(result['wind_angle'].to('deg'))
         >>> print(result['grad_r_surface'])
@@ -577,7 +582,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
 
         # ---- Gradient in geographic spherical coordinates ----
         r, R_r, r_line, grad_r, grad_theta, grad_phi = self.findGradientsAtDirection(
-            stateNames=stateNames,
+            stateCoefficients=stateCoefficients,
             station=station,
             meas_time=mw.time,
             truncRadius=truncRadius,

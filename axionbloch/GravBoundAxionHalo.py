@@ -344,9 +344,55 @@ class GravBoundAxionHalo:
         logPrefix = f"[{self.__class__.__name__}.{self.getStateEnergies.__name__}]"
         return [state["eigenE"] for state in self.states.values()]
 
+    def _resolveStateCoefficients(
+        self,
+        stateCoefficients: dict[str, complex] | None,
+    ) -> dict[str, complex]:
+        """Validate and normalize an ordered eigenstate coefficient mapping."""
+        if not self.states:
+            raise RuntimeError(
+                "No eigenstates are available. Call solve_TISE_3D first."
+            )
+        if stateCoefficients is None:
+            raise ValueError("stateCoefficients must be provided.")
+        if not isinstance(stateCoefficients, dict):
+            raise TypeError("stateCoefficients must be a dictionary.")
+        if not stateCoefficients:
+            raise ValueError("stateCoefficients must not be empty.")
+
+        available_states = set(self.states)
+        missing_states = set(stateCoefficients) - available_states
+        if missing_states:
+            raise KeyError(
+                f"Unknown states {sorted(missing_states)}. "
+                f"Available states: {sorted(available_states)}"
+            )
+
+        resolved = {}
+        for name, coefficient in stateCoefficients.items():
+            if not np.isscalar(coefficient):
+                raise TypeError(f"Coefficient for {name!r} must be a scalar.")
+            try:
+                coefficient = complex(coefficient)
+            except (TypeError, ValueError) as exc:
+                raise TypeError(
+                    f"Coefficient for {name!r} must be a numeric scalar."
+                ) from exc
+            if not np.isfinite(coefficient):
+                raise ValueError(f"Coefficient for {name!r} must be finite.")
+            resolved[name] = coefficient
+
+        coefficient_norm = np.linalg.norm(list(resolved.values()))
+        if coefficient_norm == 0:
+            raise ValueError("At least one state coefficient must be nonzero.")
+        return {
+            name: coefficient / coefficient_norm
+            for name, coefficient in resolved.items()
+        }
+
     def findGradientsAtDirection(
         self,
-        stateNames: list[str],
+        stateCoefficients: dict[str, complex],
         station: Station | None = None,
         meas_time: Time | None = None,
         truncRadius: Quantity | None = None,
@@ -357,19 +403,22 @@ class GravBoundAxionHalo:
     ):
         """Compute and plot the 3-D gradient of the total wavefunction at a direction.
 
-        Superimposes the requested eigenstates (with equal weight), computes the
-        spherical-coordinate gradient (∂_r, ∂_θ/r, ∂_φ/(r sinθ)), interpolates
-        each component onto a radial line pointing toward the requested direction,
-        and plots all four quantities (wavefunction + three gradient components).
+        Superimposes the requested eigenstates with user-specified complex
+        coefficients, computes the spherical-coordinate gradient
+        (∂_r, ∂_θ/r, ∂_φ/(r sinθ)), interpolates each component onto a radial
+        line pointing toward the requested direction, and plots the total
+        wavefunction and its three gradient components.
 
         The direction should be specified by a :class:`~axionbloch.Station.Station`
         object.
 
         Parameters
         ----------
-        stateNames : list of str
-            Labels of eigenstates to include (e.g. ``['1s', '2p']``).
-            Defaults to the lowest-energy state.
+        stateCoefficients : dict of str to complex
+            Mapping from eigenstate labels to coefficients ``c_nlm``, for
+            example ``{"2p": 1, "3p": 1 + 1j}``. Coefficients are
+            automatically normalized so that
+            ``sum(abs(c_nlm)**2) = 1``.
         station : Station, optional
             Geographic station whose latitude, longitude, and elevation define
             the direction.
@@ -386,6 +435,18 @@ class GravBoundAxionHalo:
             from Earth's rotation, corresponding to a nonrotating
             geocentric halo. Pass an explicit zero vector for a corotating
             halo.
+        Examples
+        --------
+        A coherent superposition is specified by one dictionary:
+
+        >>> from astropy.time import Time
+        >>> from axionbloch.Station import Mainz
+        >>> result = halo.findGradientsAtDirection(
+        ...     stateCoefficients={"2p": 1, "3p": 1 + 1j},
+        ...     station=Mainz,
+        ...     meas_time=Time("2022-12-14T12:00:00"),
+        ...     showPlot=False,
+        ... )
         """
 
         logPrefix = (
@@ -425,6 +486,10 @@ class GravBoundAxionHalo:
         # update r and Nr
         r = self.r[start_index:stop_index]
         self.sortByEigenE()
+        stateCoefficients = self._resolveStateCoefficients(
+            stateCoefficients=stateCoefficients,
+        )
+        stateNames = list(stateCoefficients)
 
         Nr, Ntheta, Nphi = len(r), 100, 100
         theta_1Dgrid = np.linspace(0, PI, Ntheta)
@@ -441,15 +506,26 @@ class GravBoundAxionHalo:
         # R_grid unit: [length]
         # Theta_grid / Phi_grid unit: radian
 
-        # if stateNames is not specified, default to the lowest-energy state (first in the sorted list) for gradient calculation
-        if stateNames is None or len(stateNames) == 0:
-            stateNames = [state["name"] for state in self.states.values()][:1]
-
-        # Accumulate superposition of eigenstates on the 3-D mesh
+        # Accumulate the spatial, time-independent superposition on the 3-D
+        # mesh. WF_total contains the full spatial dependence of all selected
+        # eigenstates.
         WF_total = (
             np.zeros(R_grid.shape, dtype=complex)
             * self.states[stateNames[0]]["R_r"].unit
         )
+
+        # WF_direction is WF_total restricted to the radial line pointing
+        # toward the station:
+        #
+        #   WF_direction(r) =
+        #       sum_j c_j R_j(r) Y_lj^mj(theta_station, phi_station).
+        #
+        # Thus, it is a one-dimensional complex array over r. It is neither a
+        # single state's radial wavefunction R_r nor the full 3-D WF_total.
+        # Time-dependent factors, including the Compton phase and
+        # exp(-i E_j t / hbar), are not included. Currently m = 0 is used for
+        # every selected state.
+        WF_direction = np.zeros(len(r), dtype=complex) * WF_total.unit
         angular_frequency_WF_total = (
             np.zeros(R_grid.shape, dtype=complex) * WF_total.unit / unit.s
         )
@@ -457,7 +533,7 @@ class GravBoundAxionHalo:
         for name in stateNames:
             state = self.states[name]
             n_r, l, m = state["n_r"], state["l"], 0
-            c = 1.0  # equal weight. This can be modified to account for different distributions
+            c = stateCoefficients[name]
             eigenE_expect = state["eigenE_expect"]
             # radial part broadcast over angular axes
             R_nl = state["R_r"][start_index:stop_index, None, None]
@@ -467,6 +543,15 @@ class GravBoundAxionHalo:
             # wavefunction
             mode_WF = c * R_nl * Y_lm  # * np.exp(-1j * E * t)
             WF_total += mode_WF
+            Y_direction = sph_harm_y(
+                l,
+                m,
+                station_theta_solarZ.to_value(unit.rad),
+                station_phi_solarZ.to_value(unit.rad),
+            )
+            WF_direction += (
+                c * state["R_r"][start_index:stop_index] * Y_direction
+            )
             mode_angular_frequency = (
                 (self.m_a * const.c**2 + eigenE_expect) / const.hbar
             ).to(
@@ -620,11 +705,10 @@ class GravBoundAxionHalo:
             print(logPrefix, f"gradient along station direction time: {toc-tic:.2e} s")
         if showPlot:
             self.plotGradients(
-                stateNames=stateNames,
                 station=station,
                 label=station.name,
                 r=r,
-                R_r=state["R_r"][start_index:stop_index],
+                R_r=WF_direction,
                 r_line=r_line,
                 grad_r_line=grad_r_line,
                 grad_theta_line=grad_theta_line,
@@ -636,9 +720,11 @@ class GravBoundAxionHalo:
             print(logPrefix, "grad_r @ station =", grad_r_line[earthRad_idx])
             print(logPrefix, "grad_theta @ station =", grad_theta_line[earthRad_idx])
             print(logPrefix, "grad_phi @ station =", grad_phi_line[earthRad_idx])
+        # The second return value is the combined time-independent spatial
+        # wavefunction along the station direction, not a single state's R_r.
         return (
             r,
-            state["R_r"][start_index:stop_index],
+            WF_direction,
             r_line,
             grad_r_line,
             grad_theta_line,
@@ -647,7 +733,6 @@ class GravBoundAxionHalo:
 
     def plotGradients(
         self,
-        stateNames: str,
         r,
         R_r,
         r_line,
@@ -693,30 +778,23 @@ class GravBoundAxionHalo:
 
         axes = [axion_ax, grad_r_ax, grad_theta_ax, grad_phi_ax]
 
-        # for name, state in list(self.states.items())[:1]:
-        for name in stateNames:
-            # print(name, state["eigenE_expect"], "eV")
-            state = self.states[name]
-            axion_ax.plot(
-                r,
-                np.real(R_r),
-                label=name + " $\\mathrm{Re}[R(r)]$",
-                # np.abs(state["R_r"]) ** 2,
-                # label=name + " $R^{2}(r)$",
-                linestyle="--",
-                # color="tab:blue",
-                zorder=4,
-                linewidth=2,
-            )
-            axion_ax.plot(
-                r,
-                np.imag(R_r),
-                label="$\\mathrm{Im}[R(r)]$",
-                linestyle="--",
-                color="tab:red",
-                zorder=4,
-                linewidth=2,
-            )
+        axion_ax.plot(
+            r,
+            np.real(R_r),
+            label="$\\mathrm{Re}[\\Psi(r)]$",
+            linestyle="--",
+            zorder=4,
+            linewidth=2,
+        )
+        axion_ax.plot(
+            r,
+            np.imag(R_r),
+            label="$\\mathrm{Im}[\\Psi(r)]$",
+            linestyle="--",
+            color="tab:red",
+            zorder=4,
+            linewidth=2,
+        )
 
         grad_r_ax.plot(
             r_line,
@@ -757,28 +835,27 @@ class GravBoundAxionHalo:
         grad_phi_ax.set_xlabel(f"$r\\,({r.unit.to_string('latex_inline')[1:-1]})$")
         # .unit.to_string("latex_inline")[1:-1] is used to remove two $ signs in the string
         ylabels = [
-            # radial wavefunction
-            "$R_{nl}$\n"
+            # total wavefunction along the selected direction
+            "$\\Psi$\n"
             + "$\\left("
-            + state["R_r"].unit.to_string("latex_inline")[1:-1]
+            + R_r.unit.to_string("latex_inline")[1:-1]
             + "\\right)$",
             # r gradient
-            "$\\partial_r\\phi$\n"
+            "$\\partial_r\\Psi$\n"
             + "$\\left("
             + grad_r_line.unit.to_string("latex_inline")[1:-1]
             + "\\right)$",
             # theta gradient
-            "$\\frac{1}{r}\\partial_\\theta \\phi$\n"
+            "$\\frac{1}{r}\\partial_\\theta \\Psi$\n"
             + "$\\left("
             + grad_theta_line.unit.to_string("latex_inline")[1:-1]
             + "\\right)$",
             # phi gradient
-            "$\\frac{1}{r\\sin\\theta}\\partial_\\varphi\\phi$\n"
+            "$\\frac{1}{r\\sin\\theta}\\partial_\\varphi\\Psi$\n"
             + "$\\left("
             + grad_phi_line.unit.to_string("latex_inline")[1:-1]
             + "\\right)$",
         ]
-        print(ylabels)
         # axion_ax.set_xlim(right=truncRadius.value)
         for i, ax in enumerate(axes):
             ax.axvline(
@@ -801,7 +878,7 @@ class GravBoundAxionHalo:
 
     def findGradientsOverTime(
         self,
-        stateNames: list[str],
+        stateCoefficients: dict[str, complex],
         station: Station,
         meas_times: list[Time],
         truncRadius: Quantity | None = None,
@@ -816,11 +893,11 @@ class GravBoundAxionHalo:
 
         Parameters
         ----------
-        stateNames : list of str
-            Eigenstate labels to superimpose.
+        stateCoefficients : dict of str to complex
+            Mapping from eigenstate names to coefficients.
         station : :class:`~axionbloch.Station.Station`
             Geographic location.
-        times : iterable of :class:`astropy.time.Time`
+        meas_times : iterable of :class:`astropy.time.Time`
             Epochs at which to evaluate the gradients.
         truncRadius : Quantity, optional
             Radial truncation passed through to :meth:`findGradientsAtDirection`.
@@ -851,7 +928,7 @@ class GravBoundAxionHalo:
                 print(logPrefix, f"step {i}/{len(meas_times)}  t={meas_time.iso}")
             _, _, r_line, grad_r_line, grad_theta_line, grad_phi_line = (
                 self.findGradientsAtDirection(
-                    stateNames=stateNames,
+                    stateCoefficients=stateCoefficients,
                     station=station,
                     meas_time=meas_time,
                     truncRadius=truncRadius,
@@ -879,7 +956,7 @@ class GravBoundAxionHalo:
 
     def findOmega_aOverTime(
         self,
-        stateNames: list[str],
+        stateCoefficients: dict[str, complex],
         station: Station,
         meas_times,
         truncRadius: Quantity | None = None,
@@ -897,8 +974,8 @@ class GravBoundAxionHalo:
 
         Parameters
         ----------
-        stateNames : list of str
-            Eigenstate labels to superimpose.
+        stateCoefficients : dict of str to complex
+            Mapping from eigenstate names to coefficients.
         station : :class:`~axionbloch.Station.Station`
             Geographic location.
         meas_times : iterable of :class:`astropy.time.Time`
@@ -907,6 +984,15 @@ class GravBoundAxionHalo:
             Radial truncation passed through to :meth:`findGradientsOverTime`.
         verbose : bool
             Print per-step progress.
+
+        Examples
+        --------
+        >>> from axionbloch.Station import Mainz
+        >>> result = halo.findOmega_aOverTime(
+        ...     stateCoefficients={"2p": 1, "3p": 1 + 1j},
+        ...     station=Mainz,
+        ...     meas_times=times,
+        ... )
 
         Returns
         -------
@@ -926,7 +1012,7 @@ class GravBoundAxionHalo:
             )
 
         gradients = self.findGradientsOverTime(
-            stateNames=stateNames,
+            stateCoefficients=stateCoefficients,
             station=station,
             meas_times=meas_times,
             truncRadius=truncRadius,
@@ -967,7 +1053,7 @@ class GravBoundAxionHalo:
 
     def findrmsOmega_aOverTime(
         self,
-        stateNames: list[str],
+        stateCoefficients: dict[str, complex],
         station: Station,
         meas_times,
         truncRadius: Quantity | None = None,
@@ -983,8 +1069,8 @@ class GravBoundAxionHalo:
 
         Parameters
         ----------
-        stateNames : list of str
-            Eigenstate labels to superimpose.
+        stateCoefficients : dict of str to complex
+            Mapping from eigenstate names to coefficients.
         station : :class:`~axionbloch.Station.Station`
             Geographic location.
         meas_times : iterable of :class:`astropy.time.Time`
@@ -1009,7 +1095,7 @@ class GravBoundAxionHalo:
         )
 
         Omega_results = self.findOmega_aOverTime(
-            stateNames=stateNames,
+            stateCoefficients=stateCoefficients,
             station=station,
             meas_times=meas_times,
             truncRadius=truncRadius,
@@ -1063,8 +1149,9 @@ class GravBoundAxionHalo:
         meas_time : :class:`astropy.time.Time`
             Measurement epoch.
         stateNamesDict : dict
-            Dictionary mapping labels to state name lists. Example:
-            ``{"2p": ["2p"], "2p and 3p": ["2p", "3p"]}``.
+            Dictionary mapping comparison labels to state/coefficient
+            dictionaries. For example,
+            ``{"2p": {"2p": 1.0}, "mix": {"2p": 0.8, "3p": 0.6j}}``.
         truncRadius : Quantity, optional
             Radial truncation passed through to :meth:`findGradientsAtDirection`.
         showPlot : bool
@@ -1092,13 +1179,18 @@ class GravBoundAxionHalo:
             "grad_phi": {},
         }
 
-        for label, stateNames in stateNamesDict.items():
+        for label, stateSelection in stateNamesDict.items():
             if verbose:
                 print(logPrefix, f"Computing gradients for: {label}")
 
+            if not isinstance(stateSelection, dict) or not stateSelection:
+                raise TypeError(
+                    "Each stateNamesDict value must be a nonempty "
+                    "state/coefficient dictionary."
+                )
             r, R_r, r_line, grad_r_line, grad_theta_line, grad_phi_line = (
                 self.findGradientsAtDirection(
-                    stateNames=stateNames,
+                    stateCoefficients=stateSelection,
                     station=station,
                     meas_time=meas_time,
                     truncRadius=truncRadius,
