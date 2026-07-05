@@ -344,6 +344,162 @@ class GravBoundAxionHalo:
         logPrefix = f"[{self.__class__.__name__}.{self.getStateEnergies.__name__}]"
         return [state["eigenE"] for state in self.states.values()]
 
+    def getStateAmplitudeSpectrum(
+        self,
+        stateCoefficients: dict[str, complex],
+    ) -> dict:
+        """Return normalized state amplitudes and their energy shifts.
+
+        The eigen-energy ``E_n`` is interpreted as the shift relative to an
+        axion at rest:
+
+        ``m_a,eff - m_a(v=0) = E_n / c**2``
+
+        and
+
+        ``nu - nu_a = E_n / h``.
+
+        Parameters
+        ----------
+        stateCoefficients : dict of str to complex
+            Mapping from eigenstate names to complex coefficients, for example
+            ``{"2p": 1, "3p": 1 + 1j}``. The coefficients are normalized in
+            the same way as in :meth:`findGradientsAtDirection`.
+
+        Returns
+        -------
+        dict
+            Energy-sorted state names, normalized complex coefficients,
+            amplitudes, eigen-energies, effective-mass shifts, and Compton
+            frequency shifts.
+        """
+        coefficients = self._resolveStateCoefficients(stateCoefficients)
+        state_names = sorted(
+            coefficients,
+            key=lambda name: self.states[name]["eigenE"],
+        )
+        eigenE = unit.Quantity(
+            [self.states[name]["eigenE"] for name in state_names]
+        )
+        normalized_coefficients = np.asarray(
+            [coefficients[name] for name in state_names],
+            dtype=complex,
+        )
+
+        return {
+            "state_names": state_names,
+            "coefficients": normalized_coefficients,
+            "amplitudes": np.abs(normalized_coefficients),
+            "eigenE": eigenE,
+            "mass_shift": (eigenE / const.c**2).to(unit.kg),
+            "frequency_shift": (eigenE / const.h).to(unit.Hz),
+        }
+
+    def plotStateAmplitudeVsEigenEnergy(
+        self,
+        stateCoefficients: dict[str, complex],
+        energy_unit=unit.attoelectronvolt,
+        frequency_unit=unit.mHz,
+        ax: Axes | None = None,
+        showPlot: bool = True,
+    ):
+        """Plot state amplitude against eigen-energy with two x-axis scales.
+
+        The lower x axis shows the effective axion mass shift
+        ``m_a,eff - m_a(v=0) = E_n / c**2``. Its numerical values are
+        expressed in ``energy_unit / c**2``. The upper x axis shows the
+        equivalent Compton frequency shift ``nu - nu_a = E_n / h``.
+
+        Parameters
+        ----------
+        stateCoefficients : dict of str to complex
+            Mapping from eigenstate names to complex coefficients. Plotted
+            amplitudes are the absolute values of the normalized coefficients.
+        energy_unit : astropy Unit
+            Energy unit used for the lower mass-shift scale. The default gives
+            an axis in ``aeV/c^2``.
+        frequency_unit : astropy Unit
+            Frequency unit used on the upper x axis. The default is mHz.
+        ax : matplotlib.axes.Axes, optional
+            Existing lower-axis object. A new figure and axis are created when
+            omitted.
+        showPlot : bool
+            Call :func:`matplotlib.pyplot.show` when true.
+
+        Returns
+        -------
+        tuple
+            ``(figure, lower_axis, upper_frequency_axis, spectrum)``.
+        """
+        spectrum = self.getStateAmplitudeSpectrum(stateCoefficients)
+        eigenE = spectrum["eigenE"].to(energy_unit)
+        energy_values = eigenE.to_value(energy_unit)
+        amplitudes = spectrum["amplitudes"]
+
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8.5/2.54, 8.5/2.54 * 10/16), dpi=300)
+        else:
+            fig = ax.figure
+
+        ax.vlines(
+            energy_values,
+            ymin=0,
+            ymax=amplitudes,
+            color="tab:blue",
+            linewidth=1.5,
+        )
+        ax.scatter(
+            energy_values,
+            amplitudes,
+            color="tab:blue",
+            zorder=3,
+        )
+        for index, (energy, amplitude, state_name) in enumerate(zip(
+            energy_values,
+            amplitudes,
+            spectrum["state_names"],
+        )):
+            ax.annotate(
+                state_name,
+                xy=(energy, amplitude),
+                xytext=(0, 5 + 12 * (index % 2)),
+                textcoords="offset points",
+                ha="center",
+                va="bottom",
+            )
+
+        energy_unit_label = energy_unit.to_string("latex_inline")[1:-1]
+        ax.set_xlim(-0.05 * np.amax(energy_values), 1.05 * np.max(energy_values))
+        ax.set_xlabel(
+            "$m-m_a\\,$"
+            f"$\\left({energy_unit_label}/c^2\\right)$"
+        )
+        # Leave vertical room for the staggered state labels.
+        ax.set_ylim(0, 1.8 * np.max(amplitudes))
+        # ax.set_ylabel("$|c_{nlm}|$")
+        ax.set_ylabel("")
+        ax.set_yticklabels([])
+        ax.set_yticks([])
+
+        # The upper x axis represents the same E_n values as frequency shifts.
+        # twiny() is used because this is a second horizontal scale, not a
+        # second dependent variable.
+        frequency_ax = ax.twiny()
+        lower_limits = np.asarray(ax.get_xlim()) * energy_unit
+        upper_limits = (lower_limits / const.h).to_value(frequency_unit)
+        frequency_ax.set_xlim(upper_limits)
+        frequency_unit_label = frequency_unit.to_string("latex_inline")[1:-1]
+        frequency_ax.set_xlabel(
+            "$\\nu-\\nu_a\\,$"
+            f"$\\left({frequency_unit_label}\\right)$"
+        )
+
+        fig.tight_layout()
+        if showPlot:
+            plt.show()
+
+        return fig, ax, frequency_ax, spectrum
+
     def _resolveStateCoefficients(
         self,
         stateCoefficients: dict[str, complex] | None,
