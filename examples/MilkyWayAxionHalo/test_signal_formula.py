@@ -626,7 +626,7 @@ def plot_frequency_curves(
         saturation = result["saturation"]
         if result["field_mode"] == "coherent":
             reference_normalized = result["coherent_normalized"]
-            reference_label = r"coherent theory $x=1$"
+            reference_label = "coherent theory $x=1$"
             reference_chi2 = result["reduced_chi2_coherent"]
         else:
             reference_normalized = result["original_normalized"]
@@ -646,7 +646,7 @@ def plot_frequency_curves(
             result["fit_normalized"] * saturation,
             color="tab:blue",
             linewidth=1.4,
-            label=rf"individual $x={result['x_fit']:.3f}$",
+            label=f"individual $x={result['x_fit']:.3f}$",
         )
         ax.plot(
             time,
@@ -654,7 +654,7 @@ def plot_frequency_curves(
             color="tab:green",
             linestyle="-.",
             linewidth=1.3,
-            label=rf"global $x={result['x_global']:.3f}$",
+            label=f"global $x={result['x_global']:.3f}$",
         )
         ax.plot(
             time,
@@ -665,11 +665,11 @@ def plot_frequency_curves(
             label=reference_label,
         )
         ax.set_title(
-            rf"$\tau_a/T_2^*={result['ratio']:.2g}$, "
-            rf"$T_2/T_2^*={result['T2_over_T2star']:.3g}$"
+            f"$\\tau_a/T\\_2^*={result['ratio']:.2g}$, "
+            f"$T_2/T\\_2^*={result['T2_over_T2star']:.3g}$"
             "\n"
-            rf"$\chi_\nu^2$: fit={result['reduced_chi2_fit']:.2g}, "
-            rf"reference={reference_chi2:.2g}"
+            f"$\\chi_\\nu^2$: fit={result['reduced_chi2_fit']:.2g}, "
+            f"reference={reference_chi2:.2g}"
         )
         ax.grid(alpha=0.25)
         ax.legend(fontsize=7)
@@ -677,12 +677,12 @@ def plot_frequency_curves(
     for ax in axes.flat[len(frequency_results) :]:
         ax.set_visible(False)
     for ax in axes[-1, :]:
-        ax.set_xlabel(r"$t/T_2^*$")
+        ax.set_xlabel("$t/T_2^*$")
     for ax in axes[:, 0]:
-        ax.set_ylabel(r"$M_{\perp,\mathrm{RMS}}/M_{\mathrm{eqb}}$")
+        ax.set_ylabel("$M_{\\perp,\\mathrm{rms}}/M_{\\mathrm{eqb}}$")
     fig.suptitle(
-        rf"$\nu_a={frequency_results[0]['frequency_Hz']:.0e}$ Hz, "
-        rf"$N_\mathrm{{fields}}={frequency_results[0]['num_fields']}$"
+        f"$\\nu_a={frequency_results[0]['frequency_Hz']:.0e}$ Hz, "
+        f"$N_\\mathrm{{fields}}={frequency_results[0]['num_fields']}$"
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(path, dpi=220, facecolor="white")
@@ -743,8 +743,8 @@ def plot_fit_summary(
         label=reference_label,
     )
     x_axis.set_xscale("log")
-    x_axis.set_xlabel(r"$\tau_a/T_2^*$")
-    x_axis.set_ylabel(r"$x$")
+    x_axis.set_xlabel("$\\tau_a/T_2^*$")
+    x_axis.set_ylabel("$x$")
     x_axis.grid(alpha=0.25)
     x_axis.legend(fontsize=8)
 
@@ -773,12 +773,12 @@ def plot_fit_summary(
             ],
             marker="o",
             linewidth=1.5,
-            label=rf"reference, $T_2/T_2^*={T2_ratio:.3g}$",
+            label=f"reference, $T_2/T_2^*={T2_ratio:.3g}$",
         )
     chi2_axis.set_xscale("log")
     chi2_axis.set_yscale("log")
-    chi2_axis.set_xlabel(r"$\tau_a/T_2^*$")
-    chi2_axis.set_ylabel(r"diagonal reduced $\chi^2$")
+    chi2_axis.set_xlabel("$\\tau_a/T_2^*$")
+    chi2_axis.set_ylabel("diagonal reduced $\\chi^2$")
     chi2_axis.grid(alpha=0.25)
     chi2_axis.legend(fontsize=8)
 

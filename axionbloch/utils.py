@@ -79,7 +79,7 @@ def check(arg):
     try:
         context = inspect.getframeinfo(frame.f_back).code_context
         caller_lines = "".join([line.strip() for line in context])
-        m = re.search(r"check\s*\((.+?)\)$", caller_lines)
+        m = re.search("check\\s*\\((.+?)\\)$", caller_lines)
         if m:
             caller_lines = m.group(1)
             position = (

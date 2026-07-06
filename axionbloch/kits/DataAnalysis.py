@@ -16,14 +16,17 @@
 
 import os
 import pickle
+
 # monitor run time
 from dataclasses import dataclass
+
 # for handling time
 from datetime import datetime, timezone
 from functools import partial
 
 # importing and processing hdf5 files
 import h5py
+
 # statistic tools
 # for interpolation
 # curve fitting (including calculating uncertainties)
@@ -35,13 +38,32 @@ from scipy.stats import norm
 # from astropy.units import Quantity, CompositeUnit
 # from astropy.constants import codata2018 as const
 from ..dependency import *
-from .utils import (LIA_FFT, DTRC_filter, ExpCos, ExpCosiSinResidual, Gaussian,
-                    Lorentzian, check, clear_lines, dualExpCos, dualGaussian,
-                    dualLorentzian, estimatedualExpCos, estimatedualGaussFit,
-                    estimatedualLorzfit, estimateExpCos, estimateExpCosiSin,
-                    estimateGaussfit, estimateLorzfit, estimatetribLorzfit,
-                    getDateAndTime, plotaxisfmt_Hz2ppm, plotaxisfmt_MHz2ppm,
-                    plotaxisfmt_ppm2MHz, tribLorentzian)
+from .utils import (
+    LIA_FFT,
+    DTRC_filter,
+    ExpCos,
+    ExpCosiSinResidual,
+    Gaussian,
+    Lorentzian,
+    check,
+    clear_lines,
+    dualExpCos,
+    dualGaussian,
+    dualLorentzian,
+    estimatedualExpCos,
+    estimatedualGaussFit,
+    estimatedualLorzfit,
+    estimateExpCos,
+    estimateExpCosiSin,
+    estimateGaussfit,
+    estimateLorzfit,
+    estimatetribLorzfit,
+    getDateAndTime,
+    plotaxisfmt_Hz2ppm,
+    plotaxisfmt_MHz2ppm,
+    plotaxisfmt_ppm2MHz,
+    tribLorentzian,
+)
 
 # -----------------------------------------------------
 
@@ -6143,7 +6165,7 @@ class Signal(NMRio):
     #         hop=hop,
     #         fs=self.sampRate,
     #         mfft=mfft,
-    #         scale_to="psd",
+    #         scale_to="PSD",
     #         fft_mode="centered",
     #     )
     #     Sf = SFT.stft(self.dataX + 1j * self.dataY)  # perform the STFT

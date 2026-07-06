@@ -119,7 +119,7 @@ from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
 axion = MilkyWayAxionHalo(nu_a=1 * unit.kHz)
 
 nu = np.linspace(0.99, 1.01, 10000) * unit.kHz
-psd = MilkyWayAxionHalo.axion_lineshape(
+PSD = MilkyWayAxionHalo.axion_lineshape(
     v_0=axion.v_0,
     v_lab=axion.v_lab,
     nu_a=axion.nu_a,

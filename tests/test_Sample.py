@@ -115,7 +115,7 @@ def test_getThermalPol_runs(sample: Sample):
 
 def test_getThermalPol_raises_below_absolute_zero(sample: Sample):
     """getThermalPol raises ValueError for temperatures below absolute zero."""
-    with pytest.raises(ValueError, match=r">= 0 K"):
+    with pytest.raises(ValueError, match=">= 0 K"):
         sample.getThermalPol(B_pol=1.0 * unit.T, temp=-1.0 * unit.K)
 
 

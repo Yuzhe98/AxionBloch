@@ -4,7 +4,7 @@ import astropy.coordinates as coord
 
 from axionbloch.dependency import *
 from axionbloch.utils import check_norm
-
+from axionbloch.MilkyWay import MilkyWay
 
 class MilkyWayAxionHalo:
     """Axion dark-matter field (axion wind) from the Milky Way halo.
@@ -221,8 +221,6 @@ class MilkyWayAxionHalo:
             galcen_frame = coord.Galactocentric()
 
         if station is None:
-            from axionbloch.MilkyWay import MilkyWay
-
             lab_velocity = MilkyWay(time=time, galcen_frame=galcen_frame).get_v_lab()
         else:
             gcrs = station.location.get_gcrs(time)
@@ -387,7 +385,7 @@ class MilkyWayAxionHalo:
         verbose: bool = False,
     ) -> None:
         """Update halo kinematics from astropy time/station inputs."""
-        from axionbloch.MilkyWay import MilkyWay
+
 
         mw = MilkyWay(
             time=time if time is not None else Time.now(),
@@ -436,7 +434,6 @@ class MilkyWayAxionHalo:
             Keys include ``times``, ``v_lab_magnitude``, ``wind_angle``,
             ``wind_parallel``, ``wind_perp``, and ``nu_a_eff``.
         """
-        from axionbloch.MilkyWay import MilkyWay
 
         if isinstance(meas_times, Time):
             if meas_times.isscalar:
@@ -455,7 +452,7 @@ class MilkyWayAxionHalo:
         for i, meas_time in enumerate(iter_times):
             if verbose:
                 print(
-                    f"[{self.__class__.__name__}.findKinematicsOverTime] "
+                    f"[{self.__class__.__name__}.{self.findKinematicsOverTime.__name__}] "
                     f"step {i + 1}/{len(iter_times)}  t={meas_time.iso}"
                 )
 
@@ -558,15 +555,15 @@ class MilkyWayAxionHalo:
                 )
             )
 
-        psd = np.array([line.to_value(lineshapes[0].unit) for line in lineshapes])
-        psd = psd * lineshapes[0].unit
+        PSD = np.array([line.to_value(lineshapes[0].unit) for line in lineshapes])
+        PSD = PSD * lineshapes[0].unit
         power_coefficient = (
             np.array(
                 [c.to_value(power_coefficients[0].unit) for c in power_coefficients]
             )
             * power_coefficients[0].unit
         )
-        power_spectrum = power_coefficient[:, np.newaxis] * psd
+        power_spectrum = power_coefficient[:, np.newaxis] * PSD
         relative_power = (
             power_coefficient / np.max(power_coefficient)
             if power_coefficient.unit != unit.one
@@ -577,7 +574,7 @@ class MilkyWayAxionHalo:
             **kinematics,
             "frequencies": frequencies,
             "case": case,
-            "lineshape": psd,
+            "lineshape": PSD,
             "power_coefficient": power_coefficient,
             "relative_power": relative_power.to(unit.one),
             "power_spectrum_shape": power_spectrum,
@@ -632,16 +629,16 @@ class MilkyWayAxionHalo:
         axes = [fig.add_subplot(grid[i, 0]) for i in range(nrows)]
 
         axes[0].plot(t_hours, result["v_lab_magnitude"].to_value(unit.km / unit.s))
-        axes[0].set_ylabel(r"$|v_\mathrm{lab}|$ (km/s)")
+        axes[0].set_ylabel("$|v_\\mathrm{lab}|$ (km/s)")
 
         axes[1].plot(t_hours, result["wind_angle"].to_value(unit.deg))
-        axes[1].set_ylabel(r"$\alpha$ (deg)")
+        axes[1].set_ylabel("$\\alpha$ (deg)")
 
         if has_lineshape:
             axes[2].plot(t_hours, result["relative_power"].to_value(unit.one))
             axes[2].set_ylabel("relative power")
 
-            psd = result["lineshape"]
+            PSD = result["lineshape"]
             power_spectrum = result["power_spectrum_shape"]
             freqs = result["frequencies"]
             if frequency_indices is None:

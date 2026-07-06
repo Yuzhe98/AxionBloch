@@ -475,9 +475,9 @@ def test_milky_way_lineshape_periodic_modulation():
     angle_span = np.ptp(result["wind_angle"].to_value(unit.deg))
     assert angle_span > 30.0
 
-    psd = result["lineshape"].to_value(result["lineshape"].unit)
-    peak_idx = int(np.argmax(np.mean(psd, axis=0)))
-    peak_trace = psd[:, peak_idx]
+    PSD = result["lineshape"].to_value(result["lineshape"].unit)
+    peak_idx = int(np.argmax(np.mean(PSD, axis=0)))
+    peak_trace = PSD[:, peak_idx]
     assert np.ptp(peak_trace) / np.mean(peak_trace) > 1e-3
     assert np.ptp(result["relative_power"].to_value(unit.one)) > 0.1
     assert result["power_spectrum_shape"].shape == result["lineshape"].shape

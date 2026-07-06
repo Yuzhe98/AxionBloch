@@ -176,14 +176,14 @@ def plot_summary(
             [result["x_fit"] for result in subset],
             color=color,
             s=35,
-            label=rf"$T_2^*={T2star:g}$ s",
+            label=f"$T_2^*={T2star:g}$ s",
         )
         chi2_axis.scatter(
             [result["ratio"] for result in subset],
             [result["reduced_chi2_fit"] for result in subset],
             color=color,
             s=35,
-            label=rf"$T_2^*={T2star:g}$ s",
+            label=f"$T_2^*={T2star:g}$ s",
         )
 
     ratio_grid = np.logspace(
@@ -207,15 +207,15 @@ def plot_summary(
     )
     x_axis.set_xscale("log")
     x_axis.set_ylim(0.48, 1.02)
-    x_axis.set_xlabel(r"$\tau_a/T_2^*$")
-    x_axis.set_ylabel(r"$x$")
+    x_axis.set_xlabel("$\\tau_a/T_2^*$")
+    x_axis.set_ylabel("$x$")
     x_axis.grid(alpha=0.25)
     x_axis.legend(fontsize=8)
 
     chi2_axis.set_xscale("log")
     chi2_axis.set_yscale("log")
-    chi2_axis.set_xlabel(r"$\tau_a/T_2^*$")
-    chi2_axis.set_ylabel(r"diagonal reduced $\chi^2$ (fitted $x$)")
+    chi2_axis.set_xlabel("$\\tau_a/T_2^*$")
+    chi2_axis.set_ylabel("diagonal reduced $\\chi^2$ (fitted $x$)")
     chi2_axis.grid(alpha=0.25)
     chi2_axis.legend(fontsize=8)
 
