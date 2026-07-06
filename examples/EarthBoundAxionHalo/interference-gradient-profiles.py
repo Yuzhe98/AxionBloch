@@ -119,7 +119,7 @@ fig.suptitle("Eigenstate interference at Mainz")
 fig.tight_layout()
 output_directory = Path(__file__).with_name("outputs")
 output_directory.mkdir(exist_ok=True)
-output_path = output_directory / "interference-gradient-profiles.png"
+output_path = output_directory / "EarthHalo-interference-gradient-profiles.png"
 fig.savefig(output_path, bbox_inches="tight")
 print("Saved", output_path)
 plt.show()
