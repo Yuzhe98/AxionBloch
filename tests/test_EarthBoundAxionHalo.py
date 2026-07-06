@@ -10,6 +10,7 @@ Run with::
 """
 
 import numpy as np
+import matplotlib.pyplot as plt
 from astropy import units as unit
 from astropy.time import Time
 
@@ -17,6 +18,7 @@ from axionbloch.EarthBoundAxionHalo import (EarthBoundAxionHalo,
                                             earth_grav_potential_earth_center,
                                             loadPEMdata,
                                             plot_earth_grav_potential)
+from axionbloch.GravBoundAxionHalo import GravBoundAxionHalo
 from axionbloch.Station import Mainz
 
 
@@ -60,6 +62,45 @@ def test_plot_earth_grav_potential_runs_without_error():
         plot_earth_grav_potential(showplot=False)
     except Exception as e:
         assert False, f"plot_earth_grav_potential raised an exception: {e}"
+
+
+def test_state_amplitude_spectrum_normalizes_and_converts_eigenE():
+    """State amplitudes and both eigen-energy-derived shifts are consistent."""
+    halo = GravBoundAxionHalo.__new__(GravBoundAxionHalo)
+    halo.states = {
+        "2p": {"eigenE": 2 * unit.attoelectronvolt},
+        "1s": {"eigenE": 1 * unit.attoelectronvolt},
+    }
+
+    spectrum = halo.getStateAmplitudeSpectrum({"2p": 1 + 1j, "1s": 1})
+
+    assert spectrum["state_names"] == ["1s", "2p"]
+    assert np.isclose(np.linalg.norm(spectrum["amplitudes"]), 1)
+    assert np.allclose(
+        spectrum["eigenE"].to_value(unit.attoelectronvolt),
+        [1, 2],
+    )
+    assert spectrum["mass_shift"].unit.is_equivalent(unit.kg)
+    assert spectrum["frequency_shift"].unit.is_equivalent(unit.Hz)
+
+
+def test_plot_state_amplitude_vs_eigenenergy_has_frequency_axis():
+    """The amplitude spectrum plot creates mass-shift and frequency axes."""
+    halo = GravBoundAxionHalo.__new__(GravBoundAxionHalo)
+    halo.states = {
+        "1s": {"eigenE": 1 * unit.attoelectronvolt},
+        "2p": {"eigenE": 2 * unit.attoelectronvolt},
+    }
+
+    fig, ax, frequency_ax, spectrum = halo.plotStateAmplitudeVsEigenEnergy(
+        {"1s": 1, "2p": 1j},
+        showPlot=False,
+    )
+
+    assert "$m_{a,\\mathrm{eff}}-m_a(v=0)$" in ax.get_xlabel()
+    assert "$\\nu-\\nu_a$" in frequency_ax.get_xlabel()
+    assert np.allclose(spectrum["amplitudes"], 1 / np.sqrt(2))
+    plt.close(fig)
 
 
 def test_findGradientsOverStates_returns_correct_structure():
