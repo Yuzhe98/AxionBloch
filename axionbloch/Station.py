@@ -276,6 +276,16 @@ Baltimore = Station(
     verbose=False,
 )
 
+Boston = Station(
+    name="Boston University Metcalf Science Center",
+    NSsemisphere="N",
+    EWsemisphere="W",
+    latitude=42.3484 * unit.deg,
+    longitude=71.1002 * unit.deg,
+    elevation=0.0 * unit.m,
+    verbose=False,
+)
+
 Tokyo = Station(
     name="Tokyo",
     NSsemisphere="N",
