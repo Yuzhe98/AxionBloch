@@ -1,22 +1,19 @@
-"""Reproduce the four periodic-modulation panels in Gramolin spectral signature paper."""
+"""Plot Milky-Way axion-wind periodic modulations at Boston.
+
+This example intentionally obtains the laboratory speed and wind-orientation
+modulations from :mod:`axionbloch.MilkyWayAxionHalo`, rather than retyping the
+closed-form approximations in the plotting script.
+"""
 
 from pathlib import Path
 import sys
 import textwrap
 
-import matplotlib
-
-# # Regular interactive mode: try TkAgg, otherwise fall back to Agg.
-# try:
-#     matplotlib.use("TkAgg")
-#     interactive = True
-# except Exception:
-#     matplotlib.use("Agg")
-#     interactive = False
-
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy import units as unit
+from astropy.time import Time
+from astropy.utils import iers
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -25,68 +22,66 @@ if str(REPO_ROOT) not in sys.path:
 from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
 from axionbloch.Station import Boston
 
+iers.conf.auto_download = False
+
 FIGURE_DIR = Path(__file__).resolve().parent / "figures"
 FIGURE_DIR.mkdir(exist_ok=True)
 
 station = Boston
 axion = MilkyWayAxionHalo(nu_a=1.0 * unit.MHz)
 
-# Equation (34) of Phys. Rev. D 105, 035029 (2022). The time origin is
-# January 1; the maximum near June 1 occurs at tau = t_y + 72.4 days.
-annual_days = np.linspace(0, 365, 365 + 1)
-v_sun = 233 * unit.km / unit.s
-v_earth = 29.8 * unit.km / unit.s
-eta = 0.982
-omega_year = 2 * np.pi / 365
-vernal_equinox_day = 31 + 28 + 19
-tau = vernal_equinox_day + 72.4
-v_lab_annual = np.sqrt(
-    v_sun**2
-    + v_earth**2
-    + eta * v_sun * v_earth * np.cos(omega_year * (annual_days - tau))
+# Use the default astropy Galactocentric frame.  This is more appropriate for
+# calculations than the simplified Gramolin reproduction convention
+# v_sun = 233 km/s, because it includes the Sun's peculiar velocity and a
+# modern Galactic rotation speed.
+
+# Annual modulation of the lab speed.  The vectorized projectHaloVelocity call
+# uses the same astropy-based halo/lab transformation as findKinematicsOverTime.
+annual_days = np.arange(365)
+annual_times = Time("2022-01-01T00:00:00", scale="utc") + annual_days * unit.day
+v_lab_annual = MilkyWayAxionHalo.projectHaloVelocity(
+    time=annual_times,
+    station=station,
+    axis="magnitude",
 )
 
-# Equations (35)-(37) for January 1 at Boston University. The Station object
-# supplies the signed latitude and longitude specified in the figure caption.
+# Daily modulation on January 1, following the time origin used in
+# reporduce-periodic-modulations-in-Gramolin-paper.py.  This is the convention
+# that makes the library result directly comparable to Eqs. (35)-(37) there.
 daily_hours = np.linspace(0, 24, 145)
-daily_days = daily_hours / 24
-latitude = station.location.lat.to_value(unit.rad)
-longitude = station.location.lon.to_value(unit.rad)
-b_0 = 0.7589
-b_1 = 0.6512
-psi = -3.5336
-phase = longitude + psi
-omega_day = 2 * np.pi / 0.9973
-daily_argument = omega_day * daily_days + phase
+daily_times = Time("2022-01-01T00:00:00", scale="utc") + daily_hours * unit.hour
 
-cos_alpha = {
-    "North": (b_0 * np.cos(latitude) - b_1 * np.sin(latitude) * np.cos(daily_argument)),
-    "West": b_1 * np.sin(daily_argument),
-    "Zenith": (
-        b_0 * np.sin(latitude) + b_1 * np.cos(latitude) * np.cos(daily_argument)
-    ),
-}
-styles = {
-    "North": {"color": "red", "linestyle": "-"},
-    "West": {"color": "blue", "linestyle": "--"},
-    "Zenith": {"color": "green", "linestyle": "-."},
+axis_styles = {
+    "north": {"label": "North", "color": "red", "linestyle": "-"},
+    "west": {"label": "West", "color": "blue", "linestyle": "--"},
+    "zenith": {"label": "Zenith", "color": "green", "linestyle": "-."},
 }
 
-v_lab_january_1 = np.full_like(daily_hours, v_lab_annual[0].value) * v_lab_annual.unit
+daily_kinematics = {
+    axis: axion.findKinematicsOverTime(
+        station=station,
+        meas_times=daily_times,
+        sensitive_axis=axis,
+        include_rotation=True,
+    )
+    for axis in axis_styles
+}
 
 fig, axes = plt.subplots(1, 2, figsize=(14 / 2.54, 6 / 2.54), dpi=300)
 fig.patch.set_facecolor("white")
-ax_a, ax_b = axes
+ax_speed, ax_cos_alpha = axes
 
-ax_a.plot(
+ax_speed.plot(
     annual_days,
     v_lab_annual.to_value(unit.km / unit.s),
     color="black",
 )
-ax_a.set_ylabel("$v_\\mathrm{lab}$ (km/s)")
+ax_speed.set_ylabel("$v_\\mathrm{lab}$ (km/s)")
+ax_speed.set_xlim(0, 364)
+ax_speed.set_xlabel("Date in 2022")
 month_starts = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]
-ax_a.set_xticks(month_starts)
-ax_a.set_xticklabels(
+ax_speed.set_xticks(month_starts)
+ax_speed.set_xticklabels(
     [
         "Jan",
         "Feb",
@@ -104,25 +99,35 @@ ax_a.set_xticklabels(
     rotation=60,
     ha="center",
 )
-ax_a.set_xlim(0, 365)
 
-for label in cos_alpha:
-    ax_b.plot(
+for axis, style in axis_styles.items():
+    # findKinematicsOverTime reports cos(alpha) for the axion wind direction,
+    # i.e. -v_lab.  The Gramolin Fig. 3 convention plots the angle relative to
+    # v_lab itself, so the sign is flipped here.
+    ax_cos_alpha.plot(
         daily_hours,
-        cos_alpha[label],
-        label=label,
-        **styles[label],
+        -daily_kinematics[axis]["cos_alpha"],
+        label=style["label"],
+        color=style["color"],
+        linestyle=style["linestyle"],
     )
 
-ax_b.axhline(0, color="0.65", linewidth=0.6, zorder=0)
-ax_b.set_ylabel("$\\cos\\alpha$")
-ax_b.set_ylim(-1.05, 1.05)
+ax_cos_alpha.axhline(0, color="0.65", linewidth=0.6, zorder=0)
+ax_cos_alpha.set_ylabel("$\\cos\\alpha$")
+ax_cos_alpha.set_xlabel("Time on Jan. 1 (hour)")
+ax_cos_alpha.set_xlim(0, 24)
+ax_cos_alpha.set_ylim(-1.05, 1.05)
+ax_cos_alpha.set_xticks([0, 6, 12, 18, 24])
+ax_cos_alpha.legend(
+    loc="lower center",
+    bbox_to_anchor=(0.5, 1.02),
+    ncol=3,
+    frameon=False,
+    fontsize=7,
+    handlelength=2.5,
+    columnspacing=1.0,
+)
 
-ax_b.set_xlim(0, 24)
-ax_b.set_xticks([0, 6, 12, 18, 24])
-ax_b.set_xlabel("Time (hour)\nfrom 2022-01-01 00:00 Boston local time")
-
-ax_b.legend(loc="lower right", frameon=False, fontsize=7)
 for panel_label, ax in zip(("a", "b"), axes.flat):
     ax.text(
         -0.18,
@@ -132,7 +137,9 @@ for panel_label, ax in zip(("a", "b"), axes.flat):
         ha="left",
         va="bottom",
     )
-# caption discarded per request
+
+for ax in axes:
+    ax.grid(True, alpha=0.25)
 
 # Watermark follows examples/example_matplotlib.py.
 script_path = Path(__file__).resolve()
@@ -152,21 +159,11 @@ fig.text(
     wrap=True,
 )
 
-fig.subplots_adjust(
-    left=0.102,
-    right=0.98,
-    top=0.904,
-    bottom=0.242,
-    wspace=0.32,
-    hspace=0.38,
-)
+fig.tight_layout(rect=(0, 0.08, 1, 0.92))
 
 output_path = FIGURE_DIR / "MW-axion-annual-daily-modulations.pdf"
 fig.savefig(output_path, facecolor="white", transparent=False)
 plt.show()
-
-
-# plt.close(fig)
 
 print(f"Saved {output_path}")
 print(
