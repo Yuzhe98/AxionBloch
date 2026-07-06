@@ -40,3 +40,18 @@ venv/
 _internal/
 
 *.pdf
+
+# Ignore temporary and generated output folders
+tmp/
+temp/
+*/tmp/
+*/temp/
+
+# Ignore example-generated outputs and figure folders
+**/outputs/
+**/figures/
+path_to_save/
+
+# OS files
+.DS_Store
+.pytest_cache/
