@@ -29,7 +29,7 @@ class MilkyWayAxionHalo:
     # axion-nucleon coupling strength
     g_aNN: Quantity[unit.GeV ** (-1)]
     # axion quality factor
-    Qa: Quantity[unit.one]
+    Q_a: Quantity[unit.one]
     # Local (@ solar radius) galaxy circular rotation speed
     v_0: Quantity[unit.km / unit.s] = 220.0 * unit.km / unit.s
     # Laboratory speed relative to the galactic rest frame
@@ -42,6 +42,7 @@ class MilkyWayAxionHalo:
     windAngle: Quantity[unit.rad] | None = None
     nu_a_eff: Quantity[unit.Hz]
     tau_a_est: Quantity[unit.s]
+    tau_a: Quantity[unit.s]
 
     # ----------- ----------- ----------- #
     def __init__(
@@ -50,7 +51,7 @@ class MilkyWayAxionHalo:
         nu_a: Quantity = None,
         m_a: Quantity = None,
         g_aNN: Quantity = None,
-        Qa: Quantity = None,
+        Q_a: Quantity = None,
         v_0: Quantity = 220.0 * unit.km / unit.s,
         v_lab: Quantity = 233.0 * unit.km / unit.s,
         windAngle: Quantity = None,
@@ -60,7 +61,7 @@ class MilkyWayAxionHalo:
         """Initialize the Milky Way axion halo model.
 
         Provide either ``nu_a`` or ``m_a`` (or both, in which case they are
-        checked for consistency).  If ``Qa`` is omitted it is estimated from the
+        checked for consistency).  If ``Q_a`` is omitted it is estimated from the
         Standard Halo Model as ``(c / v_lab)^2``.
 
         Parameters
@@ -73,7 +74,7 @@ class MilkyWayAxionHalo:
             Axion mass (kg or equivalent).
         g_aNN : Quantity, optional
             Axion-nucleon coupling constant (GeV⁻¹).
-        Qa : Quantity, optional
+        Q_a : Quantity, optional
             Axion quality factor (dimensionless).  Defaults to ``(c/v_lab)^2``.
         v_0 : Quantity
             Local circular-rotation speed of the galaxy (km/s).
@@ -102,9 +103,7 @@ class MilkyWayAxionHalo:
         if nu_a is not None and m_a is not None:
             # check consistency
             nu_a_from_m_a = m_a * const.c**2 / const.h
-            if not np.isclose(
-                nu_a.value, nu_a_from_m_a.to_value(nu_a.unit), rtol=1e-6
-            ):
+            if not np.isclose(nu_a.value, nu_a_from_m_a.to_value(nu_a.unit), rtol=1e-6):
                 raise ValueError(
                     f"Inconsistent nu_a and m_a: nu_a from m_a = {nu_a_from_m_a}, provided nu_a = {nu_a}"
                 )
@@ -117,12 +116,12 @@ class MilkyWayAxionHalo:
 
         self.g_aNN = g_aNN
 
-        if Qa is None:
-            self.Qa = (const.c / self.v_0) ** 2.0
+        if Q_a is None:
+            self.Q_a = (const.c / self.v_0) ** 2.0
         else:
-            self.Qa = Qa
+            self.Q_a = Q_a
 
-        self.FWHM = 1.0 / self.Qa
+        self.FWHM = 1.0 / self.Q_a
 
         # effective axion frequency considering second-order Doppler effect
         self.nu_a_eff = self.nu_a * (1 + 0.5 * self.v_lab**2 / const.c**2)
@@ -181,9 +180,7 @@ class MilkyWayAxionHalo:
                 [sc.cartesian.x.value, sc.cartesian.y.value, sc.cartesian.z.value]
             )
 
-        return np.column_stack(
-            [_icrs_hat(180, 0), _icrs_hat(90, 0), _icrs_hat(0, 90)]
-        )
+        return np.column_stack([_icrs_hat(180, 0), _icrs_hat(90, 0), _icrs_hat(0, 90)])
 
     @staticmethod
     def getHaloVelocity(
@@ -231,9 +228,7 @@ class MilkyWayAxionHalo:
             gcrs = station.location.get_gcrs(time)
             galcen = coord.SkyCoord(gcrs).transform_to(galcen_frame)
             diff = galcen.cartesian.differentials["s"]
-            lab_velocity = MilkyWayAxionHalo._cartesian_xyz(
-                diff, unit.km / unit.s
-            )
+            lab_velocity = MilkyWayAxionHalo._cartesian_xyz(diff, unit.km / unit.s)
 
         return -lab_velocity if as_wind else lab_velocity
 
@@ -260,9 +255,7 @@ class MilkyWayAxionHalo:
         from astropy.coordinates import GCRS
 
         loc_itrs = station.location.get_itrs(obstime=time)
-        origin_gcrs = loc_itrs.transform_to(GCRS(obstime=time)).cartesian.xyz.to(
-            unit.m
-        )
+        origin_gcrs = loc_itrs.transform_to(GCRS(obstime=time)).cartesian.xyz.to(unit.m)
         gcrs_to_galcen = MilkyWayAxionHalo._galcen_to_icrs_rotation().T
 
         basis_itrs = MilkyWayAxionHalo._station_basis_itrs(station)
@@ -358,9 +351,7 @@ class MilkyWayAxionHalo:
                 (unit.km / unit.s) ** 2
             )
         if case == "grad_perp":
-            return (v_0**2 + v_lab**2 * np.sin(alpha) ** 2).to(
-                (unit.km / unit.s) ** 2
-            )
+            return (v_0**2 + v_lab**2 * np.sin(alpha) ** 2).to((unit.km / unit.s) ** 2)
         if case == "non-grad":
             return np.ones_like(np.atleast_1d(v_lab.value)) * unit.one
         raise ValueError("case must be 'non-grad', 'grad_par', or 'grad_perp'")
@@ -377,8 +368,8 @@ class MilkyWayAxionHalo:
         self.v_lab = mw.get_v_lab_magnitude()
         if mw.station is not None:
             self.windAngle = mw.get_wind_angle()
-        self.Qa = (const.c / self.v_0) ** 2.0
-        self.FWHM = 1.0 / self.Qa
+        self.Q_a = (const.c / self.v_0) ** 2.0
+        self.FWHM = 1.0 / self.Q_a
         self.nu_a_eff = self.nu_a * (1 + 0.5 * self.v_lab**2 / const.c**2)
         self.tau_a_est = 1.0 / (np.pi * self.FWHM * self.nu_a_eff)
 
@@ -482,9 +473,7 @@ class MilkyWayAxionHalo:
                     galcen_frame=galcen_frame,
                 )
                 perp = np.sqrt(speed**2 - parallel**2).to(unit.km / unit.s)
-                cos_alpha = np.clip(
-                    (parallel / speed).to_value(unit.one), -1.0, 1.0
-                )
+                cos_alpha = np.clip((parallel / speed).to_value(unit.one), -1.0, 1.0)
                 angle = np.arccos(np.abs(cos_alpha)) * unit.rad
             else:
                 mw = MilkyWay(
@@ -572,7 +561,9 @@ class MilkyWayAxionHalo:
         psd = np.array([line.to_value(lineshapes[0].unit) for line in lineshapes])
         psd = psd * lineshapes[0].unit
         power_coefficient = (
-            np.array([c.to_value(power_coefficients[0].unit) for c in power_coefficients])
+            np.array(
+                [c.to_value(power_coefficients[0].unit) for c in power_coefficients]
+            )
             * power_coefficients[0].unit
         )
         power_spectrum = power_coefficient[:, np.newaxis] * psd
@@ -657,7 +648,9 @@ class MilkyWayAxionHalo:
                 frequency_indices = [
                     int(
                         np.argmax(
-                            np.mean(power_spectrum.to_value(power_spectrum.unit), axis=0)
+                            np.mean(
+                                power_spectrum.to_value(power_spectrum.unit), axis=0
+                            )
                         )
                     )
                 ]

@@ -150,7 +150,7 @@ def test_MilkyWayAxionHalo_initialization():
             name="Milky Way Axion Halo",
             nu_a=1 * unit.MHz,
             g_aNN=None,
-            Qa=None,
+            Q_a=None,
             v_0=220.0 * unit.km / unit.s,
             v_lab=233.0 * unit.km / unit.s,
             rho_E_DM=0.3 * unit.GeV / unit.cm**3,
@@ -193,11 +193,11 @@ def test_getRabiFreq():
     assert rabi_perp_max > rabi_perp_min
 
 
-def test_frequency_mass_conversion_and_explicit_Qa():
-    """Compton frequency uses h, and explicit Qa is preserved."""
+def test_frequency_mass_conversion_and_explicit_Q_a():
+    """Compton frequency uses h, and explicit Q_a is preserved."""
     nu_a = 1 * unit.MHz
-    axion = MilkyWayAxionHalo(nu_a=nu_a, Qa=1e5 * unit.one)
-    assert axion.Qa == 1e5 * unit.one
+    axion = MilkyWayAxionHalo(nu_a=nu_a, Q_a=1e5 * unit.one)
+    assert axion.Q_a == 1e5 * unit.one
     assert np.isclose(
         axion.m_a.to_value(unit.kg),
         (nu_a * const.h / const.c**2).to_value(unit.kg),
@@ -208,7 +208,7 @@ def test_frequency_mass_conversion_and_explicit_Qa():
 
     default_axion = MilkyWayAxionHalo(nu_a=nu_a)
     assert np.isclose(
-        default_axion.Qa.to_value(unit.one),
+        default_axion.Q_a.to_value(unit.one),
         ((const.c / default_axion.v_0) ** 2).to_value(unit.one),
     )
     assert np.isclose(
@@ -333,7 +333,7 @@ def test_getAmpSpectra_stochastic():
         name="Milky Way Axion Halo",
         nu_a=nu_a,
         g_aNN=1.0e-9 * unit.GeV ** (-1),
-        Qa=None,
+        Q_a=None,
         v_0=v_0,
         v_lab=v_lab,
         windAngle=None,
@@ -381,7 +381,7 @@ def test_getAmpSpectra_deterministic():
         name="Milky Way Axion Halo",
         nu_a=nu_a,
         g_aNN=1.0e-9 * unit.GeV ** (-1),
-        Qa=None,
+        Q_a=None,
         v_0=v_0,
         v_lab=v_lab,
         windAngle=None,

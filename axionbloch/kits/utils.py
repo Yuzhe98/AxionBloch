@@ -2424,8 +2424,8 @@ def axion_lineshape_Gramolin(v_0_ms, v_lab_ms, nu_a_Hz, nu, case="non-grad", alp
     # return the lineshape under certain special circumstances
     c = 299792458.0  # Speed of light (in m/s)
     v_0_ms, v_lab_ms = np.abs(v_0_ms), np.abs(v_lab_ms)
-    Qa = 1e6
-    FWHM = 1 / Qa
+    Q_a = 1e6
+    FWHM = 1 / Q_a
 
     full_lineshape = np.zeros(len(nu))
     RBW = np.abs(nu[1] - nu[0])

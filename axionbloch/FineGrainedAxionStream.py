@@ -19,7 +19,7 @@ class FineGrainedAxionStream(PhysicalObject):
 
     Represents a coherent axion stream with a fixed laboratory velocity
     ``v_lab`` and dark-matter density ``rho_E_DM``.  The quality factor
-    ``Q_a = (c/v_lab)²`` is derived automatically unless overridden by ``Qa``.
+    ``Q_a = (c/v_lab)²`` is derived automatically unless overridden by ``Q_a``.
 
     Attributes
     ----------
@@ -38,7 +38,7 @@ class FineGrainedAxionStream(PhysicalObject):
         name="axion stream",
         nu_a: Quantity = None,  # compton frequency
         g_aNN: Quantity = None,
-        Qa: Quantity = None,
+        Q_a: Quantity = None,
         # v_0: Quantity = 220.0 * unit.km / unit.s,  # Local (@ solar radius) galaxy circular rotation speed
         v_lab: Quantity = 233.0
         * unit.km
@@ -59,7 +59,7 @@ class FineGrainedAxionStream(PhysicalObject):
             Axion Compton frequency.
         g_aNN : Quantity
             Axion-nucleon coupling in 1/GeV.
-        Qa : Quantity, optional
+        Q_a : Quantity, optional
             Axion quality factor (dimensionless). Derived from ``v_lab`` if not given.
         v_lab : Quantity
             Laboratory speed relative to the galactic rest frame (default 233 km/s).
@@ -79,7 +79,7 @@ class FineGrainedAxionStream(PhysicalObject):
         self.nu_a = nu_a
         self.g_aNN = g_aNN
 
-        if Qa is None:
+        if Q_a is None:
             self.Q_a = (const.c / self.v_lab).to(unit.one) ** 2
 
         self.FWHM = 1.0 / self.Q_a
@@ -92,17 +92,17 @@ class FineGrainedAxionStream(PhysicalObject):
         self.tau_a_est = self.tau_a_est.to(unit.s)
 
         # Specify all physical quantities with units
-        self.quantities = {
-            "v_0": "km/s",
-            "v_lab": "km/s",
-            "rho_E_DM": "GeV/cm**3",
-            "nu_a": "Hz",
-            "g_aNN": "GeV**-1",
-            "Qa": "",
-            "FWHM": "",
-            "nu_a_eff": "Hz",
-            "tau_a_est": "s",
-        }
+        # self.quantities = {
+        #     "v_0": "km/s",
+        #     "v_lab": "km/s",
+        #     "rho_E_DM": "GeV/cm**3",
+        #     "nu_a": "Hz",
+        #     "g_aNN": "GeV**-1",
+        #     "Q_a": "",
+        #     "FWHM": "",
+        #     "nu_a_eff": "Hz",
+        #     "tau_a_est": "s",
+        # }
         self.useCommonUnits()
 
     # def GetAxionWind(
