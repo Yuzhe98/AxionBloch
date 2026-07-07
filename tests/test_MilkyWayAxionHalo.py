@@ -217,6 +217,28 @@ def test_frequency_mass_conversion_and_explicit_Q_a():
     )
 
 
+def test_get_T_coh():
+    """T_coh follows T2star * sqrt(tau_a / (tau_a + T2star))."""
+    axion = MilkyWayAxionHalo(nu_a=1 * unit.MHz)
+    axion.tau_a = 4 * unit.s
+
+    T2star = 1 * unit.s
+    expected = T2star * np.sqrt(
+        (axion.tau_a / (axion.tau_a + T2star)).to_value(unit.one)
+    )
+
+    result = axion.get_T_coh(T2star)
+
+    assert result.unit == unit.s
+    assert np.isclose(result.to_value(unit.s), expected.to_value(unit.s))
+
+    T2star_ms = 1000 * unit.ms
+    result_ms = axion.get_T_coh(T2star_ms)
+
+    assert result_ms.unit == unit.ms
+    assert np.isclose(result_ms.to_value(unit.ms), expected.to_value(unit.ms))
+
+
 def test_gradient_power_coefficients_match_gramolin_eq_19():
     """Eq. (19): C_parallel and C_perp carry the Fig. 3 power modulation."""
     v_0 = 220 * unit.km / unit.s

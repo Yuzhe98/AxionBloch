@@ -121,7 +121,7 @@ class MilkyWayAxionHalo:
         self.g_aNN = g_aNN
 
         if Q_a is None:
-            self.Q_a = (const.c / self.v_0) ** 2.0
+            self.Q_a = (const.c / self.v_lab) ** 2.0
         else:
             self.Q_a = Q_a
 
@@ -137,6 +137,19 @@ class MilkyWayAxionHalo:
         self.tau_a_est = 1.0 / (np.pi * self.FWHM * self.nu_a_eff)
         self.tau_a_est = self.tau_a_est
         self.tau_a = 1.0 / (np.pi * self.FWHM * self.nu_a)
+
+    def get_T_coh(self, T2star: Quantity) -> Quantity:
+        """Return the signal coherence time for a given ``T2star``.
+
+        Uses the current ``self.tau_a`` value, so updates from measured
+        linewidth calculations are reflected in the returned coherence time.
+        """
+        T2star_s = T2star.to(unit.s)
+        tau_a_s = self.tau_a.to(unit.s)
+        T_coh = T2star_s * np.sqrt(
+            (tau_a_s / (tau_a_s + T2star_s))
+        )
+        return T_coh.to(T2star.unit)
 
     @staticmethod
     def _cartesian_xyz(cartesian, xyz_unit: unit.Unit) -> Quantity:
