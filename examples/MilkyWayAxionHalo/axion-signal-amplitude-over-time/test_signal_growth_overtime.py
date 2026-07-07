@@ -28,11 +28,11 @@ Example
 -------
 Run the default coherent-limit scan with 1000 field realizations:
 
-    python examples/MilkyWayAxionHalo/test_signal_formula.py
+    python examples/MilkyWayAxionHalo/axion-signal-amplitude-over-time/test_signal_growth_overtime.py
 
 Run a smaller exploratory scan and display the plots:
 
-    python examples/MilkyWayAxionHalo/test_signal_formula.py \
+    python examples/MilkyWayAxionHalo/axion-signal-amplitude-over-time/test_signal_growth_overtime.py \
         --frequencies 1e3 1e6 --ratios 10 30 100 \
         --T2-over-T2star 1.05 3 100 --num-fields 1000 --show
 """
@@ -44,6 +44,11 @@ import csv
 import gc
 import sys
 from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 import matplotlib
 import numpy as np
@@ -65,7 +70,7 @@ from axionbloch.SimuTools import MagField, Simulations
 from axionbloch.SimuTypes import SimuParams
 
 
-SCRIPT_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = SCRIPT_DIR / "outputs"
 
 
 def parse_args() -> argparse.Namespace:
@@ -136,7 +141,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-prefix",
         type=Path,
-        default=SCRIPT_DIR / "signal-formula-scan",
+        default=OUTPUT_DIR / "signal-formula-scan",
         help="Path prefix for the PNG and CSV outputs.",
     )
     parser.add_argument(

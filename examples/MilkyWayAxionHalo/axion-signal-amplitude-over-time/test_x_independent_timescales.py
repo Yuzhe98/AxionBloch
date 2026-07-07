@@ -9,14 +9,20 @@ from __future__ import annotations
 
 import argparse
 import gc
+import sys
 from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SCRIPT_DIR.parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy import units as unit
 
 from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
-from test_signal_formula import (
+from test_signal_growth_overtime import (
     add_global_model,
     analyze_case,
     fit_global_x_model,
@@ -29,7 +35,7 @@ from test_signal_formula import (
 )
 
 
-SCRIPT_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = SCRIPT_DIR / "outputs"
 
 
 def parse_args() -> argparse.Namespace:
@@ -79,7 +85,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-prefix",
         type=Path,
-        default=SCRIPT_DIR / "x-independent-timescales",
+        default=OUTPUT_DIR / "x-independent-timescales",
     )
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
@@ -156,7 +162,7 @@ def plot_summary(
     results: list[dict[str, object]],
     global_parameters: np.ndarray,
     path: Path,
-) -> plt.Figure:
+):
     fig, (x_axis, chi2_axis) = plt.subplots(
         1, 2, figsize=(11, 4.3), constrained_layout=True
     )
