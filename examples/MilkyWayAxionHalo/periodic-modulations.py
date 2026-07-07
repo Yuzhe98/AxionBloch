@@ -1,4 +1,4 @@
-"""Plot Milky-Way axion-wind periodic modulations at Boston.
+"""Plot MW axion-wind periodic modulations at Boston.
 
 This example intentionally obtains the laboratory speed and wind-orientation
 modulations from :mod:`axionbloch.MilkyWayAxionHalo`, rather than retyping the
@@ -67,9 +67,45 @@ daily_kinematics = {
     for axis in axis_styles
 }
 
-fig, axes = plt.subplots(1, 2, figsize=(14 / 2.54, 6 / 2.54), dpi=300)
+P_parallel = {}
+P_perp = {}
+for axis in axis_styles:
+    alpha = daily_kinematics[axis]["wind_angle"]
+    v_lab_daily = daily_kinematics[axis]["v_lab_magnitude"]
+    P_parallel[axis] = axion.gradientPowerCoefficient(
+        v_0=axion.v_0,
+        v_lab=v_lab_daily,
+        alpha=alpha,
+        case="grad_par",
+    )
+    P_perp[axis] = axion.gradientPowerCoefficient(
+        v_0=axion.v_0,
+        v_lab=v_lab_daily,
+        alpha=alpha,
+        case="grad_perp",
+    )
+
+# Use one common scaling factor for all three orientations in each power panel.
+P_parallel_max = max(np.max(values) for values in P_parallel.values())
+P_perp_max = max(np.max(values) for values in P_perp.values())
+P_parallel_normalized = {
+    axis: (values / P_parallel_max).to_value(unit.one)
+    for axis, values in P_parallel.items()
+}
+P_perp_normalized = {
+    axis: (values / P_perp_max).to_value(unit.one)
+    for axis, values in P_perp.items()
+}
+
+fig, axes = plt.subplots(
+    2,
+    2,
+    figsize=(14 / 2.54, 13 / 2.54),
+    dpi=300,
+)
 fig.patch.set_facecolor("white")
-ax_speed, ax_cos_alpha = axes
+ax_speed, ax_cos_alpha = axes[0]
+ax_P_parallel, ax_P_perp = axes[1]
 
 ax_speed.plot(
     annual_days,
@@ -104,20 +140,31 @@ for axis, style in axis_styles.items():
     # findKinematicsOverTime reports cos(alpha) for the axion wind direction,
     # i.e. -v_lab.  The Gramolin Fig. 3 convention plots the angle relative to
     # v_lab itself, so the sign is flipped here.
+    line_kwargs = {
+        "label": style["label"],
+        "color": style["color"],
+        "linestyle": style["linestyle"],
+    }
     ax_cos_alpha.plot(
         daily_hours,
         -daily_kinematics[axis]["cos_alpha"],
-        label=style["label"],
-        color=style["color"],
-        linestyle=style["linestyle"],
+        **line_kwargs,
+    )
+    ax_P_parallel.plot(
+        daily_hours,
+        P_parallel_normalized[axis],
+        **line_kwargs,
+    )
+    ax_P_perp.plot(
+        daily_hours,
+        P_perp_normalized[axis],
+        **line_kwargs,
     )
 
 ax_cos_alpha.axhline(0, color="0.65", linewidth=0.6, zorder=0)
 ax_cos_alpha.set_ylabel("$\\cos\\alpha$")
-ax_cos_alpha.set_xlabel("Time on Jan. 1 (hour)")
 ax_cos_alpha.set_xlim(0, 24)
 ax_cos_alpha.set_ylim(-1.05, 1.05)
-ax_cos_alpha.set_xticks([0, 6, 12, 18, 24])
 ax_cos_alpha.legend(
     loc="lower center",
     bbox_to_anchor=(0.5, 1.02),
@@ -128,7 +175,17 @@ ax_cos_alpha.legend(
     columnspacing=1.0,
 )
 
-for panel_label, ax in zip(("a", "b"), axes.flat):
+ax_P_parallel.set_ylabel("$P_\\parallel$ (arb. units)")
+ax_P_perp.set_ylabel("$P_\\perp$ (arb. units)")
+for ax in (ax_P_parallel, ax_P_perp):
+    ax.set_ylim(0, 1.03)
+
+for ax in (ax_cos_alpha, ax_P_parallel, ax_P_perp):
+    ax.set_xlim(0, 24)
+    ax.set_xticks([0, 6, 12, 18, 24])
+    ax.set_xlabel("Time on Jan. 1 (hour)")
+
+for panel_label, ax in zip(("a", "b", "c", "d"), axes.flat):
     ax.text(
         -0.18,
         1.02,
@@ -138,7 +195,7 @@ for panel_label, ax in zip(("a", "b"), axes.flat):
         va="bottom",
     )
 
-for ax in axes:
+for ax in axes.flat:
     ax.grid(True, alpha=0.25)
 
 # Watermark follows examples/example_matplotlib.py.
@@ -159,7 +216,7 @@ fig.text(
     wrap=True,
 )
 
-fig.tight_layout(rect=(0, 0.08, 1, 0.92))
+fig.tight_layout(rect=(0, 0.08, 1, 0.94))
 
 output_path = FIGURE_DIR / "MW-axion-annual-daily-modulations.pdf"
 fig.savefig(output_path, facecolor="white", transparent=False)

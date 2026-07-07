@@ -6,6 +6,7 @@ from axionbloch.dependency import *
 from axionbloch.utils import check_norm
 from axionbloch.MilkyWay import MilkyWay
 
+
 class MilkyWayAxionHalo:
     """Axion dark-matter field (axion wind) from the Milky Way halo.
 
@@ -41,6 +42,8 @@ class MilkyWayAxionHalo:
     rho_E_DM: Quantity[unit.GeV / unit.cm**3] = 0.3 * unit.GeV / unit.cm**3
     windAngle: Quantity[unit.rad] | None = None
     nu_a_eff: Quantity[unit.Hz]
+    FWHM_a: Quantity[ppm]
+    FWHM_frequency: Quantity[unit.Hz]
     tau_a_est: Quantity[unit.s]
     tau_a: Quantity[unit.s]
 
@@ -88,6 +91,7 @@ class MilkyWayAxionHalo:
         verbose : bool
             Print derived quantities after construction.
         """
+
         logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
         self.name = name
         self.v_0 = v_0
@@ -122,6 +126,8 @@ class MilkyWayAxionHalo:
             self.Q_a = Q_a
 
         self.FWHM = 1.0 / self.Q_a
+        self.FWHM_a = self.FWHM.to(ppm)
+        self.FWHM_frequency = (self.FWHM * self.nu_a).to(unit.Hz)
 
         # effective axion frequency considering second-order Doppler effect
         self.nu_a_eff = self.nu_a * (1 + 0.5 * self.v_lab**2 / const.c**2)
@@ -130,6 +136,7 @@ class MilkyWayAxionHalo:
         # coherence time (estimated)
         self.tau_a_est = 1.0 / (np.pi * self.FWHM * self.nu_a_eff)
         self.tau_a_est = self.tau_a_est
+        self.tau_a = 1.0 / (np.pi * self.FWHM * self.nu_a)
 
     @staticmethod
     def _cartesian_xyz(cartesian, xyz_unit: unit.Unit) -> Quantity:
@@ -351,7 +358,7 @@ class MilkyWayAxionHalo:
         if case == "grad_perp":
             return (v_0**2 + v_lab**2 * np.sin(alpha) ** 2).to((unit.km / unit.s) ** 2)
         if case == "non-grad":
-            return np.ones_like(np.atleast_1d(v_lab.value)) * unit.one
+            return np.ones(np.shape(v_lab.value)) * unit.one
         raise ValueError("case must be 'non-grad', 'grad_par', or 'grad_perp'")
 
     def setKinematicsWithMilkyWay(self, mw, verbose: bool = False) -> None:
@@ -368,8 +375,11 @@ class MilkyWayAxionHalo:
             self.windAngle = mw.get_wind_angle()
         self.Q_a = (const.c / self.v_0) ** 2.0
         self.FWHM = 1.0 / self.Q_a
+        self.FWHM_a = self.FWHM.to(ppm)
+        self.FWHM_frequency = (self.FWHM * self.nu_a).to(unit.Hz)
         self.nu_a_eff = self.nu_a * (1 + 0.5 * self.v_lab**2 / const.c**2)
         self.tau_a_est = 1.0 / (np.pi * self.FWHM * self.nu_a_eff)
+        self.tau_a = 1.0 / (np.pi * self.FWHM * self.nu_a)
 
         if verbose:
             print(f"[{self.__class__.__name__}.setKinematicsWithMilkyWay]")
@@ -385,7 +395,6 @@ class MilkyWayAxionHalo:
         verbose: bool = False,
     ) -> None:
         """Update halo kinematics from astropy time/station inputs."""
-
 
         mw = MilkyWay(
             time=time if time is not None else Time.now(),
@@ -403,7 +412,7 @@ class MilkyWayAxionHalo:
         galcen_frame: coord.Galactocentric | None = None,
         verbose: bool = False,
     ) -> dict:
-        """Milky-Way halo kinematics over a list of epochs.
+        """Milky Way halo kinematics over a list of epochs.
 
         This is the time-domain companion to the static SHM parameters.  It
         exposes the daily/annual modulation ingredients entering the gradient
@@ -580,6 +589,339 @@ class MilkyWayAxionHalo:
             "power_spectrum_shape": power_spectrum,
         }
 
+    def makeLineshapeFrequencyGrid(
+        self,
+        *,
+        frequency_span: Quantity | None = None,
+        frequency_span_ppm: float | None = None,
+        num_frequency_points: int = 20001,
+    ) -> Quantity:
+        """Return a frequency grid suitable for SHM axion PSD evaluation.
+
+        The grid starts at ``nu_a`` and extends over the positive kinetic-energy
+        side of the line.  If no span is supplied, it covers ten times the
+        nominal SHM width ``nu_a / Q_a``.
+
+        Parameters
+        ----------
+        frequency_span : Quantity, optional
+            Absolute span above ``nu_a``.
+        frequency_span_ppm : float, optional
+            Fractional span above ``nu_a`` in ppm.  Ignored when
+            ``frequency_span`` is supplied.
+        num_frequency_points : int
+            Number of grid points.
+
+        Returns
+        -------
+        Quantity
+            Frequency grid in the same unit as ``nu_a``.
+        """
+
+        if num_frequency_points < 3:
+            raise ValueError("num_frequency_points must be at least 3")
+
+        if frequency_span is None:
+            if frequency_span_ppm is None:
+                frequency_span = 10.0 * self.FWHM * self.nu_a
+            else:
+                frequency_span = frequency_span_ppm * ppm * self.nu_a
+        else:
+            frequency_span = frequency_span.to(self.nu_a.unit)
+
+        return (
+            self.nu_a
+            + np.linspace(
+                0.0,
+                frequency_span.to_value(self.nu_a.unit),
+                num_frequency_points,
+            )
+            * self.nu_a.unit
+        )
+
+    @staticmethod
+    def measureLineshapeFWHM(
+        frequencies: Quantity,
+        spectrum: Quantity | np.ndarray,
+        *,
+        nu_a: Quantity | None = None,
+    ) -> dict:
+        """Measure the FWHM of a sampled PSD or power spectrum.
+
+        Linear interpolation is used for the two half-maximum crossings.  The
+        method is agnostic to whether ``spectrum`` is a normalized PSD or a
+        power spectrum; multiplying a spectrum by a constant does not change
+        the returned width.
+
+        Parameters
+        ----------
+        frequencies : Quantity
+            Frequency grid.
+        spectrum : Quantity or ndarray
+            Sampled PSD or power spectrum on ``frequencies``.
+        nu_a : Quantity, optional
+            Reference frequency used to report the fractional width in ppm.
+            Defaults to the first frequency grid point.
+
+        Returns
+        -------
+        dict
+            Contains ``FWHM_frequency``, ``FWHM_a``, ``tau_a``, peak and
+            half-maximum diagnostics.
+        """
+
+        freq = frequencies
+        values = (
+            spectrum.to_value(spectrum.unit)
+            if isinstance(spectrum, Quantity)
+            else np.asarray(spectrum)
+        )
+        values = np.asarray(values, dtype=float)
+
+        if freq.ndim != 1 or values.ndim != 1:
+            raise ValueError("frequencies and spectrum must be one-dimensional")
+        if len(freq) != len(values):
+            raise ValueError("frequencies and spectrum must have the same length")
+        if len(freq) < 3:
+            raise ValueError("at least three frequency points are required")
+        if not np.all(np.isfinite(values)):
+            raise ValueError("spectrum contains non-finite values")
+
+        peak_idx = int(np.argmax(values))
+        peak_value = values[peak_idx]
+        if peak_value <= 0:
+            raise ValueError("spectrum maximum must be positive")
+        half_max = 0.5 * peak_value
+        x = freq.to_value(unit.Hz)
+
+        def _crossing(i_low, i_high):
+            x0, x1 = x[i_low], x[i_high]
+            y0, y1 = values[i_low], values[i_high]
+            if y1 == y0:
+                return 0.5 * (x0 + x1)
+            return x0 + (half_max - y0) * (x1 - x0) / (y1 - y0)
+
+        lower_idx = None
+        for idx in range(peak_idx - 1, -1, -1):
+            if values[idx] <= half_max <= values[idx + 1]:
+                lower_idx = idx
+                break
+        if lower_idx is None:
+            lower_frequency = x[0]
+        else:
+            lower_frequency = _crossing(lower_idx, lower_idx + 1)
+
+        upper_idx = None
+        for idx in range(peak_idx, len(values) - 1):
+            if values[idx] >= half_max >= values[idx + 1]:
+                upper_idx = idx
+                break
+        if upper_idx is None:
+            raise ValueError(
+                "upper half-maximum crossing was not found; use a wider "
+                "frequency grid"
+            )
+        upper_frequency = _crossing(upper_idx, upper_idx + 1)
+
+        FWHM_frequency = (upper_frequency - lower_frequency) * unit.Hz
+        if FWHM_frequency <= 0 * unit.Hz:
+            raise ValueError("measured FWHM is not positive")
+
+        if nu_a is None:
+            nu_a = Quantity(freq[0])
+        else:
+            nu_a = nu_a.to(unit.Hz)
+        FWHM_fraction = (FWHM_frequency / nu_a).to(unit.one)
+        FWHM_a = FWHM_fraction.to(ppm)
+        tau_a = (1.0 / (np.pi * FWHM_fraction * nu_a)).to(unit.s)
+
+        return {
+            "FWHM_frequency": FWHM_frequency.to(frequencies.unit),
+            "FWHM_fraction": FWHM_fraction,
+            "FWHM_a": FWHM_a,
+            "tau_a": tau_a,
+            "lower_half_max_frequency": (lower_frequency * unit.Hz).to(
+                frequencies.unit
+            ),
+            "upper_half_max_frequency": (upper_frequency * unit.Hz).to(
+                frequencies.unit
+            ),
+            "peak_frequency": freq[peak_idx].to(frequencies.unit),
+            "peak_value": peak_value
+            * (spectrum.unit if isinstance(spectrum, Quantity) else unit.one),
+            "half_max": half_max
+            * (spectrum.unit if isinstance(spectrum, Quantity) else unit.one),
+        }
+
+    def findLineshapeAtStationAndTime(
+        self,
+        station,
+        meas_time: Time | None = None,
+        frequencies: Quantity | None = None,
+        case: str = "grad_perp",
+        sensitive_axis: str | np.ndarray | Quantity = "up",
+        include_rotation: bool = True,
+        galcen_frame: coord.Galactocentric | None = None,
+        update: bool = True,
+        verbose: bool = False,
+        **frequency_grid_kwargs,
+    ) -> dict:
+        """Evaluate the axion PSD seen by a station at one time.
+
+        The method obtains ``v_lab`` and the wind angle ``alpha`` from
+        :meth:`findKinematicsOverTime`, then passes them to the static
+        :meth:`axion_lineshape` implementation.
+
+        Parameters
+        ----------
+        station : axionbloch.Station.Station
+            Laboratory location.
+        meas_time : astropy.time.Time, optional
+            Observation time.  Defaults to ``Time.now()``.
+        frequencies : Quantity, optional
+            Frequency grid.  If omitted, :meth:`makeLineshapeFrequencyGrid` is
+            used.  Keyword arguments such as ``frequency_span_ppm`` and
+            ``num_frequency_points`` are forwarded to that grid maker.
+        case : str
+            ``'non-grad'``, ``'grad_par'``, or ``'grad_perp'``.
+        sensitive_axis : str or vector
+            Local axis used to define the wind angle.
+        include_rotation : bool
+            Include the station's surface rotation in the lab velocity.
+        galcen_frame : astropy.coordinates.Galactocentric, optional
+            Custom Galactocentric frame.
+        update : bool
+            If ``True``, update ``v_lab``, ``windAngle`` and ``nu_a_eff`` on
+            this object.
+
+        Returns
+        -------
+        dict
+            Kinematics plus ``frequencies``, normalized ``PSD``,
+            ``power_coefficient`` and ``power_spectrum``.
+        """
+
+        if meas_time is None:
+            meas_time = Time.now()
+        if frequencies is None:
+            frequencies = self.makeLineshapeFrequencyGrid(**frequency_grid_kwargs)
+
+        kinematics = self.findKinematicsOverTime(
+            station=station,
+            meas_times=meas_time,
+            sensitive_axis=sensitive_axis,
+            include_rotation=include_rotation,
+            galcen_frame=galcen_frame,
+            verbose=verbose,
+        )
+
+        speed = kinematics["v_lab_magnitude"][0]
+        alpha = kinematics["wind_angle"][0]
+        lineshape = self.axion_lineshape(
+            v_0=self.v_0,
+            v_lab=speed,
+            nu_a=self.nu_a,
+            nu=frequencies,
+            case=case,
+            alpha=alpha,
+            verbose=verbose,
+        )
+        power_coefficient = self.gradientPowerCoefficient(
+            v_0=self.v_0,
+            v_lab=speed,
+            alpha=alpha,
+            case=case,
+        )
+        power_spectrum = power_coefficient * lineshape
+
+        if update:
+            self.v_lab = speed
+            self.windAngle = alpha
+            self.nu_a_eff = kinematics["nu_a_eff"][0]
+
+        return {
+            **kinematics,
+            "time": kinematics["times"][0],
+            "frequency": frequencies,
+            "frequencies": frequencies,
+            "case": case,
+            "alpha": alpha,
+            "lineshape": lineshape,
+            "PSD": lineshape,
+            "power_coefficient": power_coefficient,
+            "power_spectrum": power_spectrum,
+        }
+
+    def findLineshapeFWHMAtStation(
+        self,
+        station,
+        meas_time: Time | None = None,
+        frequencies: Quantity | None = None,
+        case: str = "grad_perp",
+        sensitive_axis: str | np.ndarray | Quantity = "up",
+        spectrum: str = "PSD",
+        include_rotation: bool = True,
+        galcen_frame: coord.Galactocentric | None = None,
+        update: bool = True,
+        verbose: bool = False,
+        **frequency_grid_kwargs,
+    ) -> dict:
+        """Find the FWHM of the station/time-dependent axion PSD.
+
+        Parameters are the same as :meth:`findLineshapeAtStation`.  ``spectrum``
+        chooses whether the width is measured from the normalized ``'PSD'`` /
+        ``'lineshape'`` or from the scaled ``'power_spectrum'``.  The two are
+        normally identical because the power coefficient is frequency
+        independent at fixed time.
+
+        When ``update=True``, this method updates:
+
+        - ``FWHM_frequency``: width in frequency units,
+        - ``FWHM_a``: fractional width expressed in ppm,
+        - ``tau_a = 1 / (pi * FWHM_a * nu_a)`` using ``FWHM_a`` as a
+          dimensionless fraction.
+        """
+
+        result = self.findLineshapeAtStationAndTime(
+            station=station,
+            meas_time=meas_time,
+            frequencies=frequencies,
+            case=case,
+            sensitive_axis=sensitive_axis,
+            include_rotation=include_rotation,
+            galcen_frame=galcen_frame,
+            update=update,
+            verbose=verbose,
+            **frequency_grid_kwargs,
+        )
+
+        spectrum_key = spectrum.lower()
+        if spectrum_key in {"psd", "lineshape"}:
+            sampled_spectrum = result["lineshape"]
+            measured_spectrum = "PSD"
+        elif spectrum_key in {"power", "power_spectrum", "powerspectrum"}:
+            sampled_spectrum = result["power_spectrum"]
+            measured_spectrum = "power_spectrum"
+        else:
+            raise ValueError("spectrum must be 'PSD'/'lineshape' or 'power_spectrum'")
+
+        fwhm = self.measureLineshapeFWHM(
+            result["frequencies"],
+            sampled_spectrum,
+            nu_a=self.nu_a,
+        )
+
+        if update:
+            self.FWHM_frequency = fwhm["FWHM_frequency"]
+            self.FWHM_a = fwhm["FWHM_a"]
+            self.tau_a = fwhm["tau_a"]
+
+        return {
+            **result,
+            **fwhm,
+            "measured_spectrum": measured_spectrum,
+        }
+
     def plotPeriodicModulation(
         self,
         station,
@@ -592,12 +934,13 @@ class MilkyWayAxionHalo:
         showPlot: bool = True,
         verbose: bool = False,
     ) -> tuple:
-        """Plot Milky-Way axion-wind periodic modulation.
+        """Plot Milky Way axion wind periodic modulation.
 
         Returns the matplotlib figure and the same result dictionary produced
         by :meth:`findLineshapeOverTime` when ``frequencies`` is supplied, or
         :meth:`findKinematicsOverTime` otherwise.
         """
+
         if frequencies is None:
             result = self.findKinematicsOverTime(
                 station=station,
@@ -736,7 +1079,7 @@ class MilkyWayAxionHalo:
         alpha: Quantity = 0.0 * unit.rad,
         verbose: bool = False,
     ):
-        """Calculate the analytical axion power-spectral-density lineshape.
+        """Calculate the analytical axion PSD lineshape.
 
         Implements Eqs. (12), (19), (20) of the Gramolin lineshape paper for
         the non-gradient, parallel-gradient, and perpendicular-gradient coupling
@@ -776,6 +1119,7 @@ class MilkyWayAxionHalo:
         ----------
         A. Gramolin et al., https://github.com/gramolin/lineshape
         """
+
         logPrefix = f"[{MilkyWayAxionHalo.__name__}.{MilkyWayAxionHalo.axion_lineshape.__name__}]"
         # ----------- prepare to generate the axion lineshape ----------- #
         # return the lineshape under certain special circumstances
