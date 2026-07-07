@@ -868,7 +868,7 @@ class MilkyWayAxionHalo:
     ) -> dict:
         """Find the FWHM of the station/time-dependent axion PSD.
 
-        Parameters are the same as :meth:`findLineshapeAtStation`.  ``spectrum``
+        Parameters are the same as :meth:`findLineshapeAtStationAndTime`.  ``spectrum``
         chooses whether the width is measured from the normalized ``'PSD'`` /
         ``'lineshape'`` or from the scaled ``'power_spectrum'``.  The two are
         normally identical because the power coefficient is frequency

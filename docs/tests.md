@@ -12,6 +12,11 @@ Run the full suite:
 pytest tests/
 ```
 
+On Windows, run the full simulator-backed suite with a Python version matching
+the compiled extension module.  The pure-Python MW and bound-halo tests can be
+run independently in a lighter environment, but full Bloch simulation tests may
+require the project CPython 3.11 environment.
+
 Run only the calibration benchmarks:
 
 ```
@@ -217,8 +222,22 @@ by the bound-axion Schrödinger solver.
 ### `test_MilkyWayAxionHalo.py`
 
 Tests {class}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo` initialization,
-Rabi-frequency computation, and the end-to-end `Simulations` pipeline.
-Accepts `PRINT_RESULTS`, `SEED`, and `NUM_FIELD` environment variables.
+static SHM PSD lineshapes, gradient power coefficients, station/lab wind
+projections, periodic lineshape modulation, Rabi-frequency computation, and
+the end-to-end `Simulations` pipeline.  Accepts `PRINT_RESULTS`, `SEED`, and
+`NUM_FIELD` environment variables.
+
+### `test_MilkyWayAxionHalo_lineshape.py`
+
+Lightweight tests for the station/time-aware MW PSD helpers.  These checks use
+the Boston station and verify that
+{meth}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshapeAtStationAndTime`
+returns a sampled PSD and power spectrum with consistent frequency grids,
+station-derived wind angle {math}`\alpha`, and lab speed.  They also verify
+{meth}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshapeFWHMAtStation`
+for both `"PSD"` and `"power_spectrum"` inputs, including the updates to
+`FWHM_frequency`, `FWHM_a`, and
+{math}`\tau_a = 1 / (\pi\,\mathrm{FWHM}_a\,\nu_a)`.
 
 ### `test_MilkyWay.py` · `test_findGradients_EarthLocation.py`
 
@@ -226,6 +245,11 @@ Integration tests for the Milky Way axion-halo model and the
 `findGradients` interface: the `Station.location` attribute
 (hemisphere sign conventions, elevation, colatitude conversion) and the
 `ValueError` raised when `findGradients` is called without a station.
+The gradient tests also cover the required `stateCoefficients` dictionary,
+default `meas_time` resolution, the first-order boost toggle and explicit
+zero-velocity case, complex eigenstate superpositions, normalized coefficient
+handling, Omega_a conversion from complex gradient amplitudes, and the
+state-amplitude/eigen-energy plotting helper.
 
 ---
 

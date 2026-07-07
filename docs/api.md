@@ -7,8 +7,12 @@ automatically from source docstrings.
 
 | Class / function | Module | Purpose |
 |---|---|---|
+| {class}`~axionbloch.MilkyWay.MilkyWay` | `MilkyWay` | Astropy-based MW/lab kinematics |
 | {class}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo` | `MilkyWayAxionHalo` | SHM axion-wind model |
 | {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.axion_lineshape` | `MilkyWayAxionHalo` | Analytical PSD lineshape (static) |
+| {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findKinematicsOverTime` | `MilkyWayAxionHalo` | Station/time-dependent MW speed and wind angle |
+| {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshapeAtStationAndTime` | `MilkyWayAxionHalo` | Station/time-dependent PSD from `axion_lineshape` |
+| {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshapeFWHMAtStation` | `MilkyWayAxionHalo` | Sampled PSD or power-spectrum FWHM and coherence time |
 | {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.getAmpSpectra` | `MilkyWayAxionHalo` | Stochastic amplitude spectra |
 | {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.getRabiFreq` | `MilkyWayAxionHalo` | rms Rabi frequency |
 | {class}`~axionbloch.GravBoundAxionHalo.GravBoundAxionHalo` | `GravBoundAxionHalo` | Generic TISE solver |
@@ -24,6 +28,30 @@ automatically from source docstrings.
 
 ---
 
+## axionbloch.MilkyWay
+
+Provides {class}`~axionbloch.MilkyWay.MilkyWay`, an Astropy-based kinematics
+helper for the laboratory motion through the MW halo.  It uses
+`astropy.coordinates.Galactocentric` for the solar and Earth orbital velocity,
+and GCRS/ITRS transformations for station orientation.  This module supplies
+the kinematic context used by the station-aware MW axion-halo helpers:
+
+- {meth}`~axionbloch.MilkyWay.MilkyWay.get_v_lab` and
+  {meth}`~axionbloch.MilkyWay.MilkyWay.get_v_lab_magnitude` return the lab
+  velocity in the Galactic rest frame.
+- {meth}`~axionbloch.MilkyWay.MilkyWay.get_nvec_gcrs` returns the station's
+  local vertical in a geocentric inertial frame.
+- {meth}`~axionbloch.MilkyWay.MilkyWay.get_wind_angle` returns the angle
+  between {math}`v_\mathrm{lab}` and the station sensitive axis.
+
+```{automodule} axionbloch.MilkyWay
+:members:
+:undoc-members:
+:show-inheritance:
+```
+
+---
+
 ## axionbloch.MilkyWayAxionHalo
 
 Models the axion dark-matter field from the Milky Way galactic halo using the
@@ -33,6 +61,17 @@ Standard Halo Model (SHM) velocity distribution.  The main class is
 - Axion field properties: Compton frequency, quality factor, coherence time.
 - Analytical PSD lineshapes for three coupling geometries via the static method
   {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.axion_lineshape`.
+- Station/time-dependent kinematics via
+  {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findKinematicsOverTime`,
+  including {math}`v_\mathrm{lab}`, {math}`\alpha`, parallel wind projection,
+  perpendicular wind projection, and {math}`\nu_{a,\mathrm{eff}}`.
+- Station/time-dependent PSDs via
+  {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshapeAtStationAndTime`,
+  which computes the wind angle and then calls `axion_lineshape`.
+- Sampled PSD or power-spectrum FWHM via
+  {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshapeFWHMAtStation`.
+  The helper stores `FWHM_frequency`, `FWHM_a` in ppm, and
+  {math}`\tau_a = 1 / (\pi\,\mathrm{FWHM}_a\,\nu_a)` when `update=True`.
 - Stochastic amplitude spectra for time-domain simulations via
   {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.getAmpSpectra`.
 - rms Rabi frequency via
@@ -55,15 +94,22 @@ gravitationally bound to a compact body.  The solver:
 - Builds a 1-D radial finite-difference Hamiltonian {math}`H = T + V_\mathrm{eff}`.
 - Diagonalizes it with `scipy.linalg.eigh` for each angular-momentum channel *l*.
 - Stores eigen-energies and normalized reduced radial wavefunctions {math}`u_{n_r l}(r)`.
+- Combines eigenstates using a required `stateCoefficients` dictionary such as
+  `{"2p": 1, "3p": 1 + 1j}`.  Coefficients are normalized internally.
 - Computes the 3-D gradient of the total wavefunction toward a geographic
   {class}`~axionbloch.Station.Station` via
   {func}`~axionbloch.GravBoundAxionHalo.GravBoundAxionHalo.findGradientsAtDirection`,
   and its time evolution via
   {func}`~axionbloch.GravBoundAxionHalo.GravBoundAxionHalo.findGradientsOverTime`.
+- Adds the first-order Lorentz-boost correction from the station velocity when
+  `include_lorentz_boost=True`; pass `relative_velocity` to override the
+  default station-rotation velocity in the solar-Z frame.
 - Computes the axion-nucleon coupling frequency (Omega_a) from gradients via
   {func}`~axionbloch.GravBoundAxionHalo.GravBoundAxionHalo.findOmega_aOverTime`,
   with RMS value computation via
-  {func}`~axionbloch.GravBoundAxionHalo.GravBoundAxionHalo.findRmsOmega_aOverTime`.
+  {func}`~axionbloch.GravBoundAxionHalo.GravBoundAxionHalo.findrmsOmega_aOverTime`.
+- Plots normalized state amplitudes versus eigen-energy using
+  {func}`~axionbloch.GravBoundAxionHalo.GravBoundAxionHalo.plotStateAmplitudeVsEigenEnergy`.
 
 Sub-class {class}`~axionbloch.EarthBoundAxionHalo.EarthBoundAxionHalo` is
 pre-configured with the Earth's gravitational potential.
@@ -87,6 +133,8 @@ Model (PEM) density profile.  Adds Earth-specific gradient helpers:
 {func}`~axionbloch.EarthBoundAxionHalo.EarthBoundAxionHalo.findGradientsWithMilkyWay`,
 and the pseudomagnetic-field conversion
 {func}`~axionbloch.EarthBoundAxionHalo.EarthBoundAxionHalo.getBfield`.
+These helpers use the same `stateCoefficients` dictionary interface as the base
+class and resolve `meas_time=None` with `Time.now()`.
 Also exports helper functions used to build the potential:
 
 | Function | Description |
@@ -116,7 +164,7 @@ position in a solar-oriented frame at a given measurement time.
 
 Pre-built station instances exported from this module:
 
-`Mainz`, `Geneva`, `Baltimore`, `Tokyo`, `Mumbai`, `Sanya`, `Sydney`,
+`Mainz`, `Geneva`, `Baltimore`, `Boston`, `Tokyo`, `Mumbai`, `Sanya`, `Sydney`,
 `CapeTown`, `BuenosAires`.
 
 ```{automodule} axionbloch.Station

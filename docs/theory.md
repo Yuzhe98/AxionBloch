@@ -38,14 +38,15 @@ the laboratory in the galactic rest frame.
 
 ### Laboratory-frame gradients
 
-#### Frames and Lorentz factor
+#### Frames and the first-order boost
 
 The axion field {math}`a` is a Lorentz scalar, so
 {math}`a_\mathrm{lab}(x_\mathrm{lab})=a_\mathrm{halo}(x_\mathrm{halo})`.
 Its time and spatial derivatives nevertheless mix under a boost.
 
 Let the laboratory move with velocity {math}`\mathbf{v}_\mathrm{rel}` relative
-to the halo rest frame. With this sign convention,
+to the halo rest frame. With this sign convention, the exact Lorentz
+transformation contains
 
 ```{math}
 \beta=\frac{|\mathbf{v}_\mathrm{rel}|}{c},
@@ -53,13 +54,7 @@ to the halo rest frame. With this sign convention,
 \gamma=\frac{1}{\sqrt{1-\beta^2}}.
 ```
 
-The implementation uses
-`gamma = 1.0 / np.sqrt(1.0 - beta**2)` and rejects
-{math}`\beta\geq1`. Reversing the definition of
-{math}`\mathbf{v}_\mathrm{rel}` reverses the signs of the
-velocity-dependent terms.
-
-The derivative transformations are
+and
 
 ```{math}
 \partial_{t_\mathrm{lab}}a
@@ -84,58 +79,73 @@ where
 {math}`\hat{\mathbf v}=\mathbf{v}_\mathrm{rel}/|\mathbf{v}_\mathrm{rel}|`.
 The term proportional to {math}`\gamma-1` changes the gradient component
 parallel to the boost; perpendicular components are unchanged by this part.
+For Earth-bound halos the station-rotation speed gives
+{math}`\beta\sim10^{-6}` and {math}`\gamma-1\sim5\times10^{-13}`, so
+`GravBoundAxionHalo` keeps only the first-order term in {math}`v/c`.
+Reversing the definition of {math}`\mathbf{v}_\mathrm{rel}` reverses the sign
+of this first-order correction.
 
 #### Complex axion-field amplitude
 
-`GravBoundAxionHalo` represents the real oscillating field using a complex
-spatial amplitude:
+`GravBoundAxionHalo` represents the real oscillating field using complex
+mode amplitudes.  For one eigenstate,
 
 ```{math}
 a(\mathbf{x},t)
 \propto
 \operatorname{Re}\!\left[
-\Psi(\mathbf{x})e^{-i\omega_a t}
+\Psi_n(\mathbf{x})e^{-i\omega_n t}
 \right],
 \qquad
-\omega_a=2\pi\nu_a.
+\omega_n=\frac{m_a c^2+E_n}{\hbar}.
 ```
 
 Consequently,
 
 ```{math}
-\partial_t a\longleftrightarrow-i\omega_a\Psi,
+\partial_t a\longleftrightarrow-i\omega_n\Psi_n,
 \qquad
 \nabla a\longleftrightarrow
-\mathbf{G}_\mathrm{halo}:=\nabla\Psi.
+\mathbf{G}_{n,\mathrm{halo}}:=\nabla\Psi_n.
 ```
 
-The complex laboratory-frame gradient amplitude implemented by
-`findGradientsAtDirection` is therefore
+The first-order complex laboratory-frame gradient phasor implemented by
+`findGradientsAtDirection` is
 
 ```{math}
-\mathbf{G}_\mathrm{lab}
-=\mathbf{G}_\mathrm{halo}
-+(\gamma-1)\hat{\mathbf v}
- \left(\hat{\mathbf v}\cdot\mathbf{G}_\mathrm{halo}\right)
--i\gamma\frac{\omega_a}{c^2}\mathbf{v}_\mathrm{rel}\Psi.
+\mathbf{G}_{n,\mathrm{lab}}
+\simeq
+\mathbf{G}_{n,\mathrm{halo}}
+-i\frac{\omega_n}{c^2}\mathbf{v}_\mathrm{rel}\Psi_n.
 ```
 
 The first term is the intrinsic halo-profile gradient. The last term is the
 motion-induced gradient. For a real intrinsic gradient it is
 {math}`90^\circ` out of phase, which explains the factor {math}`-i`.
-For nonrelativistic laboratory speeds,
-{math}`\gamma\simeq1+\beta^2/2`, and the expression reduces to
+The omitted exact-Lorentz longitudinal term is order {math}`(v/c)^2`.
+
+For a superposition, the code sums normalized complex coefficients:
+
+```{math}
+\Psi(\mathbf{x},t)
+=\sum_j c_j\,\Psi_j(\mathbf{x})e^{-i\omega_j t},
+\qquad
+\sum_j |c_j|^2=1.
+```
+
+The intrinsic gradient and boost contribution are accumulated mode by mode:
 
 ```{math}
 \mathbf{G}_\mathrm{lab}
-\simeq\nabla\Psi
--i\frac{\omega_a}{c^2}\mathbf{v}_\mathrm{rel}\Psi.
+\simeq
+\sum_j c_j\mathbf{G}_{j,\mathrm{halo}}
+-i\frac{\mathbf{v}_\mathrm{rel}}{c^2}
+\sum_j c_j\omega_j\Psi_j.
 ```
 
-The implementation retains both {math}`\gamma` and the
-{math}`\gamma-1` longitudinal correction. It uses the common Compton
-frequency {math}`\omega_a=2\pi\nu_a`; small state-dependent binding-energy
-corrections to this frequency are not currently included.
+This is why the user-facing interface requires a dictionary such as
+`{"2p": 1, "3p": 1 + 1j}`: the relative complex phases define the
+interference pattern.
 
 #### Implementation in spherical components
 
@@ -168,25 +178,20 @@ v_\theta
 v_\phi=-v_x\sin\phi+v_y\cos\phi.
 ```
 
-Defining
-
-```{math}
-D:=\mathbf{v}_\mathrm{rel}\cdot\mathbf{G}_\mathrm{halo}
-=v_rG_r+v_\theta G_\theta+v_\phi G_\phi,
-```
-
-the code applies the boost component by component:
+The code applies the first-order boost component by component:
 
 ```{math}
 G_{q,\mathrm{lab}}
 =G_q
-+(\gamma-1)\frac{v_qD}{|\mathbf{v}_\mathrm{rel}|^2}
--i\gamma\frac{\omega_a}{c^2}v_q\Psi,
+-i\frac{v_q}{c^2}
+\sum_j c_j\omega_j\Psi_j,
 \qquad q\in\{r,\theta,\phi\}.
 ```
 
-When {math}`|\mathbf{v}_\mathrm{rel}|=0`, the longitudinal correction is set
-to zero explicitly, avoiding division by zero.
+For a single state this reduces to
+{math}`G_{q,\mathrm{lab}}=G_q-i(\omega_n/c^2)v_q\Psi_n`.  When
+`include_lorentz_boost=False`, only the intrinsic components
+{math}`G_q` are returned.
 
 #### Unit consistency
 
@@ -200,7 +205,7 @@ The boost term has the same units:
 
 ```{math}
 \left[
-i\gamma\frac{\omega_a}{c^2}\mathbf{v}_\mathrm{rel}\Psi
+i\frac{\omega_n}{c^2}\mathbf{v}_\mathrm{rel}\Psi
 \right]
 =
 \frac{T^{-1}}{L^2T^{-2}}\,
@@ -208,15 +213,15 @@ i\gamma\frac{\omega_a}{c^2}\mathbf{v}_\mathrm{rel}\Psi
 =\frac{[\Psi]}{L},
 ```
 
-because {math}`i`, {math}`\gamma`, and {math}`\beta` are dimensionless,
-{math}`[\omega_a]=T^{-1}`, {math}`[c]=LT^{-1}`, and
+because {math}`i` and {math}`\beta` are dimensionless,
+{math}`[\omega_n]=T^{-1}`, {math}`[c]=LT^{-1}`, and
 {math}`[\mathbf{v}_\mathrm{rel}]=LT^{-1}`. Therefore,
 
 ```{math}
 [\mathbf{G}_\mathrm{lab}]
 =[\nabla\Psi]
 =\left[
-i\gamma\frac{\omega_a}{c^2}\mathbf{v}_\mathrm{rel}\Psi
+i\frac{\omega_n}{c^2}\mathbf{v}_\mathrm{rel}\Psi
 \right]
 =\frac{[\Psi]}{L}.
 ```
@@ -228,7 +233,7 @@ The normalized three-dimensional wavefunctions used by
 [\mathbf{G}_\mathrm{lab}]
 =[\nabla\Psi]
 =\left[
-i\gamma\frac{\omega_a}{c^2}\mathbf{v}_\mathrm{rel}\Psi
+i\frac{\omega_n}{c^2}\mathbf{v}_\mathrm{rel}\Psi
 \right]
 =L^{-5/2}=\mathrm{m}^{-5/2}.
 ```
@@ -236,18 +241,20 @@ i\gamma\frac{\omega_a}{c^2}\mathbf{v}_\mathrm{rel}\Psi
 #### Interpreting the complex result
 
 The returned gradient components are complex phasors, not instantaneous real
-fields. At a chosen carrier phase, the physical gradient is proportional to
+fields.  For a single mode, the physical gradient is proportional to
 
 ```{math}
 \nabla a(\mathbf{x},t)
 \propto
 \operatorname{Re}\!\left[
-\mathbf{G}_\mathrm{lab}(\mathbf{x})e^{-i\omega_a t}
+\mathbf{G}_{n,\mathrm{lab}}(\mathbf{x})e^{-i\omega_n t}
 \right].
 ```
 
-Thus, `gradient.real` contains only the in-phase quadrature and can omit a
-purely boost-induced contribution. The oscillation amplitude is
+For a superposition, the code returns the complex phasor obtained by summing
+the selected modes at the requested epoch.  Thus, `gradient.real` contains
+only one quadrature and can omit a purely boost-induced contribution. The
+oscillation amplitude is
 {math}`|\mathbf{G}_\mathrm{lab}|`; accordingly, the
 `findOmega_aOverTime` helper uses the absolute value of each complex gradient
 component. Multiplication by the halo field-normalization factor converts the

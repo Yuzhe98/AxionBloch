@@ -107,14 +107,17 @@ For the example above ({math}`N_\mathrm{steps} \approx 4 \times 10^9`) the
 runtime is approximately 10 s on a modern laptop CPU, thanks to the C++
 backend.
 
-### Axion lineshape
+### MW axion PSD and station-aware lineshapes
 
 The analytical SHM PSD can be evaluated without running a full simulation:
 
 ```python
 import numpy as np
 from astropy import units as unit
+from astropy.time import Time
+from axionbloch.dependency import ppm
 from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
+from axionbloch.Station import Boston
 
 axion = MilkyWayAxionHalo(nu_a=1 * unit.kHz)
 
@@ -129,7 +132,72 @@ PSD = MilkyWayAxionHalo.axion_lineshape(
 ```
 
 The returned array has units Hz{math}`^{-2}` and integrates to 1 over
-frequency.
+frequency.  The static method is the most direct way to compare the three
+analytical cases:
+
+| Case | Meaning |
+|------|---------|
+| `non-grad` | Non-gradient coupling; independent of `alpha` |
+| `grad_par` | Gradient coupling parallel to the bias/sensitive axis |
+| `grad_perp` | Gradient coupling perpendicular to the bias/sensitive axis |
+
+For station-specific calculations, use the helper that first computes the
+laboratory kinematics and then calls the same static PSD function:
+
+```python
+axion = MilkyWayAxionHalo(nu_a=1 * unit.MHz)
+
+result = axion.findLineshapeAtStationAndTime(
+    station=Boston,
+    meas_time=Time("2022-01-01T00:00:00", scale="utc"),
+    case="grad_perp",
+    sensitive_axis="zenith",
+    num_frequency_points=20001,
+)
+
+frequencies = result["frequencies"]
+PSD = result["PSD"]
+alpha = result["alpha"]
+v_lab = result["v_lab_magnitude"][0]
+```
+
+`sensitive_axis` can be `"north"`, `"west"`, `"east"`, `"zenith"`/`"up"`, or
+another axis accepted by
+{meth}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.projectHaloVelocity`.
+For fixed alpha comparisons independent of station orientation, pass alpha
+directly to {meth}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.axion_lineshape`.
+
+The sampled FWHM of a PSD or power spectrum can be measured in frequency
+units and as a fractional ppm width:
+
+```python
+FWHM_result = axion.findLineshapeFWHMAtStation(
+    station=Boston,
+    meas_time=Time("2022-01-01T00:00:00", scale="utc"),
+    case="grad_par",
+    sensitive_axis="zenith",
+    spectrum="PSD",
+    num_frequency_points=20001,
+)
+
+print(FWHM_result["FWHM_frequency"])
+print(FWHM_result["FWHM_a"].to(ppm))
+print(FWHM_result["tau_a"])
+```
+
+This updates `axion.FWHM_frequency`, `axion.FWHM_a`, and `axion.tau_a` when
+`update=True`.  Here `FWHM_a` is a dimensionless fractional linewidth expressed
+in the package's `ppm` unit, so
+{math}`\tau_a = 1 / (\pi\,\mathrm{FWHM}_a\,\nu_a)`.
+
+Two example scripts use these helpers:
+
+- `examples/MilkyWayAxionHalo/plot-axion-lineshape-at-station.py` plots static
+  `non-grad`, `grad_par`, and `grad_perp` PSDs for `alpha = 0` and
+  `alpha = pi/2`, or station-derived alpha with `--mode station`.
+- `examples/MilkyWayAxionHalo/periodic-modulations.py` plots annual
+  {math}`v_\mathrm{lab}`, daily {math}`\cos\alpha`, and the relative
+  `grad_par`/`grad_perp` power modulation for Boston.
 
 ## NMR calibration
 
@@ -190,8 +258,8 @@ print(my_lab.phi.to(unit.deg))     # azimuthal angle from prime meridian
 print(my_lab.nvec)                  # Cartesian unit normal
 ```
 
-Pre-built stations: `Mainz`, `Baltimore`, `Sanya`, `Geneva`, `Tokyo`,
-`Mumbai`, `Sydney`, `CapeTown`, `BuenosAires`.
+Pre-built stations: `Mainz`, `Geneva`, `Baltimore`, `Boston`, `Tokyo`,
+`Mumbai`, `Sanya`, `Sydney`, `CapeTown`, `BuenosAires`.
 
 ## Earth-bound axion halo
 
@@ -241,7 +309,7 @@ station = Baltimore
 meas_time = Time("2024-06-21T14:00:00")
 
 r, R_r, r_line, grad_r, grad_theta, grad_phi = halo.findGradients(
-    stateNames=["2p"],
+    stateCoefficients={"2p": 1.0},
     station=station,
     meas_time=meas_time,
     truncRadius=2 * unit.R_earth,
@@ -258,17 +326,37 @@ print("a_0 * grad_theta =", (halo.a_0 * grad_theta[earthRad_idx]).si)
 print("a_0 * grad_phi   =", (halo.a_0 * grad_phi[earthRad_idx]).si)
 ```
 
-`findGradients` returns six arrays: the radial grid `r`, the radial
-wavefunction `R_r`, the interpolation line `r_line`, and the three
+`findGradients` returns six arrays: the radial grid `r`, the total
+wavefunction along the station direction (`R_r` in the return tuple for
+backward compatibility), the interpolation line `r_line`, and the three
 spherical-coordinate gradient components
 {math}`(\partial_r\Psi,\; r^{-1}\partial_\theta\Psi,\; (r\sin\theta)^{-1}\partial_\phi\Psi)`
-evaluated along the radial line pointing toward the station. By default these
-include the Lorentz-boost contribution from the station's rotation through a
-nonrotating Earth halo. Use `include_lorentz_boost=False` for the intrinsic
-profile gradient alone, or pass a three-component `relative_velocity` in the
-solar-Z Cartesian frame to model a different halo velocity. An explicit zero
-velocity represents a corotating halo. If `meas_time` is omitted,
-`Time.now()` is used.
+evaluated along the radial line pointing toward the station.
+
+The `stateCoefficients` argument is required and must be a dictionary such as
+`{"2p": 1.0}` or `{"2p": 1.0, "3p": 1.0 + 1.0j}`.  Coefficients are normalized
+internally so that {math}`\sum_i |c_i|^2=1`.  This makes interference between
+bound eigenstates explicit and avoids accidental ambiguity between state names
+and coefficients.
+
+By default the gradients include the first-order laboratory-frame correction
+from the station's rotation through a nonrotating Earth halo. Use
+`include_lorentz_boost=False` for the intrinsic spatial gradient alone, or pass
+a three-component `relative_velocity` in the solar-Z Cartesian frame to model a
+different halo velocity. An explicit zero velocity represents a corotating
+halo. If `meas_time` is omitted, `Time.now()` is used.
+
+To inspect the states in a superposition, use:
+
+```python
+halo.plotStateAmplitudeVsEigenEnergy(
+    stateCoefficients={"1s": 1, "2p": 1 + 1j, "3p": 0.5},
+)
+```
+
+The lower x-axis is the effective mass shift
+{math}`m_{a,\mathrm{eff}} - m_a(v=0)` and the top x-axis is the corresponding
+frequency shift {math}`\nu-\nu_a`.
 
 ### Axion-nucleon coupling frequency (Omega_a) over time
 
@@ -285,8 +373,8 @@ from axionbloch.Station import Baltimore
 times = Time.now() + np.linspace(0, 1, 24) * unit.hour
 
 # Compute Omega_a over time
-omega_results = halo.findOmega_aOverTime(
-    stateNames=["2p"],
+Omega_results = halo.findOmega_aOverTime(
+    stateCoefficients={"2p": 1.0},
     station=Baltimore,
     meas_times=times,
     g_aNN=1e-9 * unit.GeV**(-1),
@@ -295,10 +383,10 @@ omega_results = halo.findOmega_aOverTime(
 )
 
 # Extract results
-omega_a_r = omega_results["Omega_a_r"]
-omega_a_theta = omega_results["Omega_a_theta"]
-omega_a_phi = omega_results["Omega_a_phi"]
-print(f"Radial component max: {np.max(np.abs(omega_a_r))}")
+Omega_a_r = Omega_results["Omega_a_r"]
+Omega_a_theta = Omega_results["Omega_a_theta"]
+Omega_a_phi = Omega_results["Omega_a_phi"]
+print(f"Radial component max: {np.max(np.abs(Omega_a_r))}")
 ```
 
 ### RMS Omega_a over time
@@ -306,8 +394,8 @@ print(f"Radial component max: {np.max(np.abs(omega_a_r))}")
 Computes the root-mean-square Omega_a for each gradient component:
 
 ```python
-rms_results = halo.findRmsOmega_aOverTime(
-    stateNames=["2p"],
+rms_results = halo.findrmsOmega_aOverTime(
+    stateCoefficients={"2p": 1.0},
     station=Baltimore,
     meas_times=times,
     g_aNN=1e-9 * unit.GeV**(-1),
@@ -316,9 +404,9 @@ rms_results = halo.findRmsOmega_aOverTime(
 )
 
 # Extract RMS values
-rms_r = rms_results["rms_omega_a_r"]
-rms_theta = rms_results["rms_omega_a_theta"]
-rms_phi = rms_results["rms_omega_a_phi"]
+rms_r = rms_results["rms_Omega_a_r"]
+rms_theta = rms_results["rms_Omega_a_theta"]
+rms_phi = rms_results["rms_Omega_a_phi"]
 print(f"RMS Omega_a_r: {rms_r}")
 print(f"RMS Omega_a_theta: {rms_theta}")
 print(f"RMS Omega_a_phi: {rms_phi}")
