@@ -1,3 +1,9 @@
+v0.2.5 (2026-07-07)
+--------------
+
+- examined and modified EarthBoundAxionHalo, GravBoundAxionHalo, MilkWay, and MilkyWayAxionHalo. added example scripts and plots of them.
+- updated documentations accordingly.  
+
 v0.2.4 (2026-06-15)
 --------------
 
