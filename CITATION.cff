@@ -1,7 +1,7 @@
-cff-version: 0.2.5
+cff-version: 0.2.6
 title: "AxionBloch"
 authors:
   - family-names: Zhang
     given-names: Yuzhe
-version: 0.2.5
+version: 0.2.6
 # doi: 

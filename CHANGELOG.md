@@ -1,3 +1,9 @@
+v0.2.6 (2026-07-09)
+--------------
+
+- organized MilkyWayAxionHalo for readability.
+- updated documentations accordingly.  
+
 v0.2.5 (2026-07-07)
 --------------
 
