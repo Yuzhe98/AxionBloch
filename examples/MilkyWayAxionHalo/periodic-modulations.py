@@ -61,7 +61,7 @@ daily_kinematics = {
     axis: axion.findKinematicsOverTime(
         station=station,
         meas_times=daily_times,
-        sensitive_axis=axis,
+        projection_axis=axis,
         include_rotation=True,
     )
     for axis in axis_styles
