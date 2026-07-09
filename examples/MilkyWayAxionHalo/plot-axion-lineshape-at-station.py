@@ -6,7 +6,7 @@ Default Boston/time velocity, static alpha = 0 and pi/2 limits for all cases::
 
     python examples/MilkyWayAxionHalo/plot-axion-lineshape-at-station.py
 
-Station-derived bias-field angle instead::
+Station-derived projection-axis angle instead::
 
     python examples/MilkyWayAxionHalo/plot-axion-lineshape-at-station.py --mode station --axis north
 
@@ -107,7 +107,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--axis",
         default="zenith",
-        help="Bias field direction: north, west, east, zenith/up, or another axis accepted by MilkyWayAxionHalo.",
+        help="Projection axis: north, west, east, zenith, or another axis accepted by MilkyWayAxionHalo.",
     )
     parser.add_argument(
         "--mode",
@@ -116,7 +116,7 @@ def _parse_args() -> argparse.Namespace:
         help=(
             "static-alpha plots the explicit axion_lineshape cases at alpha=0 "
             "and pi/2. station plots the selected cases at the station-derived "
-            "bias-field angle."
+            "projection-axis angle."
         ),
     )
     parser.add_argument(
@@ -229,7 +229,7 @@ def main() -> None:
     kinematics = axion.findKinematicsOverTime(
         station=station,
         meas_times=meas_time,
-        sensitive_axis=args.axis,
+        projection_axis=args.axis,
         include_rotation=True,
     )
     v_lab = kinematics["v_lab_magnitude"][0]
