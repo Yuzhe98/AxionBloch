@@ -71,7 +71,7 @@ Standard Halo Model (SHM) velocity distribution.  The main class is
 - Sampled PSD or power-spectrum FWHM via
   {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshapeFWHM`.
   The scalar lineshape helper also reports these values.  The helpers store
-  `FWHM_frequency` / `FWHM_freq`, `FWHM`, `FWHM_a` in ppm, and
+  `FWHM_freq`, `FWHM`, `FWHM_a` in ppm, and
   {math}`\tau_a = 1 / (\pi\,\mathrm{FWHM}_a\,\nu_a)` when `update=True`.
 - Stochastic amplitude spectra for time-domain simulations via
   {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.getAmpSpectra`.

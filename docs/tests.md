@@ -235,8 +235,8 @@ the Boston station and verify that
 returns a sampled PSD and power spectrum with consistent frequency grids,
 station-derived wind angle {math}`\alpha`, and lab speed.  They also verify
 {meth}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshapeFWHM`
-for both `"PSD"` and `"power_spectrum"` inputs, including the updates to
-`FWHM_frequency`, `FWHM_a`, and
+for both `"lineshape"` and `"power_spectrum"` inputs, including the updates to
+`FWHM_freq`, `FWHM`, `FWHM_a`, and
 {math}`\tau_a = 1 / (\pi\,\mathrm{FWHM}_a\,\nu_a)`.
 
 ### `test_MilkyWay.py` · `test_findGradients_EarthLocation.py`

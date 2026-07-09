@@ -44,6 +44,7 @@ class MilkyWayAxionHalo:
     nu_a_eff: Quantity[unit.Hz]
     FWHM_a: Quantity[ppm]
     FWHM_frequency: Quantity[unit.Hz]
+    FWHM_freq: Quantity[unit.Hz]
     tau_a_est: Quantity[unit.s]
     tau_a: Quantity[unit.s]
 
@@ -84,7 +85,7 @@ class MilkyWayAxionHalo:
         v_lab : Quantity
             Speed of the laboratory relative to the galactic rest frame (km/s).
         windAngle : Quantity, optional
-            Angle between the sensitive axis and the axion wind direction (rad).
+            Angle between the projection axis and the axion wind direction (rad).
         rho_E_DM : Quantity
             Local dark-matter energy density (GeV/cm³).
             SHM: 0.3, commonly-used: 0.4, SHM++ / PDG 2024: 0.55.
@@ -123,11 +124,12 @@ class MilkyWayAxionHalo:
         if Q_a is None:
             self.Q_a = (const.c / self.v_lab) ** 2.0
         else:
-            self.Q_a = Q_a
+            self.Q_a = Q_a if isinstance(Q_a, Quantity) else Q_a * unit.one
 
-        self.FWHM = 1.0 / self.Q_a
-        self.FWHM_a = self.FWHM.to(ppm)
+        self.FWHM = (1.0 / self.Q_a).to(ppm)
+        self.FWHM_a = self.FWHM
         self.FWHM_frequency = (self.FWHM * self.nu_a).to(unit.Hz)
+        self.FWHM_freq = self.FWHM_frequency
 
         # effective axion frequency considering second-order Doppler effect
         self.nu_a_eff = self.nu_a * (1 + 0.5 * self.v_lab**2 / const.c**2)
@@ -137,19 +139,19 @@ class MilkyWayAxionHalo:
         self.tau_a_est = 1.0 / (np.pi * self.FWHM * self.nu_a_eff)
         self.tau_a_est = self.tau_a_est
         self.tau_a = 1.0 / (np.pi * self.FWHM * self.nu_a)
+        self.kinematicsOverTimeResult = None
+        self._kinematicsOverTime_cache_key = None
+        self.lineshapeAtStationAndTimeResult = None
+        self._lineshapeAtStationAndTime_cache_key = None
 
     def get_T_coh(self, T2star: Quantity) -> Quantity:
         """Return the signal coherence time for a given ``T2star``.
 
-        Uses the current ``self.tau_a`` value, so updates from measured
+        Uses the current ``self.tau_a``, so updates from measured
         linewidth calculations are reflected in the returned coherence time.
         """
-        T2star_s = T2star.to(unit.s)
-        tau_a_s = self.tau_a.to(unit.s)
-        T_coh = T2star_s * np.sqrt(
-            (tau_a_s / (tau_a_s + T2star_s))
-        )
-        return T_coh.to(T2star.unit)
+        T_coh = T2star * np.sqrt((self.tau_a / (self.tau_a + T2star)))
+        return T_coh.to(unit.s)
 
     @staticmethod
     def _cartesian_xyz(cartesian, xyz_unit: unit.Unit) -> Quantity:
@@ -170,8 +172,141 @@ class MilkyWayAxionHalo:
         return vectors / np.expand_dims(norm, axis=-1)
 
     @staticmethod
+    def _quantity_cache_key(value, unit_out=None):
+        """Return a compact cache key for scalar or array-like quantities."""
+        if isinstance(value, Quantity):
+            if unit_out is None:
+                unit_out = value.unit
+            values = np.asarray(value.to_value(unit_out), dtype=float)
+            unit_string = str(unit_out)
+        else:
+            values = np.asarray(value, dtype=float)
+            unit_string = ""
+        values = np.ascontiguousarray(values)
+        if values.shape == ():
+            return ("scalar", float(values), unit_string)
+        return (
+            "array",
+            values.shape,
+            hash(values.tobytes()),
+            float(values.flat[0]) if values.size else None,
+            float(values.flat[-1]) if values.size else None,
+            unit_string,
+        )
+
+    @staticmethod
+    def _station_cache_key(station):
+        """Return a cache key for a Station-like object."""
+        location = getattr(station, "location", None)
+        if location is None:
+            return ("id", id(station))
+        return (
+            getattr(station, "name", None),
+            float(location.lat.to_value(unit.deg)),
+            float(location.lon.to_value(unit.deg)),
+            float(location.height.to_value(unit.m)),
+        )
+
+    @staticmethod
+    def _time_cache_key(meas_time: Time):
+        """Return a scalar-time cache key."""
+        time = Time(meas_time)
+        if not time.isscalar:
+            raise ValueError("findLineshape expects one measurement time")
+        return float(time.utc.jd)
+
+    @staticmethod
+    def _times_cache_key(meas_times: list[Time] | Time):
+        """Return a cache key for scalar or vector measurement times."""
+        times = Time(meas_times)
+        values = (
+            np.array([times.utc.jd], dtype=float)
+            if times.isscalar
+            else np.asarray(times.reshape(-1).utc.jd, dtype=float)
+        )
+        values = np.ascontiguousarray(values)
+        return (
+            "times",
+            values.shape,
+            hash(values.tobytes()),
+            float(values.flat[0]) if values.size else None,
+            float(values.flat[-1]) if values.size else None,
+        )
+
+    @staticmethod
+    def _axis_cache_key(projection_axis):
+        """Return a cache key for a projection-axis string or vector."""
+        if isinstance(projection_axis, str):
+            return (
+                "axis",
+                MilkyWayAxionHalo._validate_projection_axis_name(projection_axis),
+            )
+        if isinstance(projection_axis, Quantity):
+            values = np.asarray(
+                projection_axis.to_value(projection_axis.unit), dtype=float
+            )
+            unit_string = str(projection_axis.unit)
+        else:
+            values = np.asarray(projection_axis, dtype=float)
+            unit_string = ""
+        values = np.ascontiguousarray(values)
+        return ("axis-vector", values.shape, hash(values.tobytes()), unit_string)
+
+    @staticmethod
+    def _validate_projection_axis_name(axis: str) -> str:
+        """Normalize and validate a named projection axis."""
+        axis_key = axis.lower()
+        if axis_key == "up":
+            raise ValueError("Use 'zenith' for the local vertical projection axis.")
+        return axis_key
+
+    @classmethod
+    def _lineshape_cache_key(
+        cls,
+        *,
+        station,
+        meas_time: Time,
+        frequencies: Quantity,
+        case: str,
+        projection_axis: str | np.ndarray | Quantity,
+        include_rotation: bool,
+        galcen_frame: coord.Galactocentric | None,
+    ):
+        """Return the cache key for a station/time-dependent lineshape."""
+        return (
+            cls._station_cache_key(station),
+            cls._time_cache_key(meas_time),
+            cls._quantity_cache_key(frequencies, unit.Hz),
+            case,
+            cls._axis_cache_key(projection_axis),
+            bool(include_rotation),
+            None if galcen_frame is None else id(galcen_frame),
+        )
+
+    @classmethod
+    def _kinematics_over_time_cache_key(
+        cls,
+        *,
+        station,
+        meas_times: list[Time] | Time,
+        projection_axis: str | np.ndarray | Quantity,
+        include_rotation: bool,
+        galcen_frame: coord.Galactocentric | None,
+        nu_a: Quantity,
+    ):
+        """Return the cache key for station/time-dependent kinematics."""
+        return (
+            cls._station_cache_key(station),
+            cls._times_cache_key(meas_times),
+            cls._axis_cache_key(projection_axis),
+            bool(include_rotation),
+            None if galcen_frame is None else id(galcen_frame),
+            cls._quantity_cache_key(nu_a, unit.Hz),
+        )
+
+    @staticmethod
     def _station_basis_itrs(station) -> dict[str, np.ndarray]:
-        """Local north/east/up unit vectors in the station's ITRS frame."""
+        """Local north/east/zenith unit vectors in the station's ITRS frame."""
         lat = station.location.lat.to_value(unit.rad)
         lon = station.location.lon.to_value(unit.rad)
 
@@ -183,10 +318,10 @@ class MilkyWayAxionHalo:
                 np.cos(lat),
             ]
         )
-        up = np.array(
+        zenith = np.array(
             [np.cos(lat) * np.cos(lon), np.cos(lat) * np.sin(lon), np.sin(lat)]
         )
-        return {"north": north, "east": east, "west": -east, "up": up, "zenith": up}
+        return {"north": north, "east": east, "west": -east, "zenith": zenith}
 
     @staticmethod
     def _galcen_to_icrs_rotation() -> np.ndarray:
@@ -256,12 +391,14 @@ class MilkyWayAxionHalo:
         station=None,
         galcen_frame: coord.Galactocentric | None = None,
     ) -> dict[str, np.ndarray]:
-        """Return local north/east/up unit vectors in Galactocentric axes.
+        """Return local north/east/zenith unit vectors in Galactocentric axes.
 
         The basis vectors are constructed as small ITRS displacements at the
         station and transformed with astropy to the Galactocentric frame.  This
         follows the spirit of TASSLE's ``get_CASPEr_vect`` while using the
-        package's :class:`~axionbloch.Station.Station` objects.
+        package's :class:`~axionbloch.Station.Station` objects.  ``zenith`` is
+        the local vertical direction, normal to the station's local ground
+        tangent plane; it is not a Galactocentric ``z`` axis.
         """
         if station is None:
             raise ValueError("station must be set to compute the lab basis")
@@ -301,16 +438,16 @@ class MilkyWayAxionHalo:
     def projectHaloVelocity(
         time: Time | None = None,
         station=None,
-        axis: str | np.ndarray | Quantity = "up",
+        axis: str | np.ndarray | Quantity = "zenith",
         galcen_frame: coord.Galactocentric | None = None,
     ) -> Quantity:
-        """Project the astropy halo wind onto a local sensitive axis.
+        """Project the astropy halo wind onto a selected axis.
 
-        ``axis`` may be ``'up'``/``'zenith'``, ``'north'``, ``'east'``,
-        ``'west'``, ``'parallel'``/
-        ``'z'`` (alias for ``'up'``), ``'perp'`` (magnitude perpendicular to
-        local up), ``'magnitude'``, or an explicit unit vector in Galactocentric
-        Cartesian coordinates.
+        ``axis`` may be ``'zenith'``, ``'north'``, ``'east'``, ``'west'``,
+        ``'perp'`` (magnitude perpendicular to local zenith), ``'magnitude'``,
+        or an explicit unit vector in Galactocentric Cartesian coordinates.
+        ``zenith`` is the local vertical direction, normal to the station's
+        local ground tangent plane.
         """
         wind = MilkyWayAxionHalo.getHaloVelocity(
             time=time,
@@ -320,24 +457,22 @@ class MilkyWayAxionHalo:
         )
 
         if isinstance(axis, str):
-            axis_key = axis.lower()
+            axis_key = MilkyWayAxionHalo._validate_projection_axis_name(axis)
             if axis_key in {"magnitude", "speed"}:
                 return np.sqrt(np.sum(wind**2, axis=-1)).to(unit.km / unit.s)
 
             basis = MilkyWayAxionHalo.getLabBasis(
                 time=time, station=station, galcen_frame=galcen_frame
             )
-            if axis_key in {"parallel", "z"}:
-                axis_key = "up"
             if axis_key in {"perp", "perpendicular"}:
-                up = basis["up"]
-                parallel = np.sum(wind * up, axis=-1)
+                zenith = basis["zenith"]
+                parallel = np.sum(wind * zenith, axis=-1)
                 return np.sqrt(np.sum(wind**2, axis=-1) - parallel**2).to(
                     unit.km / unit.s
                 )
             if axis_key not in basis:
                 raise ValueError(
-                    "axis must be 'up'/'zenith', 'north', 'east', 'west', "
+                    "axis must be 'zenith', 'north', 'east', 'west', "
                     "'perp', 'magnitude', or an explicit vector"
                 )
             axis_vec = basis[axis_key]
@@ -387,9 +522,10 @@ class MilkyWayAxionHalo:
         if mw.station is not None:
             self.windAngle = mw.get_wind_angle()
         self.Q_a = (const.c / self.v_0) ** 2.0
-        self.FWHM = 1.0 / self.Q_a
-        self.FWHM_a = self.FWHM.to(ppm)
+        self.FWHM = (1.0 / self.Q_a).to(ppm)
+        self.FWHM_a = self.FWHM
         self.FWHM_frequency = (self.FWHM * self.nu_a).to(unit.Hz)
+        self.FWHM_freq = self.FWHM_frequency
         self.nu_a_eff = self.nu_a * (1 + 0.5 * self.v_lab**2 / const.c**2)
         self.tau_a_est = 1.0 / (np.pi * self.FWHM * self.nu_a_eff)
         self.tau_a = 1.0 / (np.pi * self.FWHM * self.nu_a)
@@ -420,7 +556,7 @@ class MilkyWayAxionHalo:
         self,
         station,
         meas_times: list[Time] | Time,
-        sensitive_axis: str | np.ndarray | Quantity = "up",
+        projection_axis: str | np.ndarray | Quantity = "zenith",
         include_rotation: bool = True,
         galcen_frame: coord.Galactocentric | None = None,
         verbose: bool = False,
@@ -429,17 +565,22 @@ class MilkyWayAxionHalo:
 
         This is the time-domain companion to the static SHM parameters.  It
         exposes the daily/annual modulation ingredients entering the gradient
-        lineshape: lab speed, angle to the sensitive axis, and parallel /
+        lineshape: lab speed, angle to the projection axis, and parallel /
         perpendicular wind projections.
 
         Parameters
         ----------
         station : axionbloch.Station.Station
-            Lab location and default sensitive-axis orientation.
+            Lab location.
         meas_times : list of astropy.time.Time or astropy.time.Time
             Epochs at which to evaluate the kinematics.
-        sensitive_axis : str or vector
-            ``'up'`` by default.  String axes are interpreted by
+        projection_axis : str or vector
+            Axis used to decompose the axion-gradient / axion-wind vector. For
+            gradient coupling, ``'grad_par'`` uses the component parallel to
+            this axis, while ``'grad_perp'`` uses the magnitude of the
+            component perpendicular to this axis. The default ``'zenith'`` is
+            the local vertical direction normal to the station's local ground
+            tangent plane. String axes are interpreted by
             :meth:`projectHaloVelocity`.
         include_rotation : bool
             If ``True`` use the station GCRS state and include Earth's surface
@@ -455,7 +596,25 @@ class MilkyWayAxionHalo:
         dict
             Keys include ``times``, ``v_lab_magnitude``, ``wind_angle``,
             ``wind_parallel``, ``wind_perp``, and ``nu_a_eff``.
+
+        The most recent result is cached and reused when the station, times,
+        projection axis, rotation setting, Galactocentric frame, and axion
+        frequency match exactly.
         """
+
+        cache_key = self._kinematics_over_time_cache_key(
+            station=station,
+            meas_times=meas_times,
+            projection_axis=projection_axis,
+            include_rotation=include_rotation,
+            galcen_frame=galcen_frame,
+            nu_a=self.nu_a,
+        )
+        if (
+            self.kinematicsOverTimeResult is not None
+            and self._kinematicsOverTime_cache_key == cache_key
+        ):
+            return self.kinematicsOverTimeResult
 
         if isinstance(meas_times, Time):
             if meas_times.isscalar:
@@ -488,7 +647,7 @@ class MilkyWayAxionHalo:
                 parallel = self.projectHaloVelocity(
                     time=meas_time,
                     station=station,
-                    axis=sensitive_axis,
+                    axis=projection_axis,
                     galcen_frame=galcen_frame,
                 )
                 perp = np.sqrt(speed**2 - parallel**2).to(unit.km / unit.s)
@@ -518,7 +677,7 @@ class MilkyWayAxionHalo:
         wind_perp = np.array([v.value for v in perp_vals]) * perp_vals[0].unit
         nu_a_eff = self.nu_a * (1 + 0.5 * v_lab**2 / const.c**2)
 
-        return {
+        result = {
             "times": times,
             "v_lab_magnitude": v_lab,
             "wind_angle": wind_angle,
@@ -527,6 +686,9 @@ class MilkyWayAxionHalo:
             "wind_perp": wind_perp,
             "nu_a_eff": nu_a_eff.to(self.nu_a.unit),
         }
+        self.kinematicsOverTimeResult = result
+        self._kinematicsOverTime_cache_key = cache_key
+        return result
 
     def findLineshapeOverTime(
         self,
@@ -534,7 +696,7 @@ class MilkyWayAxionHalo:
         station,
         meas_times: list[Time] | Time,
         case: str = "grad_perp",
-        sensitive_axis: str | np.ndarray | Quantity = "up",
+        projection_axis: str | np.ndarray | Quantity = "zenith",
         include_rotation: bool = True,
         galcen_frame: coord.Galactocentric | None = None,
         verbose: bool = False,
@@ -549,7 +711,7 @@ class MilkyWayAxionHalo:
         kinematics = self.findKinematicsOverTime(
             station=station,
             meas_times=meas_times,
-            sensitive_axis=sensitive_axis,
+            projection_axis=projection_axis,
             include_rotation=include_rotation,
             galcen_frame=galcen_frame,
             verbose=verbose,
@@ -679,7 +841,7 @@ class MilkyWayAxionHalo:
         Returns
         -------
         dict
-            Contains ``FWHM_frequency``, ``FWHM_a``, ``tau_a``, peak and
+            Contains ``FWHM_freq``, ``FWHM``, ``FWHM_a``, ``tau_a``, peak and
             half-maximum diagnostics.
         """
 
@@ -749,8 +911,8 @@ class MilkyWayAxionHalo:
         tau_a = (1.0 / (np.pi * FWHM_fraction * nu_a)).to(unit.s)
 
         return {
-            "FWHM_frequency": FWHM_frequency.to(frequencies.unit),
-            "FWHM_fraction": FWHM_fraction,
+            "FWHM_freq": FWHM_frequency.to(unit.Hz),
+            "FWHM": FWHM_a,
             "FWHM_a": FWHM_a,
             "tau_a": tau_a,
             "lower_half_max_frequency": (lower_frequency * unit.Hz).to(
@@ -766,13 +928,13 @@ class MilkyWayAxionHalo:
             * (spectrum.unit if isinstance(spectrum, Quantity) else unit.one),
         }
 
-    def findLineshapeAtStationAndTime(
+    def findLineshape(
         self,
         station,
         meas_time: Time | None = None,
         frequencies: Quantity | None = None,
         case: str = "grad_perp",
-        sensitive_axis: str | np.ndarray | Quantity = "up",
+        projection_axis: str | np.ndarray | Quantity = "zenith",
         include_rotation: bool = True,
         galcen_frame: coord.Galactocentric | None = None,
         update: bool = True,
@@ -797,8 +959,12 @@ class MilkyWayAxionHalo:
             ``num_frequency_points`` are forwarded to that grid maker.
         case : str
             ``'non-grad'``, ``'grad_par'``, or ``'grad_perp'``.
-        sensitive_axis : str or vector
-            Local axis used to define the wind angle.
+        projection_axis : str or vector
+            Axis used to decompose the axion-gradient / axion-wind vector.
+            ``'grad_par'`` uses the component parallel to this axis, while
+            ``'grad_perp'`` uses the magnitude of the component perpendicular
+            to it. The default ``'zenith'`` is the local vertical direction
+            normal to the station's local ground tangent plane.
         include_rotation : bool
             Include the station's surface rotation in the lab velocity.
         galcen_frame : astropy.coordinates.Galactocentric, optional
@@ -810,7 +976,7 @@ class MilkyWayAxionHalo:
         Returns
         -------
         dict
-            Kinematics plus ``frequencies``, normalized ``PSD``,
+            Kinematics plus ``frequencies``, normalized ``lineshape``,
             ``power_coefficient`` and ``power_spectrum``.
         """
 
@@ -818,11 +984,20 @@ class MilkyWayAxionHalo:
             meas_time = Time.now()
         if frequencies is None:
             frequencies = self.makeLineshapeFrequencyGrid(**frequency_grid_kwargs)
+        cache_key = self._lineshape_cache_key(
+            station=station,
+            meas_time=meas_time,
+            frequencies=frequencies,
+            case=case,
+            projection_axis=projection_axis,
+            include_rotation=include_rotation,
+            galcen_frame=galcen_frame,
+        )
 
         kinematics = self.findKinematicsOverTime(
             station=station,
             meas_times=meas_time,
-            sensitive_axis=sensitive_axis,
+            projection_axis=projection_axis,
             include_rotation=include_rotation,
             galcen_frame=galcen_frame,
             verbose=verbose,
@@ -846,86 +1021,146 @@ class MilkyWayAxionHalo:
             case=case,
         )
         power_spectrum = power_coefficient * lineshape
+        fwhm = self.measureLineshapeFWHM(
+            frequencies,
+            lineshape,
+            nu_a=self.nu_a,
+        )
 
         if update:
             self.v_lab = speed
             self.windAngle = alpha
             self.nu_a_eff = kinematics["nu_a_eff"][0]
+            self.FWHM = fwhm["FWHM"]
+            self.FWHM_a = fwhm["FWHM_a"]
+            self.FWHM_frequency = fwhm["FWHM_freq"]
+            self.FWHM_freq = fwhm["FWHM_freq"]
+            self.tau_a = fwhm["tau_a"]
 
-        return {
+        result = {
             **kinematics,
+            **fwhm,
             "time": kinematics["times"][0],
-            "frequency": frequencies,
             "frequencies": frequencies,
             "case": case,
             "alpha": alpha,
             "lineshape": lineshape,
-            "PSD": lineshape,
             "power_coefficient": power_coefficient,
             "power_spectrum": power_spectrum,
         }
+        self.lineshapeAtStationAndTimeResult = result
+        self._lineshapeAtStationAndTime_cache_key = cache_key
+        return result
 
-    def findLineshapeFWHMAtStation(
+    def findLineshapeFWHM(
         self,
         station,
         meas_time: Time | None = None,
         frequencies: Quantity | None = None,
         case: str = "grad_perp",
-        sensitive_axis: str | np.ndarray | Quantity = "up",
-        spectrum: str = "PSD",
+        projection_axis: str | np.ndarray | Quantity = "zenith",
+        spectrum: str = "lineshape",
         include_rotation: bool = True,
         galcen_frame: coord.Galactocentric | None = None,
         update: bool = True,
         verbose: bool = False,
         **frequency_grid_kwargs,
     ) -> dict:
-        """Find the FWHM of the station/time-dependent axion PSD.
+        """Find the FWHM of the station/time-dependent axion lineshape.
 
-        Parameters are the same as :meth:`findLineshapeAtStationAndTime`.  ``spectrum``
-        chooses whether the width is measured from the normalized ``'PSD'`` /
+        Parameters are the same as :meth:`findLineshape`.  ``spectrum``
+        chooses whether the width is measured from the normalized
         ``'lineshape'`` or from the scaled ``'power_spectrum'``.  The two are
         normally identical because the power coefficient is frequency
-        independent at fixed time.
+        independent at fixed time.  If the most recent
+        :meth:`findLineshape` result was computed with the
+        same station, time, frequency grid, coupling case, projection axis, and
+        kinematic settings, that stored result is reused instead of recomputing
+        the PSD.
 
         When ``update=True``, this method updates:
 
-        - ``FWHM_frequency``: width in frequency units,
-        - ``FWHM_a``: fractional width expressed in ppm,
+        - ``FWHM_freq``: width in Hz,
+        - ``FWHM``: fractional width expressed in ppm,
+        - ``FWHM_a``: alias for ``FWHM``,
         - ``tau_a = 1 / (pi * FWHM_a * nu_a)`` using ``FWHM_a`` as a
           dimensionless fraction.
         """
 
-        result = self.findLineshapeAtStationAndTime(
+        if frequencies is None:
+            frequencies = self.makeLineshapeFrequencyGrid(**frequency_grid_kwargs)
+
+        cached_result = self.lineshapeAtStationAndTimeResult
+        if meas_time is None and cached_result is not None:
+            meas_time_for_key = cached_result["time"]
+        elif meas_time is None:
+            meas_time_for_key = Time.now()
+        else:
+            meas_time_for_key = meas_time
+
+        cache_key = self._lineshape_cache_key(
             station=station,
-            meas_time=meas_time,
+            meas_time=meas_time_for_key,
             frequencies=frequencies,
             case=case,
-            sensitive_axis=sensitive_axis,
+            projection_axis=projection_axis,
             include_rotation=include_rotation,
             galcen_frame=galcen_frame,
-            update=update,
-            verbose=verbose,
-            **frequency_grid_kwargs,
         )
+
+        if (
+            cached_result is not None
+            and self._lineshapeAtStationAndTime_cache_key == cache_key
+        ):
+            result = cached_result
+        else:
+            result = self.findLineshape(
+                station=station,
+                meas_time=meas_time_for_key,
+                frequencies=frequencies,
+                case=case,
+                projection_axis=projection_axis,
+                include_rotation=include_rotation,
+                galcen_frame=galcen_frame,
+                update=update,
+                verbose=verbose,
+            )
 
         spectrum_key = spectrum.lower()
         if spectrum_key in {"psd", "lineshape"}:
-            sampled_spectrum = result["lineshape"]
-            measured_spectrum = "PSD"
+            fwhm = {
+                key: result[key]
+                for key in (
+                    "FWHM_freq",
+                    "FWHM",
+                    "FWHM_a",
+                    "tau_a",
+                    "lower_half_max_frequency",
+                    "upper_half_max_frequency",
+                    "peak_frequency",
+                    "peak_value",
+                    "half_max",
+                )
+            }
+            measured_spectrum = "lineshape"
         elif spectrum_key in {"power", "power_spectrum", "powerspectrum"}:
             sampled_spectrum = result["power_spectrum"]
             measured_spectrum = "power_spectrum"
+            fwhm = self.measureLineshapeFWHM(
+                result["frequencies"],
+                sampled_spectrum,
+                nu_a=self.nu_a,
+            )
         else:
-            raise ValueError("spectrum must be 'PSD'/'lineshape' or 'power_spectrum'")
-
-        fwhm = self.measureLineshapeFWHM(
-            result["frequencies"],
-            sampled_spectrum,
-            nu_a=self.nu_a,
-        )
+            raise ValueError("spectrum must be 'lineshape' or 'power_spectrum'")
 
         if update:
-            self.FWHM_frequency = fwhm["FWHM_frequency"]
+            self.v_lab = result["v_lab_magnitude"][0]
+            self.windAngle = result["alpha"]
+            self.nu_a_eff = result["nu_a_eff"][0]
+            self.FWHM = fwhm["FWHM"]
+            self.FWHM_frequency = fwhm["FWHM_freq"]
+            self.FWHM_freq = fwhm["FWHM_freq"]
             self.FWHM_a = fwhm["FWHM_a"]
             self.tau_a = fwhm["tau_a"]
 
@@ -941,7 +1176,7 @@ class MilkyWayAxionHalo:
         meas_times: list[Time] | Time,
         frequencies: Quantity | None = None,
         case: str = "grad_perp",
-        sensitive_axis: str | np.ndarray | Quantity = "up",
+        projection_axis: str | np.ndarray | Quantity = "zenith",
         include_rotation: bool = True,
         frequency_indices: list[int] | None = None,
         showPlot: bool = True,
@@ -958,7 +1193,7 @@ class MilkyWayAxionHalo:
             result = self.findKinematicsOverTime(
                 station=station,
                 meas_times=meas_times,
-                sensitive_axis=sensitive_axis,
+                projection_axis=projection_axis,
                 include_rotation=include_rotation,
                 verbose=verbose,
             )
@@ -969,7 +1204,7 @@ class MilkyWayAxionHalo:
                 station=station,
                 meas_times=meas_times,
                 case=case,
-                sensitive_axis=sensitive_axis,
+                projection_axis=projection_axis,
                 include_rotation=include_rotation,
                 verbose=verbose,
             )
@@ -1118,7 +1353,7 @@ class MilkyWayAxionHalo:
             Coupling geometry: ``'non-grad'``, ``'grad_par'``, or
             ``'grad_perp'``.
         alpha : Quantity [rad]
-            Angle between the sensitive axis and the axion wind velocity.
+            Angle between the projection axis and the axion wind velocity.
         verbose : bool
             Print diagnostic information.
 

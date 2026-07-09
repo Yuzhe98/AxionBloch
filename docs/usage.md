@@ -156,7 +156,7 @@ result = axion.findLineshape(
 )
 
 frequencies = result["frequencies"]
-PSD = result["PSD"]
+lineshape = result["lineshape"]
 alpha = result["alpha"]
 v_lab = result["v_lab_magnitude"][0]
 FWHM = result["FWHM"]
@@ -182,21 +182,21 @@ FWHM_result = axion.findLineshapeFWHM(
     meas_time=Time("2022-01-01T00:00:00", scale="utc"),
     case="grad_par",
     projection_axis="zenith",
-    spectrum="PSD",
+    spectrum="lineshape",
     num_frequency_points=20001,
 )
 
-print(FWHM_result["FWHM_frequency"])
 print(FWHM_result["FWHM_freq"])
+print(FWHM_result["FWHM"].to(ppm))
 print(FWHM_result["FWHM_a"].to(ppm))
 print(FWHM_result["tau_a"])
 ```
 
 `findLineshape()` also measures these FWHM quantities and includes them in its
-result dictionary.  These helpers update `axion.FWHM_frequency`,
-`axion.FWHM_freq`, `axion.FWHM`, `axion.FWHM_a`, and `axion.tau_a` when
-`update=True`.  Here `FWHM` is the dimensionless fractional linewidth and
-`FWHM_a` is the same quantity expressed in the package's `ppm` unit, so
+result dictionary.  These helpers update `axion.FWHM_freq`, `axion.FWHM`,
+`axion.FWHM_a`, and `axion.tau_a` when `update=True`.  Here `FWHM` is the
+fractional linewidth expressed in the package's `ppm` unit and `FWHM_a` is an
+alias, so
 {math}`\tau_a = 1 / (\pi\,\mathrm{FWHM}_a\,\nu_a)`.
 
 Two example scripts use these helpers:

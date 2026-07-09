@@ -128,9 +128,9 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--spectrum",
-        default="PSD",
-        choices=["PSD", "power_spectrum"],
-        help="Plot PSD or power_spectrum without normalization.",
+        default="lineshape",
+        choices=["lineshape", "power_spectrum"],
+        help="Plot lineshape or power_spectrum without normalization.",
     )
     parser.add_argument(
         "--frequency-span-ppm",
@@ -242,7 +242,7 @@ def main() -> None:
     y_unit = None
     for case, alpha, label_prefix in _line_settings(args):
         alpha_for_case = station_alpha if alpha is None else alpha
-        PSD = axion.axion_lineshape(
+        lineshape = axion.axion_lineshape(
             v_0=axion.v_0,
             v_lab=v_lab,
             nu_a=axion.nu_a,
@@ -256,9 +256,11 @@ def main() -> None:
             alpha=alpha_for_case,
             case=case,
         )
-        power_spectrum = power_coefficient * PSD
+        power_spectrum = power_coefficient * lineshape
         y_quantity = (
-            (axion.nu_a * PSD / 1e6).to(unit.one) if args.spectrum == "PSD" else power_spectrum
+            (axion.nu_a * lineshape / 1e6).to(unit.one)
+            if args.spectrum == "lineshape"
+            else power_spectrum
         )
         FWHM = axion.measureLineshapeFWHM(
             frequencies,
@@ -271,7 +273,7 @@ def main() -> None:
         plotted_results[result_key] = {
             "case": case,
             "alpha": alpha_for_case,
-            "PSD": PSD,
+            "lineshape": lineshape,
             "power_spectrum": power_spectrum,
             **FWHM,
         }
@@ -329,7 +331,7 @@ def main() -> None:
     v_lab_value = v_lab.to_value(unit.km / unit.s)
 
     ax.set_xlabel("$\\nu/\\nu_a - 1$ (ppm)")
-    if args.spectrum == "PSD":
+    if args.spectrum == "lineshape":
         ax.set_ylabel("$\\nu_a \\lambda / 10^6$")
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0)

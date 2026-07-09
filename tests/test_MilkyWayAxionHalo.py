@@ -453,13 +453,14 @@ def test_astropy_halo_wind_helpers():
     assert wind.unit.is_equivalent(unit.km / unit.s)
     assert 200 < np.linalg.norm(wind.to_value(unit.km / unit.s)) < 320
 
-    for axis in ("north", "east", "up"):
+    for axis in ("north", "east", "zenith"):
         assert basis[axis].shape == (3,)
         assert np.isclose(np.linalg.norm(basis[axis]), 1.0, rtol=1e-6)
     assert np.allclose(basis["west"], -basis["east"])
-    assert np.allclose(basis["zenith"], basis["up"])
 
-    parallel = MilkyWayAxionHalo.projectHaloVelocity(time=t, station=Mainz, axis="up")
+    parallel = MilkyWayAxionHalo.projectHaloVelocity(
+        time=t, station=Mainz, axis="zenith"
+    )
     perpendicular = MilkyWayAxionHalo.projectHaloVelocity(
         time=t, station=Mainz, axis="perp"
     )
