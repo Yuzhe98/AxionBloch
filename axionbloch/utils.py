@@ -2303,7 +2303,7 @@ markers = [
 # ):
 #     """
 #     returns the velocity 'v_lab' between lab frame and DM halo (SHM), in the galactic rest frame, for the specified coordinates and time
-#     returns the angle [rad] between the CASPEr sensitive axis (z-direction = earth surface normal) and 'v_lab'
+#     returns the angle [rad] between the CASPEr projection axis (zenith) and 'v_lab'
 
 #     time: needs to be in the format "15:47:18"
 #         if none is specified, use current time
@@ -2383,7 +2383,7 @@ markers = [
 #     Vlab = Vhalo.get_d_xyz()  # convert into a vector
 #     Bz = (
 #         unit_Up.get_xyz()
-#     )  # our leading field is pointing up perpendicular to earth's surface
+#     )  # our leading field is along zenith, normal to the local ground tangent plane
 
 #     alpha_ALP = angle_between(Vlab, Bz).value
 #     v_ALP = np.linalg.norm(Vlab.value) * 1e3
@@ -2394,7 +2394,7 @@ markers = [
 #         print("Bz vector @DM time (galaxy frame):", Bz)
 #         print("v_halo @DM time (galaxy frame):", Vhalo)
 #         print("v_lab @DM time:", Vlab)
-#         print("angle between sensitive axis & lab velocity @DM time: ", alpha_ALP)
+#         print("angle between projection axis & lab velocity @DM time: ", alpha_ALP)
 
 #     ###############################################################################################
 #     # do not delete

@@ -98,9 +98,9 @@ class MilkyWay:
       :class:`~astropy.coordinates.Galactocentric` rest frame.
     - The lab velocity :math:`\\mathbf{v}_\\mathrm{lab}` (Sun's galactic
       rotation + peculiar velocity + Earth's instantaneous orbital velocity).
-    - The station's sensitive-axis unit vector in galactic coordinates
+    - The station's projection-axis unit vector in galactic coordinates
       (changes daily as Earth rotates — the daily-modulation signal).
-    - The angle between the axion wind and the sensitive axis.
+    - The angle between the axion wind and the projection axis.
     - Earth's surface rotation velocity at the station.
 
     Parameters
@@ -451,7 +451,7 @@ class MilkyWay:
     # ------------------------------------------------------------------
 
     def get_wind_angle(self) -> Quantity:
-        """Angle between the lab velocity and the station's sensitive axis.
+        """Angle between the lab velocity and the station's projection axis.
 
         Computes the angle between:
 
@@ -609,7 +609,7 @@ class MilkyWay:
         * **Right** — Solar system (not to scale) showing Earth's orbit,
           Earth's current position, the Earth's rotation axis (two arrows
           for N / S poles), and the Earth's equatorial plane.  If
-          :attr:`station` is set, the station's sensitive axis is also drawn.
+          :attr:`station` is set, the station's projection axis is also drawn.
 
         Parameters
         ----------
@@ -939,7 +939,7 @@ class MilkyWay:
             label="Equator",
         )
 
-        # ---- station sensitive axis ----
+        # ---- station projection axis ----
         if self.station is not None:
             n_gcrs = self.get_nvec_gcrs()
             # rotate GCRS equatorial → ecliptic (tilt z-axis by ε around x-axis)

@@ -519,10 +519,11 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
 
         - Lab velocity :math:`\\mathbf{v}_\\mathrm{lab}` (magnitude and direction).
         - Wind angle between :math:`\\mathbf{v}_\\mathrm{lab}` and the
-          station's sensitive axis.
+          station's projection axis.
         - Gradient in Cartesian ITRS coordinates (useful for projecting onto
           a non-vertical :math:`\\mathbf{B}_0`).
-        - Projection of the gradient onto the sensitive axis (radial direction).
+        - Projection of the gradient onto the projection axis (local
+          zenith/radial direction).
 
         Parameters
         ----------
@@ -557,7 +558,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
 
             ``v_lab``, ``v_lab_magnitude`` — lab velocity in galactic frame.
 
-            ``wind_angle`` — angle between v_lab and the sensitive axis [rad].
+            ``wind_angle`` — angle between v_lab and the projection axis [rad].
 
         Examples
         --------
