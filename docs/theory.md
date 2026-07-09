@@ -402,8 +402,8 @@ for three coupling geometries:
 | Case | Description |
 |------|-------------|
 | ``non-grad`` | Non-gradient coupling |
-| ``grad_par`` | Gradient coupling, sensitive axis ∥ {math}`\mathbf{v}_\mathrm{lab}` |
-| ``grad_perp`` | Gradient coupling, sensitive axis ⊥ {math}`\mathbf{v}_\mathrm{lab}` |
+| ``grad_par`` | Gradient coupling parallel to the chosen projection axis |
+| ``grad_perp`` | Gradient coupling perpendicular to the chosen projection axis |
 
 All lineshapes are one-sided (zero below {math}`\nu_a`) and normalized so
 that {math}`\int S(\nu)\,d\nu = 1`.

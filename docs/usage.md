@@ -138,8 +138,8 @@ analytical cases:
 | Case | Meaning |
 |------|---------|
 | `non-grad` | Non-gradient coupling; independent of `alpha` |
-| `grad_par` | Gradient coupling parallel to the bias/sensitive axis |
-| `grad_perp` | Gradient coupling perpendicular to the bias/sensitive axis |
+| `grad_par` | Gradient coupling parallel to the projection axis |
+| `grad_perp` | Gradient coupling perpendicular to the projection axis |
 
 For station-specific calculations, use the helper that first computes the
 laboratory kinematics and then calls the same static PSD function:
@@ -147,11 +147,11 @@ laboratory kinematics and then calls the same static PSD function:
 ```python
 axion = MilkyWayAxionHalo(nu_a=1 * unit.MHz)
 
-result = axion.findLineshapeAtStationAndTime(
+result = axion.findLineshape(
     station=Boston,
     meas_time=Time("2022-01-01T00:00:00", scale="utc"),
     case="grad_perp",
-    sensitive_axis="zenith",
+    projection_axis="zenith",
     num_frequency_points=20001,
 )
 
@@ -159,9 +159,15 @@ frequencies = result["frequencies"]
 PSD = result["PSD"]
 alpha = result["alpha"]
 v_lab = result["v_lab_magnitude"][0]
+FWHM = result["FWHM"]
+FWHM_a = result["FWHM_a"]
 ```
 
-`sensitive_axis` can be `"north"`, `"west"`, `"east"`, `"zenith"`/`"up"`, or
+`projection_axis` selects the axis used to decompose the axion-gradient /
+axion-wind vector.  `grad_par` uses the component parallel to this axis, while
+`grad_perp` uses the magnitude of the component perpendicular to it.  The
+default `"zenith"` is the local vertical direction normal to the station's
+local ground tangent plane.  It can also be `"north"`, `"west"`, `"east"`, or
 another axis accepted by
 {meth}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.projectHaloVelocity`.
 For fixed alpha comparisons independent of station orientation, pass alpha
@@ -171,23 +177,26 @@ The sampled FWHM of a PSD or power spectrum can be measured in frequency
 units and as a fractional ppm width:
 
 ```python
-FWHM_result = axion.findLineshapeFWHMAtStation(
+FWHM_result = axion.findLineshapeFWHM(
     station=Boston,
     meas_time=Time("2022-01-01T00:00:00", scale="utc"),
     case="grad_par",
-    sensitive_axis="zenith",
+    projection_axis="zenith",
     spectrum="PSD",
     num_frequency_points=20001,
 )
 
 print(FWHM_result["FWHM_frequency"])
+print(FWHM_result["FWHM_freq"])
 print(FWHM_result["FWHM_a"].to(ppm))
 print(FWHM_result["tau_a"])
 ```
 
-This updates `axion.FWHM_frequency`, `axion.FWHM_a`, and `axion.tau_a` when
-`update=True`.  Here `FWHM_a` is a dimensionless fractional linewidth expressed
-in the package's `ppm` unit, so
+`findLineshape()` also measures these FWHM quantities and includes them in its
+result dictionary.  These helpers update `axion.FWHM_frequency`,
+`axion.FWHM_freq`, `axion.FWHM`, `axion.FWHM_a`, and `axion.tau_a` when
+`update=True`.  Here `FWHM` is the dimensionless fractional linewidth and
+`FWHM_a` is the same quantity expressed in the package's `ppm` unit, so
 {math}`\tau_a = 1 / (\pi\,\mathrm{FWHM}_a\,\nu_a)`.
 
 Two example scripts use these helpers:

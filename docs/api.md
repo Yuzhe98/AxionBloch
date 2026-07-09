@@ -11,8 +11,8 @@ automatically from source docstrings.
 | {class}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo` | `MilkyWayAxionHalo` | SHM axion-wind model |
 | {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.axion_lineshape` | `MilkyWayAxionHalo` | Analytical PSD lineshape (static) |
 | {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findKinematicsOverTime` | `MilkyWayAxionHalo` | Station/time-dependent MW speed and wind angle |
-| {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshapeAtStationAndTime` | `MilkyWayAxionHalo` | Station/time-dependent PSD from `axion_lineshape` |
-| {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshapeFWHMAtStation` | `MilkyWayAxionHalo` | Sampled PSD or power-spectrum FWHM and coherence time |
+| {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshape` | `MilkyWayAxionHalo` | Station/time-dependent PSD from `axion_lineshape` |
+| {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshapeFWHM` | `MilkyWayAxionHalo` | Sampled PSD or power-spectrum FWHM and coherence time |
 | {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.getAmpSpectra` | `MilkyWayAxionHalo` | Stochastic amplitude spectra |
 | {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.getRabiFreq` | `MilkyWayAxionHalo` | rms Rabi frequency |
 | {class}`~axionbloch.GravBoundAxionHalo.GravBoundAxionHalo` | `GravBoundAxionHalo` | Generic TISE solver |
@@ -40,9 +40,9 @@ the kinematic context used by the station-aware MW axion-halo helpers:
   {meth}`~axionbloch.MilkyWay.MilkyWay.get_v_lab_magnitude` return the lab
   velocity in the Galactic rest frame.
 - {meth}`~axionbloch.MilkyWay.MilkyWay.get_nvec_gcrs` returns the station's
-  local vertical in a geocentric inertial frame.
+  local zenith in a geocentric inertial frame.
 - {meth}`~axionbloch.MilkyWay.MilkyWay.get_wind_angle` returns the angle
-  between {math}`v_\mathrm{lab}` and the station sensitive axis.
+  between {math}`v_\mathrm{lab}` and the station projection axis.
 
 ```{automodule} axionbloch.MilkyWay
 :members:
@@ -66,11 +66,12 @@ Standard Halo Model (SHM) velocity distribution.  The main class is
   including {math}`v_\mathrm{lab}`, {math}`\alpha`, parallel wind projection,
   perpendicular wind projection, and {math}`\nu_{a,\mathrm{eff}}`.
 - Station/time-dependent PSDs via
-  {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshapeAtStationAndTime`,
+  {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshape`,
   which computes the wind angle and then calls `axion_lineshape`.
 - Sampled PSD or power-spectrum FWHM via
-  {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshapeFWHMAtStation`.
-  The helper stores `FWHM_frequency`, `FWHM_a` in ppm, and
+  {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshapeFWHM`.
+  The scalar lineshape helper also reports these values.  The helpers store
+  `FWHM_frequency` / `FWHM_freq`, `FWHM`, `FWHM_a` in ppm, and
   {math}`\tau_a = 1 / (\pi\,\mathrm{FWHM}_a\,\nu_a)` when `update=True`.
 - Stochastic amplitude spectra for time-domain simulations via
   {func}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.getAmpSpectra`.

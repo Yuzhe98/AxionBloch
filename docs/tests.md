@@ -231,10 +231,10 @@ the end-to-end `Simulations` pipeline.  Accepts `PRINT_RESULTS`, `SEED`, and
 
 Lightweight tests for the station/time-aware MW PSD helpers.  These checks use
 the Boston station and verify that
-{meth}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshapeAtStationAndTime`
+{meth}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshape`
 returns a sampled PSD and power spectrum with consistent frequency grids,
 station-derived wind angle {math}`\alpha`, and lab speed.  They also verify
-{meth}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshapeFWHMAtStation`
+{meth}`~axionbloch.MilkyWayAxionHalo.MilkyWayAxionHalo.findLineshapeFWHM`
 for both `"PSD"` and `"power_spectrum"` inputs, including the updates to
 `FWHM_frequency`, `FWHM_a`, and
 {math}`\tau_a = 1 / (\pi\,\mathrm{FWHM}_a\,\nu_a)`.
