@@ -3,7 +3,7 @@
 Covers:
 - Earth velocity in the galactic rest frame (magnitude, annual modulation)
 - Sun's galactocentric position and velocity
-- Station sensitive-axis unit vector (unit norm, daily variation)
+- Station projection-axis unit vector (unit norm, daily variation)
 - Wind angle (range, seasonal change)
 - Earth rotation velocity (order of magnitude)
 - Heliocentric velocity (order of magnitude)
@@ -146,7 +146,7 @@ class TestHeliocentricVelocity:
 
 
 # ---------------------------------------------------------------------------
-# Station sensitive-axis (nvec)
+# Station projection axis (nvec)
 # ---------------------------------------------------------------------------
 
 
@@ -243,7 +243,7 @@ class TestWindAngle:
             MilkyWay(t, station=Mainz).get_wind_angle().to(unit.deg).value
             for t in times
         ]
-        # Over 18 h the sensitive axis sweeps ~270° — expect > 30° variation
+        # Over 18 h the projection axis sweeps ~270° — expect > 30° variation
         assert (
             max(angles) - min(angles) > 30.0
         ), f"Wind angle variation too small: {[f'{a:.1f}' for a in angles]}"
@@ -334,7 +334,7 @@ class TestPlot:
         plt.close("all")
 
     def test_plot_without_station(self, mw_no_station):
-        """plot() should work even without a station (no sensitive-axis arrow)."""
+        """plot() should work even without a station projection-axis arrow."""
         fig = mw_no_station.plot(show=False)
         assert len(fig.axes) == 2
         plt.close("all")
