@@ -93,7 +93,7 @@ class MilkyWayAxionHalo:
             Print derived quantities after construction.
         """
 
-        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
         self.name = name
         self.v_0 = v_0
         self.v_lab = v_lab
@@ -1276,7 +1276,7 @@ class MilkyWayAxionHalo:
         get the Rabi frequency of the pseudomagnetic field amplitude in [Hz] for the specified case
         case: "non-grad", "grad_par" or "grad_perp", determines the lineshape function to use
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.getRabiFreq.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.getRabiFreq.__name__}]"
         if g_aNN is None:
             if self.g_aNN is None:
                 raise ValueError("g_aNN cannot be None")
@@ -1312,7 +1312,7 @@ class MilkyWayAxionHalo:
             )
         if verbose:
             print(
-                logPrefix,
+                msgPrefix,
                 f"axion wind Rabi frequency (case={case}): {Omega_rms.to(unit.Hz)}",
             )
         return Omega_rms
@@ -1368,7 +1368,7 @@ class MilkyWayAxionHalo:
         A. Gramolin et al., https://github.com/gramolin/lineshape
         """
 
-        logPrefix = f"[{MilkyWayAxionHalo.__name__}.{MilkyWayAxionHalo.axion_lineshape.__name__}]"
+        msgPrefix = f"[{MilkyWayAxionHalo.__name__}.{MilkyWayAxionHalo.axion_lineshape.__name__}]"
         # ----------- prepare to generate the axion lineshape ----------- #
         # return the lineshape under certain special circumstances
         v_0, v_lab = Quantity(np.abs(v_0)), Quantity(np.abs(v_lab))
@@ -1389,14 +1389,14 @@ class MilkyWayAxionHalo:
             nu_a_indx = positive_indices[0]
             if verbose:
                 print(
-                    logPrefix,
+                    msgPrefix,
                     f"nu_a = {nu_a}, first frequency element > nu_a is nu[{nu_a_indx}] = {nu[nu_a_indx]}",
                 )
         # if there is no element >= nu_a, return an array of zeros
         else:
             if verbose:
                 print(
-                    logPrefix,
+                    msgPrefix,
                     f"all input frequencies are < nu_a = {nu_a}, returning an array of zeros",
                 )
             return full_lineshape
@@ -1408,7 +1408,7 @@ class MilkyWayAxionHalo:
         if cutoff_indices.size > 0:
             if verbose:
                 print(
-                    logPrefix,
+                    msgPrefix,
                     f"cutoff frequency is {(1 + 10 * FWHM) * nu_a}, first frequency element > cutoff frequency is nu[{cutoff_indices[0]}] = {nu[cutoff_indices[0]]}",
                 )
             cutoff_idx = cutoff_indices[0]
@@ -1416,7 +1416,7 @@ class MilkyWayAxionHalo:
         else:
             if verbose:
                 print(
-                    logPrefix,
+                    msgPrefix,
                     f"all input frequencies are < cutoff frequency {(1 + 10 * FWHM) * nu_a}, setting cutoff index to the last index of the array",
                 )
             cutoff_idx = len(nu) - 1
@@ -1512,7 +1512,7 @@ class MilkyWayAxionHalo:
         if RBW <= 0.1 * FWHM * nu_a:
             if verbose:
                 print(
-                    logPrefix,
+                    msgPrefix,
                     f"RBW = {RBW:.3e} is <= 0.1 * FWHM * nu_a = {0.1 * FWHM * nu_a:.3e}, using input frequencies to get the lineshape",
                 )
             full_lineshape[nu_a_indx : cutoff_idx + 1] += _axion_lineshape(
@@ -1524,7 +1524,7 @@ class MilkyWayAxionHalo:
             # within [idx(nu_a) - 1, idx(nu_a + 10 Delta nu_a)]
             if verbose:
                 print(
-                    logPrefix,
+                    msgPrefix,
                     f"RBW = {RBW:.3e} is > 0.1 * FWHM * nu_a = {(0.1 * FWHM * nu_a).to(RBW.unit):.3e}, using finer frequencies to get the lineshape",
                 )
             start_idx = max(0, nu_a_indx - 1)
@@ -1610,7 +1610,7 @@ class MilkyWayAxionHalo:
             Complex amplitude spectra.
         """
 
-        logPrefix = f"[{self.__class__.__name__}.{self.getAmpSpectra.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.getAmpSpectra.__name__}]"
         if alpha is None:
             alpha = self.windAngle if self.windAngle is not None else 0.0 * unit.rad
 

@@ -75,15 +75,15 @@ class GravBoundAxionHalo:
         verbose : bool
             Print axion mass and frequency after construction.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
         self.name = name
         self.nu_a = nu_a
         # axion mass derived from Compton frequency: m = h * nu / c²
         self.m_a = self.nu_a * const.h / const.c**2
         if verbose:
-            print(logPrefix, "axion Compton frequency =", self.nu_a)
+            print(msgPrefix, "axion Compton frequency =", self.nu_a)
             print(
-                logPrefix,
+                msgPrefix,
                 f"axion mass = {self.m_a.to(unit.kg)}",
                 f"= {self.m_a.to_value(unit.eV / const.c**2):g} eV/c^2",
             )
@@ -122,20 +122,20 @@ class GravBoundAxionHalo:
         identical for quantities compared or added together, making unit
         mismatches easy to spot during development.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.showValueAndUnits.__name__}]"
-        print(logPrefix, "self.r.mean():", self.r.mean())  # mean of radial grid
-        print(logPrefix, "self.r.std():", self.r.std())  # spread of radial grid
-        print(logPrefix, "self.dr:", self.dr)  # grid spacing
+        msgPrefix = f"[{self.__class__.__name__}.{self.showValueAndUnits.__name__}]"
+        print(msgPrefix, "self.r.mean():", self.r.mean())  # mean of radial grid
+        print(msgPrefix, "self.r.std():", self.r.std())  # spread of radial grid
+        print(msgPrefix, "self.dr:", self.dr)  # grid spacing
         print(
-            logPrefix, "self.pot.mean():", self.pot.mean()
+            msgPrefix, "self.pot.mean():", self.pot.mean()
         )  # mean gravitational potential energy
         print(
-            logPrefix, "self.pot.std():", self.pot.std()
+            msgPrefix, "self.pot.std():", self.pot.std()
         )  # spread of gravitational potential energy
         print(
-            logPrefix, "self.T_magnitude:", self.T_magnitude
+            msgPrefix, "self.T_magnitude:", self.T_magnitude
         )  # kinetic energy prefactor ℏ²/(2m dr²)
-        print(logPrefix, "self.m_a:", self.m_a.si)  # axion mass
+        print(msgPrefix, "self.m_a:", self.m_a.si)  # axion mass
 
     def solve_TISE_3D_l(
         self,
@@ -164,7 +164,7 @@ class GravBoundAxionHalo:
         verbose : bool
             Print timing and eigen-energy tables.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.solve_TISE_3D_l.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.solve_TISE_3D_l.__name__}]"
         # Effective potential including centrifugal term ℏ²l(l+1)/(2m r²)
         Veff = Quantity(
             self.pot + const.hbar**2 * l * (l + 1) / (2 * self.m_a * self.r**2)
@@ -189,7 +189,7 @@ class GravBoundAxionHalo:
         toc = time.time()
         if verbose:
             print(
-                logPrefix, f"N={self.N} l={l} Eigensolver took {toc - tic:.3f} seconds"
+                msgPrefix, f"N={self.N} l={l} Eigensolver took {toc - tic:.3f} seconds"
             )
         # ----------------- end of dimensionless computation ---------------- #
         energies = np.zeros_like(energies_pot_unit) * self.pot.unit
@@ -197,7 +197,7 @@ class GravBoundAxionHalo:
             energies[i] = e * self.pot.unit
 
         if verbose:
-            print(logPrefix, "Eigen-energies:")
+            print(msgPrefix, "Eigen-energies:")
             print("[")
             for i, e in enumerate(energies_pot_unit[0:max_n_r]):
                 print(f"{e:.6e},")
@@ -273,7 +273,9 @@ class GravBoundAxionHalo:
                 "T_expect": T_expect,
                 "V_expect": V_expect,
                 "Veff_expect": Veff_expect,
-                "eigenE_expect": (T_expect + Veff_expect),  # TODO check if this is consistent with eigenE
+                "eigenE_expect": (
+                    T_expect + Veff_expect
+                ),  # TODO check if this is consistent with eigenE
                 "u_r": u_r,
                 "R_r": R_r,
                 "R_reduced": R_reduced,
@@ -321,10 +323,10 @@ class GravBoundAxionHalo:
         verbose : bool
             Forwarded to :meth:`solve_TISE_3D_l`.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.solve_TISE_3D.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.solve_TISE_3D.__name__}]"
         for l in l_vals:
             if verbose:
-                print(logPrefix, f"Solving for l={l}")
+                print(msgPrefix, f"Solving for l={l}")
             self.solve_TISE_3D_l(
                 l=l,
                 showPlot=showPlot,
@@ -336,12 +338,12 @@ class GravBoundAxionHalo:
 
     def getStateNames(self):
         """Return a list of state label strings (e.g. ``['1s', '2s', '2p']``)."""
-        logPrefix = f"[{self.__class__.__name__}.{self.getStateNames.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.getStateNames.__name__}]"
         return [state["name"] for state in self.states.values()]
 
     def getStateEnergies(self):
         """Return a list of eigen-energies in the units stored in ``self.states``."""
-        logPrefix = f"[{self.__class__.__name__}.{self.getStateEnergies.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.getStateEnergies.__name__}]"
         return [state["eigenE"] for state in self.states.values()]
 
     def getStateAmplitudeSpectrum(
@@ -378,9 +380,7 @@ class GravBoundAxionHalo:
             coefficients,
             key=lambda name: self.states[name]["eigenE"],
         )
-        eigenE = unit.Quantity(
-            [self.states[name]["eigenE"] for name in state_names]
-        )
+        eigenE = unit.Quantity([self.states[name]["eigenE"] for name in state_names])
         normalized_coefficients = np.asarray(
             [coefficients[name] for name in state_names],
             dtype=complex,
@@ -437,7 +437,7 @@ class GravBoundAxionHalo:
         amplitudes = spectrum["amplitudes"]
 
         if ax is None:
-            fig, ax = plt.subplots(figsize=(8.5/2.54, 8.5/2.54 * 10/16), dpi=300)
+            fig, ax = plt.subplots(figsize=(8.5 / 2.54, 8.5 / 2.54 * 10 / 16), dpi=300)
         else:
             fig = ax.figure
 
@@ -454,11 +454,13 @@ class GravBoundAxionHalo:
             color="tab:blue",
             zorder=3,
         )
-        for index, (energy, amplitude, state_name) in enumerate(zip(
-            energy_values,
-            amplitudes,
-            spectrum["state_names"],
-        )):
+        for index, (energy, amplitude, state_name) in enumerate(
+            zip(
+                energy_values,
+                amplitudes,
+                spectrum["state_names"],
+            )
+        ):
             ax.annotate(
                 state_name,
                 xy=(energy, amplitude),
@@ -470,10 +472,7 @@ class GravBoundAxionHalo:
 
         energy_unit_label = energy_unit.to_string("latex_inline")[1:-1]
         ax.set_xlim(-0.05 * np.amax(energy_values), 1.05 * np.max(energy_values))
-        ax.set_xlabel(
-            "$m-m_a\\,$"
-            f"$\\left({energy_unit_label}/c^2\\right)$"
-        )
+        ax.set_xlabel("$m-m_a\\,$" f"$\\left({energy_unit_label}/c^2\\right)$")
         # Leave vertical room for the staggered state labels.
         ax.set_ylim(0, 1.8 * np.max(amplitudes))
         # ax.set_ylabel("$|c_{nlm}|$")
@@ -490,8 +489,7 @@ class GravBoundAxionHalo:
         frequency_ax.set_xlim(upper_limits)
         frequency_unit_label = frequency_unit.to_string("latex_inline")[1:-1]
         frequency_ax.set_xlabel(
-            "$\\nu-\\nu_a\\,$"
-            f"$\\left({frequency_unit_label}\\right)$"
+            "$\\nu-\\nu_a\\,$" f"$\\left({frequency_unit_label}\\right)$"
         )
 
         fig.tight_layout()
@@ -605,16 +603,16 @@ class GravBoundAxionHalo:
         ... )
         """
 
-        logPrefix = (
+        msgPrefix = (
             f"[{self.__class__.__name__}.{self.findGradientsAtDirection.__name__}]"
         )
 
         # --- Resolve direction from station ---
-        assert station is not None, logPrefix + " Please provide a Station."
+        assert station is not None, msgPrefix + " Please provide a Station."
 
         if meas_time is None:
             print(
-                logPrefix, "Warning: time not provided. Using Time.now() as the input. "
+                msgPrefix, "Warning: time not provided. Using Time.now() as the input. "
             )
             meas_time = Time.now()
         # geodetic lat/lon → spherical colatitude (theta) and azimuth (phi)
@@ -633,11 +631,11 @@ class GravBoundAxionHalo:
             )
         else:
             raise TypeError(
-                logPrefix + " truncRadius unit is not equivalent to length. "
+                msgPrefix + " truncRadius unit is not equivalent to length. "
             )
 
         if verbose:
-            print(logPrefix, "(start_index, stop_index) =", (start_index, stop_index))
+            print(msgPrefix, "(start_index, stop_index) =", (start_index, stop_index))
 
         # update r and Nr
         r = self.r[start_index:stop_index]
@@ -705,9 +703,7 @@ class GravBoundAxionHalo:
                 station_theta_solarZ.to_value(unit.rad),
                 station_phi_solarZ.to_value(unit.rad),
             )
-            WF_direction += (
-                c * state["R_r"][start_index:stop_index] * Y_direction
-            )
+            WF_direction += c * state["R_r"][start_index:stop_index] * Y_direction
             mode_angular_frequency = (
                 (self.m_a * const.c**2 + eigenE_expect) / const.hbar
             ).to(
@@ -736,14 +732,14 @@ class GravBoundAxionHalo:
                 relative_velocity = station.rotation_velocity_in_solarZ_frame(meas_time)
             if not isinstance(relative_velocity, Quantity):
                 raise TypeError(
-                    logPrefix
+                    msgPrefix
                     + " relative_velocity must be an astropy Quantity with velocity units."
                 )
             if relative_velocity.shape != (
                 3,
             ) or not relative_velocity.unit.is_equivalent(unit.m / unit.s):
                 raise ValueError(
-                    logPrefix
+                    msgPrefix
                     + " relative_velocity must have shape (3,) and velocity units."
                 )
 
@@ -751,7 +747,7 @@ class GravBoundAxionHalo:
             speed = np.linalg.norm(velocity)
             beta = (speed / const.c).to(unit.one)
             if beta >= 1 * unit.one:
-                raise ValueError(logPrefix + " relative_velocity must be below c.")
+                raise ValueError(msgPrefix + " relative_velocity must be below c.")
 
             # here Theta_grid and Phi_grid are grid of the space
             theta_values = Theta_grid.to_value(unit.rad)
@@ -769,9 +765,7 @@ class GravBoundAxionHalo:
                 + velocity[1] * cos_theta * sin_phi
                 - velocity[2] * sin_theta
             )
-            velocity_phi = (
-                -velocity[0] * sin_phi + velocity[1] * cos_phi
-            )
+            velocity_phi = -velocity[0] * sin_phi + velocity[1] * cos_phi
 
             # First order in v/c: the (gamma - 1) spatial correction is
             # O(v^2/c^2) and is omitted. The time-derivative term remains
@@ -784,22 +778,22 @@ class GravBoundAxionHalo:
                 grad_phi = grad_phi + boost_scale * velocity_phi
 
             if verbose:
-                print(logPrefix, "relative velocity =", velocity)
-                print(logPrefix, "v/c = beta =", beta)
+                print(msgPrefix, "relative velocity =", velocity)
+                print(msgPrefix, "v/c = beta =", beta)
 
         if verbose:
             print(
-                logPrefix, "grad_r.shape =", grad_r.shape, "grad_r.unit =", grad_r.unit
+                msgPrefix, "grad_r.shape =", grad_r.shape, "grad_r.unit =", grad_r.unit
             )
             print(
-                logPrefix,
+                msgPrefix,
                 "grad_theta.shape =",
                 grad_theta.shape,
                 "grad_theta.unit =",
                 grad_theta.unit,
             )
             print(
-                logPrefix,
+                msgPrefix,
                 "grad_phi.shape =",
                 grad_phi.shape,
                 "grad_phi.unit =",
@@ -834,7 +828,7 @@ class GravBoundAxionHalo:
         )
         toc = time.time()
         if verbose:
-            print(logPrefix, f"interpolation time: {toc-tic:.2e} s")
+            print(msgPrefix, f"interpolation time: {toc-tic:.2e} s")
 
         # sample gradient along the radial line toward the station
         Nr_plot = 2**10
@@ -858,7 +852,7 @@ class GravBoundAxionHalo:
         grad_phi_line = np.asarray(interp_phi(points)) * grad_phi.unit
         toc = time.time()
         if verbose:
-            print(logPrefix, f"gradient along station direction time: {toc-tic:.2e} s")
+            print(msgPrefix, f"gradient along station direction time: {toc-tic:.2e} s")
         if showPlot:
             self.plotGradients(
                 station=station,
@@ -872,10 +866,10 @@ class GravBoundAxionHalo:
             )
         if verbose:
             earthRad_idx = np.argmin(np.abs(r_line - 1 * unit.earthRad))
-            print(logPrefix, "r_line index @ station =", earthRad_idx)
-            print(logPrefix, "grad_r @ station =", grad_r_line[earthRad_idx])
-            print(logPrefix, "grad_theta @ station =", grad_theta_line[earthRad_idx])
-            print(logPrefix, "grad_phi @ station =", grad_phi_line[earthRad_idx])
+            print(msgPrefix, "r_line index @ station =", earthRad_idx)
+            print(msgPrefix, "grad_r @ station =", grad_r_line[earthRad_idx])
+            print(msgPrefix, "grad_theta @ station =", grad_theta_line[earthRad_idx])
+            print(msgPrefix, "grad_phi @ station =", grad_phi_line[earthRad_idx])
         # The second return value is the combined time-independent spatial
         # wavefunction along the station direction, not a single state's R_r.
         return (
@@ -1075,13 +1069,13 @@ class GravBoundAxionHalo:
         * ``'grad_theta'`` — Quantity array, shape ``(N_times,)``
         * ``'grad_phi'``   — Quantity array, shape ``(N_times,)``
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.findGradientsOverTime.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.findGradientsOverTime.__name__}]"
 
         grad_r_vals, grad_theta_vals, grad_phi_vals = [], [], []
 
         for i, meas_time in enumerate(meas_times):
             if verbose:
-                print(logPrefix, f"step {i}/{len(meas_times)}  t={meas_time.iso}")
+                print(msgPrefix, f"step {i}/{len(meas_times)}  t={meas_time.iso}")
             _, _, r_line, grad_r_line, grad_theta_line, grad_phi_line = (
                 self.findGradientsAtDirection(
                     stateCoefficients=stateCoefficients,
@@ -1099,7 +1093,7 @@ class GravBoundAxionHalo:
             grad_theta_vals.append(grad_theta_line[idx])
             grad_phi_vals.append(grad_phi_line[idx])
         # if verbose:
-        #     print(logPrefix, f"grid + interpolators built in {_time.time()-tic:.2f} s")
+        #     print(msgPrefix, f"grid + interpolators built in {_time.time()-tic:.2f} s")
 
         return {
             "times": meas_times,
@@ -1159,11 +1153,11 @@ class GravBoundAxionHalo:
         * ``'Omega_a_theta'`` — Quantity array, shape ``(N_times,)``, Omega_a from theta gradient
         * ``'Omega_a_phi'``   — Quantity array, shape ``(N_times,)``, Omega_a from phi gradient
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.findOmega_aOverTime.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.findOmega_aOverTime.__name__}]"
 
         if g_aNN is None:
             raise ValueError(
-                logPrefix
+                msgPrefix
                 + " g_aNN is not set. Please provide g_aNN in the method input."
             )
 
@@ -1246,7 +1240,7 @@ class GravBoundAxionHalo:
         * ``'rms_Omega_a_theta'`` — RMS of Omega_a from theta gradient
         * ``'rms_Omega_a_phi'``   — RMS of Omega_a from phi gradient
         """
-        logPrefix = (
+        msgPrefix = (
             f"[{self.__class__.__name__}.{self.findrmsOmega_aOverTime.__name__}]"
         )
 
@@ -1271,9 +1265,9 @@ class GravBoundAxionHalo:
         rms_phi = np.sqrt(np.mean(Omega_a_phi**2))
 
         if verbose:
-            print(logPrefix, f"RMS Omega_a_r = {rms_r}")
-            print(logPrefix, f"RMS Omega_a_theta = {rms_theta}")
-            print(logPrefix, f"RMS Omega_a_phi = {rms_phi}")
+            print(msgPrefix, f"RMS Omega_a_r = {rms_r}")
+            print(msgPrefix, f"RMS Omega_a_theta = {rms_theta}")
+            print(msgPrefix, f"RMS Omega_a_phi = {rms_phi}")
 
         return {
             "rms_Omega_a_r": rms_r,
@@ -1324,7 +1318,7 @@ class GravBoundAxionHalo:
         * ``'grad_phi'``   — dict of Quantity arrays for each state combination
         * ``'r_line'``     — common radial grid for all combinations
         """
-        logPrefix = (
+        msgPrefix = (
             f"[{self.__class__.__name__}.{self.findGradientsOverStates.__name__}]"
         )
 
@@ -1337,7 +1331,7 @@ class GravBoundAxionHalo:
 
         for label, stateSelection in stateNamesDict.items():
             if verbose:
-                print(logPrefix, f"Computing gradients for: {label}")
+                print(msgPrefix, f"Computing gradients for: {label}")
 
             if not isinstance(stateSelection, dict) or not stateSelection:
                 raise TypeError(
@@ -1413,7 +1407,7 @@ class GravBoundAxionHalo:
         * ``'grad_phi'``     — Quantity array of grad_phi values at station radius
         * ``'r_eval'``       — station radius used for evaluation
         """
-        logPrefix = (
+        msgPrefix = (
             f"[{self.__class__.__name__}.{self.compareGradientsOverStates.__name__}]"
         )
 
@@ -1703,7 +1697,7 @@ class GravBoundAxionHalo:
         l : int
             Orbital angular-momentum quantum number.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.plotEigenstate.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.plotEigenstate.__name__}]"
         n = n_r + l + 1
         name = f"{n}{self.orbitalLabels[l]}"
         # key = f"{n_r}_{l}"
@@ -1786,7 +1780,7 @@ class GravBoundAxionHalo:
         ylim : tuple or None
             Shared y-axis limits.  Auto-computed from peak amplitude if None.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.stackEigenStates.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.stackEigenStates.__name__}]"
         self.sortByEigenE()
 
         mass_eV_c2 = 4.135667696e-09  # axion mass in eV/c^2
@@ -1906,7 +1900,7 @@ class GravBoundAxionHalo:
         ylim : tuple or None
             Shared y-axis limits.  Auto-computed from peak amplitude if None.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self._plotEigenStates.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self._plotEigenStates.__name__}]"
         self.sortByEigenE()
 
         startIdx = self.N // 2 + 1  # avoid r=0 singularity
@@ -1916,7 +1910,7 @@ class GravBoundAxionHalo:
             stopIdx = startIdx + np.argmin(np.abs(self.r[startIdx:] - truncRadius))
         else:
             raise TypeError(
-                logPrefix + " truncRadius unit is not equivalent to length. "
+                msgPrefix + " truncRadius unit is not equivalent to length. "
             )
 
         plt.rcParams["font.serif"] = ["Times New Roman"]
@@ -1994,7 +1988,7 @@ class GravBoundAxionHalo:
         spanning the classical turning points where the potential crosses that
         energy level.
         """
-        logPrefix = (
+        msgPrefix = (
             f"[{self.__class__.__name__}.{self.plotEigenEnergiesInPot.__name__}]"
         )
         self.sortByEigenE()
@@ -2037,7 +2031,7 @@ class GravBoundAxionHalo:
 
     def sortByEigenE(self):
         """Sort ``self.states`` in-place by ascending eigen-energy."""
-        logPrefix = f"[{self.__class__.__name__}.{self.sortByEigenE.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.sortByEigenE.__name__}]"
         self.states = dict(
             sorted(self.states.items(), key=lambda item: item[1]["eigenE"])
         )
@@ -2064,7 +2058,7 @@ class GravBoundAxionHalo:
             Minimum probability fraction to flag a state (currently unused,
             reserved for future filtering).
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.findHighProbStates.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.findHighProbStates.__name__}]"
         # find eigen-states which has high probability around earth radius
         self.sortByEigenE()
         states = []
@@ -2092,7 +2086,7 @@ class GravBoundAxionHalo:
                 self.r[start_indx:stop_indx],
             )
             # print("key =", key, "; n_r and l are:", n_r, l_val)
-            print(logPrefix, f"(n_r, l) = ({n_r}, {l_val})")
+            print(msgPrefix, f"(n_r, l) = ({n_r}, {l_val})")
             print(f"eigen-energy = {eigenstate['eigenE']:.3e} eV")
             print("norm =", norm)
             print("integral =", integral)
@@ -2108,7 +2102,7 @@ class GravBoundAxionHalo:
         eigen-energy (eV), kinetic energy (eV), and mean axion speed (m/s).
         States are listed in ascending eigen-energy order.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.listEigenStates.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.listEigenStates.__name__}]"
         # find eigen-states which has high probability around earth radius
         self.sortByEigenE()
 

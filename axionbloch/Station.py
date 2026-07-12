@@ -4,8 +4,7 @@ A :class:`Station` stores the location of an experimental site on Earth and
 exposes the corresponding unit vector and distance from the Earth's centre.
 """
 
-from astropy.coordinates import (GCRS, EarthLocation,
-                                 get_body_barycentric_posvel)
+from astropy.coordinates import GCRS, EarthLocation, get_body_barycentric_posvel
 
 from axionbloch.dependency import Quantity, np, unit
 
@@ -70,7 +69,7 @@ class Station:
             Print derived spherical coordinates after construction.
         """
 
-        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
         self.name = name
         self.NSsemisphere = NSsemisphere
         self.EWsemisphere = EWsemisphere
@@ -216,8 +215,8 @@ class Station:
         _, velocity_gcrs = self.location.get_gcrs_posvel(meas_time)
         rotation = self._solarZ_basis(meas_time)
         return (
-            rotation.T @ velocity_gcrs.xyz.to_value(unit.m / unit.s)
-        ) * unit.m / unit.s
+            (rotation.T @ velocity_gcrs.xyz.to_value(unit.m / unit.s)) * unit.m / unit.s
+        )
 
     @staticmethod
     def direction_to_spherical(direction) -> tuple[Quantity, Quantity]:

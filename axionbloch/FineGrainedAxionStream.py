@@ -70,7 +70,7 @@ class FineGrainedAxionStream(PhysicalObject):
         verbose : bool
             Print input parameters and computed properties.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}] "
+        msgPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}] "
         # super().__init__()
         # self.name = name
         # self.v_lab = v_lab
@@ -90,6 +90,4 @@ class FineGrainedAxionStream(PhysicalObject):
         # # coherence time (estimated)
         # self.tau_a_est = 1.0 / (np.pi * self.FWHM * self.nu_a_eff)
         # self.tau_a_est = self.tau_a_est.to(unit.s)
-        print(f"{logPrefix} not implemented yet")
-
-
+        print(f"{msgPrefix} not implemented yet")

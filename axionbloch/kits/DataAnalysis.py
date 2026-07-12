@@ -154,7 +154,7 @@ class NMRio:
         """
         Save this instance to a pickle file.
         """
-        logPrefix = f"[{cls.__class__.__name__}.{cls.saveToPkl.__name__}]"
+        msgPrefix = f"[{cls.__class__.__name__}.{cls.saveToPkl.__name__}]"
         if dir is None:
             raise ValueError("dir must not be None")
 
@@ -187,7 +187,7 @@ class NMRio:
         """
         Load an instance of this class from a pickle file.
         """
-        logPrefix = f"[{cls.__name__}.{cls.loadFromPkl.__name__}]"
+        msgPrefix = f"[{cls.__name__}.{cls.loadFromPkl.__name__}]"
         if not os.path.isfile(path):
             raise FileNotFoundError(f"Pickle file not found: {path}")
 
@@ -228,8 +228,8 @@ class NMRio:
         subgroup : h5py.Group
             The created subgroup containing the datasets "value" and "unit".
         """
-        logPrefix = f"[{NMRio.__name__}.{NMRio.saveQuantityToH5group.__name__}]"
-        # print(logPrefix, quantity)
+        msgPrefix = f"[{NMRio.__name__}.{NMRio.saveQuantityToH5group.__name__}]"
+        # print(msgPrefix, quantity)
         subgroup = group.create_group(name)
         if type(quantity) == Quantity:
             q_value = quantity.value
@@ -237,7 +237,7 @@ class NMRio:
             subgroup.create_dataset("value", data=[q_value])
             subgroup.create_dataset("unit", data=[q_unit])
             if verbose:
-                print(logPrefix, "quantity.unit:", q_unit)
+                print(msgPrefix, "quantity.unit:", q_unit)
         else:
             q_value = quantity
             q_unit = ""
@@ -703,7 +703,7 @@ class Signal(NMRio):
 
         For multi-file signals, the earliest file creation time is used.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.getCreationTime.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.getCreationTime.__name__}]"
         candidate_files = []
         if hasattr(self, "fileList") and self.fileList is not None:
             candidate_files.extend([f for f in self.fileList if f is not None])
@@ -717,7 +717,7 @@ class Signal(NMRio):
         for file in candidate_files:
             if not os.path.isfile(file):
                 if verbose:
-                    print(logPrefix, f"file not found: {file}")
+                    print(msgPrefix, f"file not found: {file}")
                 continue
 
             creation_time = os.path.getctime(file)
@@ -736,7 +736,7 @@ class Signal(NMRio):
         """
         get creation times of data files.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.getCreationTimes.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.getCreationTimes.__name__}]"
         return self.getCreationTime(verbose=verbose)
 
     def LoadStream(
@@ -1071,7 +1071,7 @@ class Signal(NMRio):
             If True, print verbose output.
             Default to False.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.createArtificialTS.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.createArtificialTS.__name__}]"
         self.demodFreq = demodFreq
         self.sampRate = sampRate
         self.acqDur = acqDur
@@ -7559,7 +7559,7 @@ class Signal(NMRio):
                                 [array]:value
                                 [unit]:value
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.saveToH5.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.saveToH5.__name__}]"
 
         # use device ID as the level-1 group name
         if h5_group_name is None:
@@ -7575,7 +7575,7 @@ class Signal(NMRio):
             self.saveToH5group(group=demods_group, verbose=verbose)
 
         if verbose:
-            print(logPrefix, f"Saved to {filePath}")
+            print(msgPrefix, f"Saved to {filePath}")
 
     def saveToH5group(
         self,
@@ -7612,23 +7612,23 @@ class Signal(NMRio):
                                 [array]:value
                                 [unit]:value
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.saveToH5group.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.saveToH5group.__name__}]"
 
         # Save name if exists
         if hasattr(self, "name"):
             group.create_dataset(
                 "name", data=["nameless" if self.name is None else self.name]
             )
-        # print(logPrefix, "sampleX" )
+        # print(msgPrefix, "sampleX" )
         Signal.saveQuantityToH5group(
             group, "sampleX", self.TS_raw.real, verbose=verbose
         )
-        # print(logPrefix, "sampleY" )
+        # print(msgPrefix, "sampleY" )
         Signal.saveQuantityToH5group(
             group, "sampleY", self.TS_raw.imag, verbose=verbose
         )
         for attr in ["demodFreq", "sampRate", "acqDur", "acqPts"]:
-            print(logPrefix, attr)
+            print(msgPrefix, attr)
             Signal.saveQuantityToH5group(
                 group, attr, getattr(self, attr), verbose=verbose
             )
@@ -7645,7 +7645,7 @@ class Signal(NMRio):
         Expects subgroups 'demodFreq', 'sampRate', 'sampleX', 'sampleY' from
         saveQuantityToH5group, optional dataset 'name'.
         """
-        logPrefix = f"[{cls.__name__}.{cls.loadFromH5group.__name__}]"
+        msgPrefix = f"[{cls.__name__}.{cls.loadFromH5group.__name__}]"
         obj = cls(
             name="LIA signal",
             device=deviceID,
@@ -7667,7 +7667,7 @@ class Signal(NMRio):
 
         for key in ("demodFreq", "sampRate", "sampleX", "sampleY"):
             if key not in group:
-                raise KeyError(f"{logPrefix} missing subgroup {key!r} in HDF5 group")
+                raise KeyError(f"{msgPrefix} missing subgroup {key!r} in HDF5 group")
 
         obj.demodFreq = cls.loadAttrFromH5group(group["demodFreq"])
         obj.sampRate = cls.loadAttrFromH5group(group["sampRate"])
@@ -7683,27 +7683,27 @@ class Signal(NMRio):
         except Exception:
             print("missing acqPts")
         if obj.TS_raw.ndim != 1:
-            print(logPrefix, "WARNING: obj.TS_raw.ndim != 1")
+            print(msgPrefix, "WARNING: obj.TS_raw.ndim != 1")
 
         return obj
 
     @classmethod
     def loadFromH5(cls, filePath, deviceID, demodIndex):
         # prefix for log messages
-        logPrefix = f"[{cls.__name__}.{cls.loadFromH5.__name__}]"
+        msgPrefix = f"[{cls.__name__}.{cls.loadFromH5.__name__}]"
 
         # add .h5 extension if needed
         path = filePath if str(filePath).endswith(".h5") else f"{filePath}.h5"
 
         # if no such file
         if not os.path.isfile(path):
-            raise FileNotFoundError(f"{logPrefix} file not found: {path}")
+            raise FileNotFoundError(f"{msgPrefix} file not found: {path}")
         grp_key = f"{deviceID}/demods/{demodIndex}"
 
         # load from a h5 group
         with h5py.File(path, "r") as h5f:
             if grp_key not in h5f:
-                raise KeyError(f"{logPrefix} missing HDF5 group {grp_key!r} in {path}")
+                raise KeyError(f"{msgPrefix} missing HDF5 group {grp_key!r} in {path}")
             obj = cls.loadFromH5group(
                 h5f[grp_key], deviceID=deviceID, demodIndex=demodIndex
             )
@@ -7735,7 +7735,7 @@ class Signals(NMRio):
         self.pool = pool
 
     def sortByAttrs(self, *attrs, reverse: bool = False, verbose=False):
-        logPrefix = f"[{self.__class__.__name__}.{self.sortByAttrs.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.sortByAttrs.__name__}]"
         if not attrs:
             raise ValueError("At least one attribute must be specified")
 
@@ -7769,7 +7769,7 @@ class Signals(NMRio):
         self,
         verbose: bool = False,
     ):
-        logPrefix = f"[{self.__class__.__name__}.{self.sortByCreationTime.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.sortByCreationTime.__name__}]"
         if len(self.pool) == 0:
             raise ValueError("'Signals.pool' is empty.")
 
@@ -7789,7 +7789,7 @@ class Signals(NMRio):
 
         self.pool = sorted(self.pool, key=lambda entry: entry.signal.creation_time)
         if verbose:
-            print(f"{logPrefix} pool sorted by creation time:")
+            print(f"{msgPrefix} pool sorted by creation time:")
             for entry in self.pool:
                 print(f"  {entry.signal.creation_time}: {entry.signal.name}")
 
@@ -7813,7 +7813,7 @@ class Signals(NMRio):
             specxlim : type_, optional Defaults to None.
             verbose : bool, optional Defaults to False.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.getFS.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.getFS.__name__}]"
         if len(self.pool) == 0:
             raise ValueError("'Signals.pool' is empty.")
 
@@ -7833,7 +7833,7 @@ class Signals(NMRio):
             )
 
     def getMeanPower(self):
-        logPrefix = f"[{self.__class__.__name__}.{self.getMeanPower.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.getMeanPower.__name__}]"
         if len(self.pool) == 0:
             raise ValueError("'Signals.pool' is empty.")
 
@@ -7882,7 +7882,7 @@ class Signals(NMRio):
         offset=None,
         linewidth=0.5,  # line width in points
     ):
-        logPrefix = f"[{self.__class__.__name__}.{self.getStackedSpectra.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.getStackedSpectra.__name__}]"
 
         if xUnit is None:
             xUnit = self.pool[0].signal.freqs.unit

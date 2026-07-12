@@ -64,7 +64,7 @@ class Sample:
         verbose : bool
             Print derived quantities after construction.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
         self.name = name
         self.gamma = gamma
 
@@ -109,7 +109,7 @@ class Sample:
         Quantity [dimensionless]
             Thermal polarization in [0, 1].
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.getThermalPol.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.getThermalPol.__name__}]"
         # pol = hbar * self.gamma * B_pol / (2 * k * temp)  # approximate
         if temp is None:
             temp = self.temp
@@ -124,7 +124,7 @@ class Sample:
         # check(pol)
         if verbose:
             print(
-                logPrefix,
+                msgPrefix,
                 f"Thermal polarization at B_pol={B_pol.to(unit.T)} and temp={temp.to(unit.K)} is {pol.to(unit.one)}. ",
             )
         return pol
@@ -146,7 +146,7 @@ class Sample:
         Quantity [A/m]
             Magnetization density.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.getM0.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.getM0.__name__}]"
 
         if pol is None:
             pol = self.pol
@@ -156,7 +156,7 @@ class Sample:
         M0 = (self.mu * pol * self.totalNumOfSpins / self.vol).to(unit.A / unit.m)
         # self.M0_SPN = (self.mu * ns_SPN).to(unit.A / unit.m)
         if verbose:
-            print(logPrefix, f"Magnetization M0 is {M0}")
+            print(msgPrefix, f"Magnetization M0 is {M0}")
         return M0
 
     def getM0_SPN(
@@ -174,14 +174,14 @@ class Sample:
         Quantity [A/m]
             Spin-projection-noise magnetization density.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.getM0_SPN.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.getM0_SPN.__name__}]"
 
         M0_SPN = (self.mu * np.sqrt(self.totalNumOfSpins) / self.vol).to(
             unit.A / unit.m
         )
         self.M0_SPN = M0_SPN
         if verbose:
-            print(logPrefix, f"Spin projection noise magnetization M0_SPN is {M0_SPN}")
+            print(msgPrefix, f"Spin projection noise magnetization M0_SPN is {M0_SPN}")
         return M0_SPN
 
     def getM0eqb(

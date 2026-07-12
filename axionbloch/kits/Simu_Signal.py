@@ -50,7 +50,7 @@ class Simu_Signal(Signal):
         deviceID="Simulation",
         verbose=False,
     ):
-        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}] "
+        msgPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}] "
         super().__init__(
             name,
             filePath=filePath,

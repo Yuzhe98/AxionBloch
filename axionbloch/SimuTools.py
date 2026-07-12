@@ -19,6 +19,7 @@ T_SETFIELD_S, T_SIMUSTEP_S : float
 """
 
 import os
+
 # for saving data
 import pickle
 import time
@@ -37,8 +38,7 @@ from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
 from axionbloch.Sample import Sample
 from axionbloch.SimuTypes import SimuEntry, SimuParams
 from axionbloch.Station import Station
-from axionbloch.utils import (PhysicalObject, check, getDateAndTime,
-                              save_phys_quantity)
+from axionbloch.utils import PhysicalObject, check, getDateAndTime, save_phys_quantity
 
 RECORD_RUNTIME = True
 
@@ -82,7 +82,7 @@ class MagField(PhysicalObject):
         self,
         name="B field",
     ):
-        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
         super().__init__()
         self.name = name
 
@@ -115,7 +115,7 @@ class MagField(PhysicalObject):
         verbose : bool
             Unused; reserved for future diagnostic output.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.setXYPulse.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.setXYPulse.__name__}]"
         timeStamp = timeStep * np.arange(timeLen - 1)
         envelope = np.zeros(timeStamp.shape) * unit.T
         envelope[:] = 0.5 * B1
@@ -162,7 +162,7 @@ class MagField(PhysicalObject):
             Unused; reserved for future diagnostic output.
         """
 
-        logPrefix = f"[{self.__class__.__name__}.{self.set90DegPulse.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.set90DegPulse.__name__}]"
         startDelayLen = 0  # this should stay 0. It does not help in anything
         timeStamp_s = timeStep * np.arange(timeLen - 1)
         t90Len = int(np.round(t90 / timeStep))
@@ -232,7 +232,7 @@ class MagField(PhysicalObject):
         verbose : bool
             Print diagnostic information (e.g. ``t90Len``).
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.setCPMGPulseTrain.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.setCPMGPulseTrain.__name__}]"
         timeStamp = timeStep * np.arange(timeLen - 1)
         t90Len = int(np.round(t90 / timeStep))
         if verbose:
@@ -249,7 +249,7 @@ class MagField(PhysicalObject):
         tauLen = int(np.round(tau / timeStep))
         if tauLen < 10 * t180Len:
             warnings.warn(
-                logPrefix
+                msgPrefix
                 + f" tauLen = {tauLen} < 10 * t180Len = {10 * t180Len}. Too short!",
                 UserWarning,
                 stacklevel=2,
@@ -325,26 +325,26 @@ class MagField(PhysicalObject):
         verbose : bool
             Print per-pulse diagnostics.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.setNPulsesArbDelay.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.setNPulsesArbDelay.__name__}]"
 
         N = len(tip_angles)
         if len(delays) != N:
             raise ValueError(
-                logPrefix + " delay and tip_angles must have the same length"
+                msgPrefix + " delay and tip_angles must have the same length"
             )
         if phases is None:
             phases = [0.0 * unit.rad] * N
         if len(phases) != N:
             raise ValueError(
-                logPrefix + " phases_rad and tip_angles must have the same length"
+                msgPrefix + " phases_rad and tip_angles must have the same length"
             )
 
         pulseLen = int(np.round(pulseDur / timeStep))
         if pulseLen < 2:
-            print(logPrefix, f"WARNING: pulseLen = {pulseLen} < 2")
+            print(msgPrefix, f"WARNING: pulseLen = {pulseLen} < 2")
         pulseDur = pulseLen * timeStep  # snap to grid
         if verbose:
-            print(logPrefix, f"pulseLen = {pulseLen}, pulseDur = {pulseDur:.4e} s")
+            print(msgPrefix, f"pulseLen = {pulseLen}, pulseDur = {pulseDur:.4e} s")
 
         B90 = PI / (gamma * pulseDur)
 
@@ -368,7 +368,7 @@ class MagField(PhysicalObject):
             if actual_len <= 0:
                 if verbose:
                     print(
-                        logPrefix, f"Pulse {i}: starts beyond simulation end, skipping"
+                        msgPrefix, f"Pulse {i}: starts beyond simulation end, skipping"
                     )
                 break
 
@@ -379,7 +379,7 @@ class MagField(PhysicalObject):
             if verbose:
                 t_start = current_idx * timeStep
                 print(
-                    logPrefix,
+                    msgPrefix,
                     f"Pulse {i}: {tip_angles[i]:.1f}° at t={t_start:.4f} s, "
                     f"phase={np.degrees(phase_i):.1f}°, B_i={B_i:.4e} T",
                 )
@@ -410,7 +410,7 @@ class MagField(PhysicalObject):
         """
         generate a pseudo-magnetic field (ALP field gradient)
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.setAxionFields.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.setAxionFields.__name__}]"
         self.numFields = numFields
         numSteps = timeLen - 1
 
@@ -495,7 +495,7 @@ class MagField(PhysicalObject):
                 toc = time.perf_counter()
                 timeConsumption = toc - tic
                 print(
-                    logPrefix, f"ifft total time consumption = {timeConsumption:.3e} s"
+                    msgPrefix, f"ifft total time consumption = {timeConsumption:.3e} s"
                 )
 
             if verbose:
@@ -510,7 +510,7 @@ class MagField(PhysicalObject):
                 toc = time.perf_counter()
                 timeConsumption = toc - tic
                 print(
-                    logPrefix,
+                    msgPrefix,
                     f"array-asignment time consumption = {timeConsumption:.3e} s",
                 )
 
@@ -547,7 +547,9 @@ class MagField(PhysicalObject):
         verbose : bool
             Print diagnostic information.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.setAxionFieldByDiscreteFreqs.__name__}]"
+        msgPrefix = (
+            f"[{self.__class__.__name__}.{self.setAxionFieldByDiscreteFreqs.__name__}]"
+        )
 
         frequencies = np.asarray(frequencies)
         amplitudes = np.asarray(amplitudes)
@@ -558,10 +560,10 @@ class MagField(PhysicalObject):
             phases = np.asarray(phases)
 
         assert len(frequencies) == len(amplitudes), (
-            logPrefix + " frequencies and amplitudes must have the same length"
+            msgPrefix + " frequencies and amplitudes must have the same length"
         )
         assert len(frequencies) == len(phases), (
-            logPrefix + " frequencies and phases must have the same length"
+            msgPrefix + " frequencies and phases must have the same length"
         )
 
         numSteps = timeLen - 1
@@ -581,12 +583,18 @@ class MagField(PhysicalObject):
         self.B_vec[0, :, 2] = 0.0
 
         if verbose:
-            print(logPrefix, f"Generated field with {len(frequencies)} frequency components")
+            print(
+                msgPrefix,
+                f"Generated field with {len(frequencies)} frequency components",
+            )
             for i, (f, a, p) in enumerate(zip(frequencies, amplitudes, phases)):
-                print(logPrefix, f"  Component {i}: freq={f:.6g} Hz, amp={a:.6e} T, phase={p:.6g} rad")
+                print(
+                    msgPrefix,
+                    f"  Component {i}: freq={f:.6g} Hz, amp={a:.6e} T, phase={p:.6g} rad",
+                )
 
     # def plotField(self, demodfreq, samprate, showplt_opt):
-    #     logPrefix = f"[{self.__class__.__name__}.{self.plotField.__name__}]"
+    #     msgPrefix = f"[{self.__class__.__name__}.{self.plotField.__name__}]"
     #     specxaxis, spectrum, specxunit, specyunit = self.showTSandPSD(
     #         dataX=self.B_vec[:, 0],
     #         dataY=self.B_vec[:, 1],
@@ -626,14 +634,14 @@ class Simulations:
         verbose=True,
     ):
         """ """
-        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
         # TODO use inspect to include links to lines in log messages
         self.name = name
         self.pool: list[SimuEntry] = []
         self.all_params: list[SimuParams] = all_params
 
     def setup(self, verbose: bool = False):
-        logPrefix = f"[{self.__class__.__name__}.{self.setup.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.setup.__name__}]"
         est_runtime = 0.0
         est_setFields_s = 0.0
         est_trjry_s = 0.0
@@ -677,7 +685,7 @@ class Simulations:
                 for key, pq in params["key_info"].items():
                     print(key, "=", pq, flush=True)
                 print(
-                    logPrefix,
+                    msgPrefix,
                     "simu.magnet.numPt =",
                     simu.magnet.numPt,
                     flush=True,
@@ -694,7 +702,7 @@ class Simulations:
             est_runtime += t_setFields_s + t_trjry_s
             if verbose:
                 print(
-                    logPrefix,
+                    msgPrefix,
                     "Estimated step runtime = "
                     + f"{(t_setFields_s + t_trjry_s) / 60:.2g} min",
                     flush=True,
@@ -702,7 +710,7 @@ class Simulations:
         return est_runtime, est_setFields_s, est_trjry_s
 
     def run(self, autoStart: bool = True, verbose: bool = False):
-        logPrefix = f"[{self.__class__.__name__}.{self.run.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.run.__name__}]"
 
         actu_runtime = 0.0
         actu_setFields_s = 0.0
@@ -715,21 +723,21 @@ class Simulations:
                 "# ---------------------------------------------------- #", flush=True
             )
             print(
-                logPrefix,
+                msgPrefix,
                 f"Estimated setFields time = {est_setFields_s / 60.0:.3g} min",
                 flush=True,
             )
             print(
-                logPrefix,
+                msgPrefix,
                 f"Estimated trjry time = {est_trjry_s / 60.0:.3g} min",
-                logPrefix,
+                msgPrefix,
                 f"Estimated trjry time = {est_trjry_s / 60.0:.3g} min",
                 flush=True,
             )
             print(
-                logPrefix,
+                msgPrefix,
                 f"Estimated total runtime = {est_runtime / 60.0:.3g} min",
-                logPrefix,
+                msgPrefix,
                 f"Estimated total runtime = {est_runtime / 60.0:.3g} min",
                 flush=True,
             )
@@ -775,18 +783,18 @@ class Simulations:
                 # for key, pq in params["key_info"].items():
                 #     print(key, "=", pq, flush=True)
                 print(
-                    logPrefix,
+                    msgPrefix,
                     f"time consumption = {timeConsumption:.6f} s = {timeConsumption/60:.1g} min",
                     flush=True,
                 )
                 print(
-                    logPrefix,
+                    msgPrefix,
                     f"individual step time consumption = {timeConsumption/(simu.numSteps+1)/simu.excField.numFields:.3e} s",
                     flush=True,
                 )
-                print(logPrefix, "simu.numSteps =", simu.numSteps, flush=True)
+                print(msgPrefix, "simu.numSteps =", simu.numSteps, flush=True)
                 print(
-                    logPrefix,
+                    msgPrefix,
                     "simu.excField.B_vec.shape =",
                     (simu.excField.B_vec.shape),
                     flush=True,
@@ -800,12 +808,12 @@ class Simulations:
             actu_trjry_s += timeConsumption
             if verbose:
                 print(
-                    logPrefix,
+                    msgPrefix,
                     f"{simu.__class__.__name__}.{simu.generateTrajectories.__name__} time consumption = {timeConsumption:.2g} s = {timeConsumption/60:.1g} min",
                     flush=True,
                 )
                 print(
-                    logPrefix,
+                    msgPrefix,
                     f"{simu.__class__.__name__}.{simu.generateTrajectories.__name__} individual step time consumption = {timeConsumption/simu.numSteps/simu.magnet.numPt/simu.excField.numFields:.2e} s",
                     flush=True,
                 )
@@ -813,7 +821,7 @@ class Simulations:
             if verbose:
                 print("", flush=True)
                 print(
-                    logPrefix,
+                    msgPrefix,
                     "simu.excField.B_vec.shape =",
                     (simu.excField.B_vec.shape),
                     flush=True,
@@ -832,7 +840,7 @@ class Simulations:
 
     def saveToH5(self, dir: str = None, verbose: bool = False):
         """ """
-        logPrefix = f"[{self.__class__.__name__}.{self.saveToH5.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.saveToH5.__name__}]"
         if dir[-1] != "\\":
             dir += "\\"
         ymd_hms = getDateAndTime()
@@ -857,7 +865,7 @@ class Simulations:
         :param verbose: Description
         :type verbose: bool
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.loadFromH5.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.loadFromH5.__name__}]"
         for i, path in enumerate(paths):
             newSimu = Simulation()
             newSimu.loadFromH5(path=path)
@@ -875,7 +883,7 @@ class Simulations:
         """
         Save this instance to a pickle file.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.saveToPkl.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.saveToPkl.__name__}]"
         if dir is None:
             raise ValueError("dir must not be None")
 
@@ -918,7 +926,7 @@ class Simulations:
         """
         Load an instance of this class from a pickle file.
         """
-        logPrefix = f"[{cls.__name__}.{cls.loadFromPkl.__name__}]"
+        msgPrefix = f"[{cls.__name__}.{cls.loadFromPkl.__name__}]"
         if not os.path.isfile(path):
             raise FileNotFoundError(f"Pickle file not found: {path}")
 
@@ -934,7 +942,7 @@ class Simulations:
         return obj
 
     def sortByAttrs(self, *attrs, reverse: bool = False, verbose=False):
-        logPrefix = f"[{self.__class__.__name__}.{self.sortByAttrs.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.sortByAttrs.__name__}]"
         if not attrs:
             raise ValueError("At least one attribute must be specified")
 
@@ -1024,7 +1032,7 @@ class Simulation(PhysicalObject):
 
 
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
         super().__init__()
         self.quantities = {
             "RCF_freq": "Hz",
@@ -1047,13 +1055,13 @@ class Simulation(PhysicalObject):
         # get the equilibrium magnetization M0
         self.M0eqb = self.sample.getM0eqb(B_pol=self.magnet.B0, verbose=verbose)
         if verbose:
-            print(logPrefix, f"self.M0eqb = {self.M0eqb}")
+            print(msgPrefix, f"self.M0eqb = {self.M0eqb}")
         # normalize the magnetization by the equilibrium magnetization M0, so that init_M is dimensionless and represents the initial polarization
 
         if self.sample.pol is not None:
             if init_M is not None:
                 print(
-                    logPrefix,
+                    msgPrefix,
                     "WARNING: init_M is provided, but sample polarization is set. The provided init_M will be ignored and overwritten by the value determined from the sample polarization.",
                     flush=True,
                 )
@@ -1112,7 +1120,7 @@ class Simulation(PhysicalObject):
             )
         )
         if verbose:
-            print(logPrefix, f"numPt = {numPt}")
+            print(msgPrefix, f"numPt = {numPt}")
         # numPt = 500
         # TODO choose better numPt for magnet
         if numPt <= 1:
@@ -1161,7 +1169,7 @@ class Simulation(PhysicalObject):
         )
         if self.magnet.numPt < 2 * variation.to_value(unit.one):
             warnings.warn(
-                logPrefix + " magnet_det.numPt may be too few.",
+                msgPrefix + " magnet_det.numPt may be too few.",
                 UserWarning,
                 stacklevel=2,
             )
@@ -1170,33 +1178,33 @@ class Simulation(PhysicalObject):
         # from experience, simulation rate should be 20 times greater than the max. of signal frequency in the rotating frame
         if self.rate < 20 * nu_L_abs_max:
             warnings.warn(
-                f"{logPrefix} the simulation rate ({self.rate.to(unit.Hz):g}) might be too small compared to signal frequency ({nu_L_abs_max.to(unit.Hz):g}).",
+                f"{msgPrefix} the simulation rate ({self.rate.to(unit.Hz):g}) might be too small compared to signal frequency ({nu_L_abs_max.to(unit.Hz):g}).",
                 UserWarning,
                 stacklevel=2,
             )
 
         if self.sample.T2 > self.sample.T1:
             warnings.warn(
-                f"{logPrefix} T2 is larger than T1.", UserWarning, stacklevel=2
+                f"{msgPrefix} T2 is larger than T1.", UserWarning, stacklevel=2
             )
 
         if self.rate <= 10 * (1.0 / self.sample.T2):
             warnings.warn(
-                f"{logPrefix} the simulation rate ({self.rate:g}) might be too small compared to T2 relaxation rate ({1.0 / self.sample.T2:g}).",
+                f"{msgPrefix} the simulation rate ({self.rate:g}) might be too small compared to T2 relaxation rate ({1.0 / self.sample.T2:g}).",
                 UserWarning,
                 stacklevel=2,
             )
         if self.rate <= 1 / self.duration:
             warnings.warn(
-                f"{logPrefix} the simulation rate ({self.rate:g}) might be too small so there are only {self.numSteps:d} step(s) in the duration of {self.duration:g}.",
+                f"{msgPrefix} the simulation rate ({self.rate:g}) might be too small so there are only {self.numSteps:d} step(s) in the duration of {self.duration:g}.",
                 UserWarning,
                 stacklevel=2,
             )
         # ----- ----------------------------------------------------- -----#
 
     def setRate(self, rate: Quantity):
-        logPrefix = f"[{self.__class__.__name__}.{self.setRate.__name__}]"
-        assert rate is not None, f"{logPrefix} rate is None"
+        msgPrefix = f"[{self.__class__.__name__}.{self.setRate.__name__}]"
+        assert rate is not None, f"{msgPrefix} rate is None"
         self.rate = rate
         self.rate_Hz = float(rate.to_value(unit.Hz))  # TODO remove?
         self.timeStep = (
@@ -1206,14 +1214,14 @@ class Simulation(PhysicalObject):
         self.numSteps: int = self.timeLen - 1
         if self.numSteps > 1e8:
             warnings.warn(
-                f"{logPrefix} Simulation.numSteps = {self.numSteps:.1e} > 1e8 is very large. Long simulation time consumption expected.",
+                f"{msgPrefix} Simulation.numSteps = {self.numSteps:.1e} > 1e8 is very large. Long simulation time consumption expected.",
                 UserWarning,
                 stacklevel=2,
             )
 
     def suggestRate(self, verbose: bool = False):
         # ----- check if parameter values are within reasonable range -----#
-        logPrefix = f"[{self.__class__.__name__}.{self.suggestRate.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.suggestRate.__name__}]"
         # compute the maximum of (absolute) Larmor frequencies
         nu_L_max = (
             self.sample.gamma / (2 * PI) * self.magnet.B_spread
@@ -1230,25 +1238,25 @@ class Simulation(PhysicalObject):
         RBW = (1 / self.duration).to(unit.Hz)
 
         if verbose:
-            print(logPrefix, f"Larmor frequency range = [{nu_L_min:g}, {nu_L_max:g}]")
+            print(msgPrefix, f"Larmor frequency range = [{nu_L_min:g}, {nu_L_max:g}]")
             print(
-                logPrefix,
+                msgPrefix,
                 f"the maximum of (absolute) Larmor frequencies  = {nu_L_abs_max:g}",
             )
-            print(logPrefix, f"T2 relaxation rate = {nu_L_abs_max:g}")
-            print(logPrefix, f"resolution bandwidth (RBW) = {RBW:g}")
+            print(msgPrefix, f"T2 relaxation rate = {nu_L_abs_max:g}")
+            print(msgPrefix, f"resolution bandwidth (RBW) = {RBW:g}")
         # from experience, simulation rate should be 20 times greater than the max. of signal frequency in the rotating frame
         rate = np.amax([21 * nu_L_abs_max, 10 * T2Rate, 10 * RBW])
         return rate
 
     def getTimeStamp(self):
-        logPrefix = f"[{self.__class__.__name__}.{self.getTimeStamp.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.getTimeStamp.__name__}]"
         return np.linspace(
             start=0, stop=(self.timeLen) * self.timeStep, num=self.timeLen
         )
 
     def estimateRuntime(self, verbose: bool = False) -> Quantity[unit.s]:
-        logPrefix = f"[{self.__class__.__name__}.{self.estimateRuntime.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.estimateRuntime.__name__}]"
         t_trjry = (
             T_SIMUSTEP_S
             * self.numSteps
@@ -1257,7 +1265,7 @@ class Simulation(PhysicalObject):
         ) * unit.s
         if verbose:
             print(
-                logPrefix,
+                msgPrefix,
                 "Estimated runtime = " + f"{t_trjry:g}",
                 flush=True,
             )
@@ -1282,7 +1290,7 @@ class Simulation(PhysicalObject):
         None
             The generated trajectories are stored in self.trjry with shape (numFields, numSteps
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.generateTrajectories.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.generateTrajectories.__name__}]"
         M = self.init_M_amp
         theta = self.init_M_theta_rad
         phi = self.init_M_phi_rad
@@ -1308,26 +1316,26 @@ class Simulation(PhysicalObject):
                 f"excField.B_vec has invalid shape {self.excField.B_vec.shape}, expected (numFields, numSteps, 3) or (numSteps, 3)"
             )
         if verbose:
-            print(logPrefix, f"B_vec       shape={self.excField.B_vec.shape}")
+            print(msgPrefix, f"B_vec       shape={self.excField.B_vec.shape}")
             print(
-                logPrefix,
+                msgPrefix,
                 f"B_spread    shape={self.magnet.B_spread.shape}  range=[{self.magnet.B_spread.min():g}, {self.magnet.B_spread.max():g}]",
             )
             print(
-                logPrefix,
+                msgPrefix,
                 f"ratios      shape={self.magnet.ratios.shape}  sum={self.magnet.ratios.sum():g}",
             )
             print(
-                logPrefix,
+                msgPrefix,
                 f"gamma       = {(self.sample.gamma).to_value(unit.rad * unit.Hz / unit.T):.6g} rad·Hz/T",
             )
-            print(logPrefix, f"timeStep    = {self.timeStep.to(unit.s):g}")
-            print(logPrefix, f"T1          = {self.sample.T1.to(unit.s):g}")
-            print(logPrefix, f"T2          = {self.sample.T2.to(unit.s):g}")
-            print(logPrefix, f"RCF_freq    = {self.RCF_freq.to(unit.Hz):g}")
-            print(logPrefix, f"M0          = ({Mx0:g}, {My0:g}, {Mz0:g})")
-            print(logPrefix, f"M0eqb_norm  = {M0eqb_norm}")
-            print(logPrefix, f"integrator  = {integrator!r}")
+            print(msgPrefix, f"timeStep    = {self.timeStep.to(unit.s):g}")
+            print(msgPrefix, f"T1          = {self.sample.T1.to(unit.s):g}")
+            print(msgPrefix, f"T2          = {self.sample.T2.to(unit.s):g}")
+            print(msgPrefix, f"RCF_freq    = {self.RCF_freq.to(unit.Hz):g}")
+            print(msgPrefix, f"M0          = ({Mx0:g}, {My0:g}, {Mz0:g})")
+            print(msgPrefix, f"M0eqb_norm  = {M0eqb_norm}")
+            print(msgPrefix, f"integrator  = {integrator!r}")
 
         # Use the kinetic simulation function from blochsimulation to generate trajectories
         self.trjry, self.dMdt, self.d2Mdt2 = bs.generateTrajectories(
@@ -1349,7 +1357,7 @@ class Simulation(PhysicalObject):
             del self.dMdt, self.d2Mdt2
 
     def cleanup(self):
-        logPrefix = f"[{self.__class__.__name__}.{self.cleanup.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.cleanup.__name__}]"
         for attr in ["trjry", "dMdt", "d2Mdt2"]:
             if hasattr(self, attr):
                 delattr(self, attr)
@@ -1364,7 +1372,7 @@ class Simulation(PhysicalObject):
             DeprecationWarning,
             stacklevel=2,
         )
-        logPrefix = f"[{self.__class__.__name__}.{self.monitorTrajectories.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.monitorTrajectories.__name__}]"
         self.rate_Hz: float = self.rate.to_value(unit.Hz)
         if plotRate is None:
             plotRate = self.rate_Hz
@@ -1610,7 +1618,7 @@ class Simulation(PhysicalObject):
         """
         Keep the mean values and standard deviations of the results
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.keepMeanStd.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.keepMeanStd.__name__}]"
         if hasattr(self.excField, "B_vec"):
             self.excField.B_vec_mean = self.excField.B_vec.mean(axis=0)
             self.excField.B_vec_std = self.excField.B_vec.std(axis=0)
@@ -1620,10 +1628,10 @@ class Simulation(PhysicalObject):
                 del self.excField.B_vec
         else:
             assert hasattr(self.excField, "B_vec_mean"), (
-                logPrefix + "No excField.B_vec nor B_vec_mean"
+                msgPrefix + "No excField.B_vec nor B_vec_mean"
             )
             assert hasattr(self.excField, "B_vec_std"), (
-                logPrefix + "No excField.B_vec nor B_vec_std"
+                msgPrefix + "No excField.B_vec nor B_vec_std"
             )
 
         if hasattr(self, "trjry"):
@@ -1666,17 +1674,17 @@ class Simulation(PhysicalObject):
                     Mz,
                 )
         else:
-            assert hasattr(self, "Mxy_mrs"), logPrefix + "No trjry nor Mxy_mrs"
-            assert hasattr(self, "Mxy_srs"), logPrefix + "No trjry nor Mxy_srs"
-            assert hasattr(self, "Mxy_rms"), logPrefix + "No trjry nor Mxy_rms"
-            assert hasattr(self, "Mxy_rss"), logPrefix + "No trjry nor Mxy_rss"
+            assert hasattr(self, "Mxy_mrs"), msgPrefix + "No trjry nor Mxy_mrs"
+            assert hasattr(self, "Mxy_srs"), msgPrefix + "No trjry nor Mxy_srs"
+            assert hasattr(self, "Mxy_rms"), msgPrefix + "No trjry nor Mxy_rms"
+            assert hasattr(self, "Mxy_rss"), msgPrefix + "No trjry nor Mxy_rss"
 
     def displayTrjries(
         self,
         plotRate_Hz: float = None,  #
         verbose: bool = False,
     ):
-        logPrefix = f"[{self.__class__.__name__}.{self.displayTrjries.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.displayTrjries.__name__}]"
         if plotRate_Hz is None:
             plotRate_Hz = self.rate_Hz
 
@@ -1806,7 +1814,7 @@ class Simulation(PhysicalObject):
         verbose: bool = False,
     ):
         # TODO remove?
-        logPrefix = f"[{self.__class__.__name__}.{self.displayTrjry.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.displayTrjry.__name__}]"
         if plotRate_Hz is None:
             plotRate_Hz = self.rate_Hz
 
@@ -1922,13 +1930,13 @@ class Simulation(PhysicalObject):
         verbose=False,
     ):
         """3D visulization of magnetization vector trajectory"""
-        logPrefix = f"[{self.__class__.__name__}.{self.visualizeTrajectory3D.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.visualizeTrajectory3D.__name__}]"
         if plotrate is None:
             plotrate = self.rate_Hz
 
         if plotrate > self.rate_Hz:
             print(
-                logPrefix,
+                msgPrefix,
                 "WARNING: plotrate > self.rate. plotrate will be decreased to rate",
             )
             plotrate = self.rate_Hz
@@ -1999,7 +2007,7 @@ class Simulation(PhysicalObject):
 
     def saveToH5(self, path: str = None, verbose: bool = False):
         """ """
-        logPrefix = f"[{self.__class__.__name__}.{self.saveToH5.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.saveToH5.__name__}]"
         if path[-3:] != ".h5":
             suffix = ".h5"
         else:
@@ -2057,7 +2065,7 @@ class Simulation(PhysicalObject):
         h5f.close()
 
     def loadFromH5(self, path: str = None, verbose: bool = False):
-        logPrefix = f"[{self.__class__.__name__}.{self.loadFromH5.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.loadFromH5.__name__}]"
         # print(pathAndName)
         with h5py.File(path, "r", driver="core") as df:  # h5py loading method
             if verbose:

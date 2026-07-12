@@ -10,6 +10,7 @@ import h5py
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
+
 # physical units and constants
 from astropy import units as unit
 from astropy.units import Quantity
@@ -1856,7 +1857,7 @@ def LIA_FFT(
         https://docs.zhinst.com/pdf/ziMFIA_UserManual.pdf
 
     """
-    logPrefix = f"[{LIA_FFT.__name__}]"
+    msgPrefix = f"[{LIA_FFT.__name__}]"
     if TS is None:
         raise ValueError("TS is None")
     if sampRate is None or sampRate <= 0:
@@ -1866,7 +1867,7 @@ def LIA_FFT(
     # For IQ data stored as two real columns, convert to complex and keep one shot.
     if TS.ndim == 1:
         signal = TS.reshape(1, -1)  # .astype(np.complex128, copy=False)
-        print(logPrefix, "input time series is not 2D. Reshaped it to (1, -1)")
+        print(msgPrefix, "input time series is not 2D. Reshaped it to (1, -1)")
     elif TS.ndim == 2:
         if np.iscomplexobj(TS):
             if TS.shape[1] == 1:

@@ -10,7 +10,7 @@ from axionbloch.utils import check
 def loadPEMdata(
     filepath="axionbloch/data/Earth_Models/PREM_data.txt",
 ):
-    logPrefix = f"[{loadPEMdata.__name__}]"
+    msgPrefix = f"[{loadPEMdata.__name__}]"
     data = {
         "radius_m": [],
         "density_kg_m3": [],
@@ -46,7 +46,7 @@ def loadPEMdata(
 
 
 def PREM_density(radius_km):
-    logPrefix = f"[{PREM_density.__name__}]"
+    msgPrefix = f"[{PREM_density.__name__}]"
     # Use the coefficients of the polynomials describing the Preliminary Reference Earth Model (PREM) to find out density.
     radius_km = np.abs(radius_km)
 
@@ -116,7 +116,7 @@ def earth_grav_potential_infty():
     Returns a function Phi(r[m]) [J/kg], valid both inside and outside Earth.
     Uses PREM-like model for interior, point-mass approximation for exterior.
     """
-    logPrefix = f"[{earth_grav_potential_infty.__name__}]"
+    msgPrefix = f"[{earth_grav_potential_infty.__name__}]"
     # Load the data (assumed to return a DataFrame with 'radius_m' and 'density_kg_m3')
     data = loadPEMdata()
 
@@ -181,7 +181,7 @@ def get_CumulativeMass():
     Returns the cumulative mass as a function of radius.
     Uses PREM-like model for interior, point-mass approximation for exterior.
     """
-    logPrefix = f"[{get_CumulativeMass.__name__}]"
+    msgPrefix = f"[{get_CumulativeMass.__name__}]"
     # Load the data (assumed to return a DataFrame with 'radius_m' and 'density_kg_m3')
     data = loadPEMdata()
 
@@ -206,7 +206,7 @@ def earth_grav_potential_earth_center():
     Returns a function Phi(r), valid both inside and outside Earth.
     Uses PREM-like model for interior, point-mass approximation for exterior.
     """
-    logPrefix = f"[{earth_grav_potential_earth_center.__name__}]"
+    msgPrefix = f"[{earth_grav_potential_earth_center.__name__}]"
     r, M_r = get_CumulativeMass()
     M_total = M_r[-1]
 
@@ -252,7 +252,7 @@ def earth_grav_potential_earth_center():
 
 
 def plot_earth_grav_potential(showplot=True):
-    logPrefix = f"[{plot_earth_grav_potential.__name__}]"
+    msgPrefix = f"[{plot_earth_grav_potential.__name__}]"
     # load the data to obtain density profile
     data = loadPEMdata()
     density_r = data["radius_m"] * unit.meter
@@ -375,7 +375,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         g_aNN: Quantity[unit.GeV**-1] = 1e-9 * unit.GeV**-1,
         verbose: bool = False,
     ):
-        logPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
         super().__init__(
             name=name,
             nu_a=nu_a,
@@ -487,9 +487,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         r, R_r, r_line, grad_r, grad_theta, grad_phi
         """
         if station is None:
-            raise ValueError(
-                "[EarthBoundAxionHalo.findGradients] Provide station=."
-            )
+            raise ValueError("[EarthBoundAxionHalo.findGradients] Provide station=.")
         if meas_time is None:
             meas_time = Time.now()
         return self.findGradientsAtDirection(
@@ -671,7 +669,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         numFields: int = 1,
         verbose: bool = False,
     ):
-        logPrefix = f"[{self.__class__.__name__}.{self.getBfield.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.getBfield.__name__}]"
         pass
 
     def coh_time_g1(self):
@@ -680,7 +678,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         dt: sampling interval
         method: "1e" or "integral"
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.coh_time_g1.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.coh_time_g1.__name__}]"
         x = self.Ba[:, 0] - np.mean(self.Ba[:, 0])
         dt = 1 / self.rate_Hz
         E = np.array(x)  # complex field
@@ -747,7 +745,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         ylim : tuple or None
             Shared y-axis limits.  Auto-computed from peak amplitude if None.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self._plotEigenStates.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self._plotEigenStates.__name__}]"
         self.sortByEigenE()
 
         startIdx = self.N // 2 + 1  # avoid r=0 singularity
@@ -757,7 +755,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
             stopIdx = startIdx + np.argmin(np.abs(self.r[startIdx:] - truncRadius))
         else:
             raise TypeError(
-                logPrefix + " truncRadius unit is not equivalent to length. "
+                msgPrefix + " truncRadius unit is not equivalent to length. "
             )
 
         plt.rcParams["font.serif"] = ["Times New Roman"]

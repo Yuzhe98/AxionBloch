@@ -49,10 +49,10 @@ halo.plotGradients(
     grad_phi_line=grad_phi_line,
 )
 
-logPrefix = os.path.abspath(__file__)
+msgPrefix = os.path.abspath(__file__)
 
 earthRad_idx = np.argmin(np.abs(r_line - 1 * unit.earthRad))
-print(logPrefix, "r_line index @ station =", earthRad_idx)
+print(msgPrefix, "r_line index @ station =", earthRad_idx)
 
 
 def _field_gradient_in_eV_per_m(gradient):
@@ -63,17 +63,17 @@ def _field_gradient_in_eV_per_m(gradient):
 
 
 print(
-    logPrefix,
+    msgPrefix,
     "a_0_reduced * grad_r @ station =",
     _field_gradient_in_eV_per_m(grad_r_line[earthRad_idx]),
 )
 print(
-    logPrefix,
+    msgPrefix,
     "a_0_reduced * grad_theta @ station =",
     _field_gradient_in_eV_per_m(grad_theta_line[earthRad_idx]),
 )
 print(
-    logPrefix,
+    msgPrefix,
     "a_0_reduced * grad_phi @ station =",
     _field_gradient_in_eV_per_m(grad_phi_line[earthRad_idx]),
 )

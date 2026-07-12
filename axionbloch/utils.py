@@ -2857,7 +2857,7 @@ class PhysicalObject:
         """
         Save this instance to a pickle file.
         """
-        logPrefix = f"[{self.__class__.__name__}.{self.saveToPkl.__name__}]"
+        msgPrefix = f"[{self.__class__.__name__}.{self.saveToPkl.__name__}]"
         if fileDir is None:
             raise ValueError("fileDir must not be None")
 
@@ -2891,7 +2891,7 @@ class PhysicalObject:
         """
         Load an instance of this class from a pickle file.
         """
-        logPrefix = f"[{self.__name__}.{self.loadFromPkl.__name__}]"
+        msgPrefix = f"[{self.__name__}.{self.loadFromPkl.__name__}]"
         if not os.path.isfile(path):
             raise FileNotFoundError(f"Pickle file not found: {path}")
 
