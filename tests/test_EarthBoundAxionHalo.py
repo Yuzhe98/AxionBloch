@@ -1,6 +1,6 @@
 """Tests for axionbloch.EarthBoundAxionHalo utility functions.
 
-Covers the Preliminary Reference Earth Model (PREM) data loader and the
+Covers the analytic Preliminary Reference Earth Model (PREM) and the
 Earth gravitational-potential helper used by the bound-axion Schrödinger
 solver.
 
@@ -15,19 +15,25 @@ from astropy import units as unit
 from astropy.time import Time
 
 from axionbloch.EarthBoundAxionHalo import (EarthBoundAxionHalo,
+                                            PREM_density,
+                                            PREM_density_profile,
                                             earth_grav_potential_earth_center,
-                                            loadPEMdata,
                                             plot_earth_grav_potential)
 from axionbloch.GravBoundAxionHalo import GravBoundAxionHalo
 from axionbloch.Station import Mainz
 
 
-def test_loadPEMdata():
-    """loadPEMdata returns a dict with matching-length radius and density arrays."""
-    data = loadPEMdata()
-    assert "radius_m" in data
-    assert "density_kg_m3" in data
-    assert len(data["radius_m"]) == len(data["density_kg_m3"])
+def test_PREM_density_profile_is_analytic_and_vectorized():
+    """The generated profile has SI units and needs no external data file."""
+    radius_m, density_kg_m3 = PREM_density_profile()
+    assert len(radius_m) == len(density_kg_m3)
+    assert radius_m[0] == 0
+    assert radius_m[-1] == 6_371_000
+    assert np.isclose(density_kg_m3[0], PREM_density(0) * 1000)
+    assert np.allclose(
+        PREM_density([0, 6371, 7000]),
+        [PREM_density(0), 1.020, 0.0],
+    )
 
 
 def test_earth_grav_potential_earth_center_returns_valid_objects():

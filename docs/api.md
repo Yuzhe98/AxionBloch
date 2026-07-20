@@ -140,8 +140,8 @@ Also exports helper functions used to build the potential:
 
 | Function | Description |
 |----------|-------------|
-| `loadPEMdata` | Load PEM density-profile data |
 | `PREM_density` | PREM piecewise density at a given radius |
+| `PREM_density_profile` | Sample the analytic PREM density profile |
 | `earth_grav_potential_earth_center` | Gravitational potential referenced to Earth's centre |
 | `earth_grav_potential_infty` | Gravitational potential referenced to infinity |
 | `get_CumulativeMass` | Cumulative enclosed mass as a function of radius |
