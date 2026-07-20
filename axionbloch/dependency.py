@@ -15,7 +15,7 @@ from astropy.time import Time  # noqa: F401
 from astropy.units import CompositeUnit, Quantity  # noqa: F401
 
 # pi with unit.radian
-PI = np.pi * unit.rad
+PI: Quantity = np.pi * unit.rad
 
 # dimensionless scale units
 # parts per million
@@ -43,6 +43,7 @@ Phi0 = magnetic_flux_quantum = unit.def_unit(
 import textwrap  # noqa: F401
 
 import matplotlib.gridspec as gridspec  # noqa: F401
+
 # --------------- plotting --------------- #
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker  # noqa: F401
