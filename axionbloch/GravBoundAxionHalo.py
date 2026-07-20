@@ -40,6 +40,7 @@ class GravBoundAxionHalo:
     mass_enclosed: Quantity | None
     g_aNN: Quantity | None
     a_0: Quantity | None
+    FWHM_a: Quantity[unit.one] | None
 
     def __init__(
         self,
