@@ -7,48 +7,14 @@ from axionbloch.Station import Station
 from axionbloch.utils import check
 
 
-def loadPEMdata(
-    filepath="axionbloch/data/Earth_Models/PREM_data.txt",
-):
-    msgPrefix = f"[{loadPEMdata.__name__}]"
-    data = {
-        "radius_m": [],
-        "density_kg_m3": [],
-        "vpv": [],
-        "vsv": [],
-        "Q_kappa": [],
-        "Q_miu": [],
-        "vph": [],
-        "vsh": [],
-        "eta": [],
-    }
-
-    with open(filepath, "r") as f:
-        for line in f:
-            line = line.strip()
-
-            if not line or line.startswith("#"):
-                continue
-
-            values = [float(x) for x in line.split()]
-
-            for key, val in zip(data.keys(), values):
-                data[key].append(val)
-
-    # sort by radius
-    order = sorted(range(len(data["radius_m"])), key=lambda i: data["radius_m"][i])
-
-    for key in data:
-        data[key] = [data[key][i] for i in order]
-    for key in data:
-        data[key] = np.asanyarray(data[key])
-    return data
-
-
 def PREM_density(radius_km):
+    """Return the analytic PREM density in g/cm³ at radius ``radius_km``.
+
+    Both scalar values and NumPy-compatible arrays are accepted.
+    """
     msgPrefix = f"[{PREM_density.__name__}]"
     # Use the coefficients of the polynomials describing the Preliminary Reference Earth Model (PREM) to find out density.
-    radius_km = np.abs(radius_km)
+    radius_km = np.abs(np.asarray(radius_km, dtype=float))
 
     # Earth's radius in km (converted to meters in DataFrame)
     EARTH_RADIUS_KM = 6371
@@ -64,21 +30,21 @@ def PREM_density(radius_km):
         return 7.9565 - 6.4761 * x + 5.5283 * x**2 - 3.0807 * x**3
 
     def density_transition_zone(x):
-        if x <= 5771 / EARTH_RADIUS_KM:
-            return 5.3197 - 1.4836 * x
-        elif x <= 5971 / EARTH_RADIUS_KM:
-            return 11.2494 - 8.0298 * x
-        else:
-            return 7.1089 - 3.8045 * x
+        return np.where(
+            x <= 5771 / EARTH_RADIUS_KM,
+            5.3197 - 1.4836 * x,
+            np.where(
+                x <= 5971 / EARTH_RADIUS_KM,
+                11.2494 - 8.0298 * x,
+                7.1089 - 3.8045 * x,
+            ),
+        )
 
     def density_lvz_lid(x):
         return 2.6910 + 0.6924 * x
 
     def density_crust(x):
-        if x <= 6356 / EARTH_RADIUS_KM:
-            return 2.900
-        else:
-            return 2.600
+        return np.where(x <= 6356 / EARTH_RADIUS_KM, 2.900, 2.600)
 
     def density_ocean(x):
         return 1.020
@@ -92,23 +58,36 @@ def PREM_density(radius_km):
     # Calculate density for each radius
     # density = []
     x = radius_km / EARTH_RADIUS_KM
-    # radius_km = radius_km
-    if radius_km <= 1221.5:
-        return density_inner_core(x)
-    elif radius_km <= 3480.0:
-        return density_outer_core(x)
-    elif radius_km <= 5701.0:
-        return density_lower_mantle(x)
-    elif radius_km <= 6151.0:
-        return density_transition_zone(x)
-    elif radius_km <= 6346.6:
-        return density_lvz_lid(x)
-    elif radius_km <= 6368.0:
-        return density_crust(x)
-    elif radius_km <= 6371.0:
-        return density_ocean(x)
-    else:
-        return density_space(x)
+    density = np.select(
+        [
+            radius_km <= 1221.5,
+            radius_km <= 3480.0,
+            radius_km <= 5701.0,
+            radius_km <= 6151.0,
+            radius_km <= 6346.6,
+            radius_km <= 6368.0,
+            radius_km <= 6371.0,
+        ],
+        [
+            density_inner_core(x),
+            density_outer_core(x),
+            density_lower_mantle(x),
+            density_transition_zone(x),
+            density_lvz_lid(x),
+            density_crust(x),
+            density_ocean(x),
+        ],
+        default=density_space(x),
+    )
+    return density.item() if density.ndim == 0 else density
+
+
+def PREM_density_profile(num_samples=6372):
+    """Sample the analytic PREM model from Earth's center to its surface."""
+    radius_km = np.linspace(0.0, 6371.0, num_samples)
+    radius_m = radius_km * 1000.0
+    density_kg_m3 = PREM_density(radius_km) * 1000.0
+    return radius_m, density_kg_m3
 
 
 def earth_grav_potential_infty():
@@ -117,12 +96,7 @@ def earth_grav_potential_infty():
     Uses PREM-like model for interior, point-mass approximation for exterior.
     """
     msgPrefix = f"[{earth_grav_potential_infty.__name__}]"
-    # Load the data (assumed to return a DataFrame with 'radius_m' and 'density_kg_m3')
-    data = loadPEMdata()
-
-    # Extract radius and density
-    r = data["radius_m"]
-    rho = data["density_kg_m3"]
+    r, rho = PREM_density_profile()
 
     # Compute shell thickness
     dr = np.gradient(r)
@@ -182,12 +156,9 @@ def get_CumulativeMass():
     Uses PREM-like model for interior, point-mass approximation for exterior.
     """
     msgPrefix = f"[{get_CumulativeMass.__name__}]"
-    # Load the data (assumed to return a DataFrame with 'radius_m' and 'density_kg_m3')
-    data = loadPEMdata()
-
-    # Extract radius and density
-    r = data["radius_m"] * unit.meter
-    rho = data["density_kg_m3"] * (unit.kg / unit.meter**3)
+    radius_m, density_kg_m3 = PREM_density_profile()
+    r = radius_m * unit.meter
+    rho = density_kg_m3 * (unit.kg / unit.meter**3)
 
     # Compute shell thickness
     dr = np.gradient(r)
@@ -253,10 +224,9 @@ def earth_grav_potential_earth_center():
 
 def plot_earth_grav_potential(showplot=True):
     msgPrefix = f"[{plot_earth_grav_potential.__name__}]"
-    # load the data to obtain density profile
-    data = loadPEMdata()
-    density_r = data["radius_m"] * unit.meter
-    density_rho = data["density_kg_m3"] * (unit.kg / unit.meter**3)
+    radius_m, density_kg_m3 = PREM_density_profile()
+    density_r = radius_m * unit.meter
+    density_rho = density_kg_m3 * (unit.kg / unit.meter**3)
 
     # cumulative mass
     mass_r, mass_M_r = get_CumulativeMass()
