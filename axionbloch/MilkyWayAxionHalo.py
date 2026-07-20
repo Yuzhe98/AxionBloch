@@ -1283,11 +1283,11 @@ class MilkyWayAxionHalo:
             else:
                 g_aNN = self.g_aNN
         # if case == "non-grad":
-        #     Omega_rms = 0.5 * self.g_aNN * (2 * const.c * self.rho_E_DM) ** (
+        #     Omega_rms = 2 * PI *0.5 * self.g_aNN * (2 * const.c * self.rho_E_DM) ** (
         #         1 / 2
         #     ) * self.v_lab * np.cos(self.windAngle)
         # elif case == "grad_par":
-        #     Omega_rms = 0.5 * self.g_aNN * (2 * const.c * self.rho_E_DM) ** (
+        #     Omega_rms = 2 * PI *0.5 * self.g_aNN * (2 * const.c * self.rho_E_DM) ** (
         #         1 / 2
         #     ) * self.v_lab * np.cos(self.windAngle) * self.FWHM**(1 / 2)
         # el
@@ -1300,20 +1300,22 @@ class MilkyWayAxionHalo:
                     v_0=self.v_0, v_lab=self.v_lab, alpha=alpha, case=case
                 )
             )
-            Omega_rms = (
+            Omega_rms = ( 
+                2 * 
+                PI *
                 0.5
                 * g_aNN
                 * (2 * const.hbar * const.c * self.rho_E_DM) ** (1 / 2)
                 * velocity_rms
-            ).to(unit.Hz)
+            ).to(unit.Hz * unit.rad)
         else:
             raise ValueError(
-                f"case {case} not recognized, should be 'grad_par' or 'grad_perp'"
+                f"{msgPrefix} case {case} not recognized, should be 'grad_par' or 'grad_perp'"
             )
         if verbose:
             print(
                 msgPrefix,
-                f"axion wind Rabi frequency (case={case}): {Omega_rms.to(unit.Hz)}",
+                f"axion wind Rabi frequency (case={case}): {Omega_rms.to(unit.Hz * unit.rad)}",
             )
         return Omega_rms
 
