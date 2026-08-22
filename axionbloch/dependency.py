@@ -6,9 +6,11 @@
 # which libraries are being used throughout the project.
 # ################################################################### #
 
-# ----------- physical units and constants ----------- #
+
 # numerical computing
 import numpy as np
+
+# physical units and constants
 from astropy import units as unit
 from astropy.constants import codata2018 as const
 from astropy.time import Time  # noqa: F401
