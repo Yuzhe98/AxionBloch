@@ -327,6 +327,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
     # Create the "axion stream" (axion field) object
     # you can get properties of the axion field, computed based on the input information
     nu_a: Quantity[unit.Hz] | None = None  # axion Compton frequency
+    m_a: Quantity[unit.g] | None = None  # axion mass
     N: int = int(2**12)
     extent: Quantity[unit.m] = 128.0 * unit.R_earth
     a_0: Quantity[unit.eV] | None = None
@@ -336,7 +337,8 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
     def __init__(
         self,
         name="Earth-Bound Axion Halo",
-        nu_a: Quantity[unit.Hz] | None = None,  # axion Compton frequency
+        nu_a: Quantity[unit.Hz] | None = None,
+        m_a: Quantity[unit.g] | None = None,
         N: int = int(2**12),
         extent: Quantity[unit.m] = 128.0 * unit.R_earth,
         getPot=earth_grav_potential_earth_center,
@@ -349,6 +351,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         super().__init__(
             name=name,
             nu_a=nu_a,
+            m_a=m_a,
             N=N,
             extent=extent,
             getPot=getPot,

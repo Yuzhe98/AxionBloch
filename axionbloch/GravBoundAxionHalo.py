@@ -36,6 +36,8 @@ class GravBoundAxionHalo:
 
     # Map l to spectroscopic labels (s, p, d, f, ...)
     orbitalLabels = ["s", "p", "d", "f", "g", "h", "i", "k", "l", "m"]
+    nu_a: Quantity[unit.Hz] | None
+    m_a: Quantity[unit.g] | None
     pot: Quantity
     mass_enclosed: Quantity | None
     g_aNN: Quantity | None
@@ -45,7 +47,8 @@ class GravBoundAxionHalo:
     def __init__(
         self,
         name="Gravitationally Bound Axion Halo",
-        nu_a: Quantity | None = None,  # axion Compton frequency
+        nu_a: Quantity | None = None,
+        m_a: Quantity | None = None,
         N: int = int(2**12),
         extent: Quantity = 128.0 * unit.R_earth,
         getPot=None,
@@ -78,11 +81,31 @@ class GravBoundAxionHalo:
         """
         msgPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
         self.name = name
-        self.nu_a = nu_a
-        # axion mass derived from Compton frequency: m = h * nu / c²
-        self.m_a = self.nu_a * const.h / const.c**2
+        if nu_a is None and m_a is None:
+            raise ValueError(
+                f"{msgPrefix} Either nu_a or m_a must be provided to determine the axion mass."
+            )
+        elif nu_a is not None and m_a is not None:
+            # If both are provided, check for consistency
+            m_a_from_nu = nu_a * const.h / const.c**2
+            if not np.isclose(m_a_from_nu, m_a):
+                raise ValueError(
+                    f"{msgPrefix} Inconsistent nu_a and m_a values: "
+                    f"nu_a={nu_a}, m_a={m_a}, "
+                    f"derived m_a from nu_a={m_a_from_nu}"
+                )
+            else:
+                self.m_a = m_a
+                self.nu_a = nu_a
+        elif nu_a is not None:
+            self.nu_a = nu_a
+            self.m_a = nu_a * const.h / const.c**2
+        else:  # m_a is not None
+            self.m_a = m_a.to(unit.kg, equivalencies=unit.mass_energy())
+            self.nu_a = m_a * const.c**2 / const.h
+        
         if verbose:
-            print(msgPrefix, "axion Compton frequency =", self.nu_a)
+            print(msgPrefix, "axion Compton frequency =", self.nu_a.to(unit.Hz))
             print(
                 msgPrefix,
                 f"axion mass = {self.m_a.to(unit.kg)}",
