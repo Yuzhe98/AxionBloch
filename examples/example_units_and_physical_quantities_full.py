@@ -190,3 +190,11 @@ print("\nnp.ceil:")
 rate = 1.01 * unit.Hz
 duration = 1.01 * unit.s
 print("np.ceil(rate * duration).to(unit.one) =", np.ceil(rate * duration).to(unit.one))
+
+
+# np.concatenate with Quantity arrays
+print("\nnp.concatenate with Quantity:")
+lengths_m = np.array([1.0, 2.0]) * unit.meter
+lengths_cm = np.array([300.0, 400.0]) * unit.centimeter
+lengths = np.concatenate([lengths_m, lengths_cm])
+print("concatenated lengths:", lengths)
