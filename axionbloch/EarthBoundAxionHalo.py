@@ -90,72 +90,12 @@ def PREM_density_profile(num_samples=6372):
     return radius_m, density_kg_m3
 
 
-def earth_grav_potential_infty():
-    """
-    Returns a function Phi(r[m]) [J/kg], valid both inside and outside Earth.
-    Uses PREM-like model for interior, point-mass approximation for exterior.
-    """
-    msgPrefix = f"[{earth_grav_potential_infty.__name__}]"
-    r, rho = PREM_density_profile()
-
-    # Compute shell thickness
-    dr = np.gradient(r)
-
-    # Shell volume and mass
-    dV = 4 * np.pi * r**2 * dr
-    dm = rho * dV
-
-    # Cumulative mass
-    M_r = np.cumsum(dm)
-    M_total = M_r[-1]
-
-    # Gravitational constant
-    G = const.G.value  # m³/kg/s²
-
-    # Extend to radii beyond Earth's surface
-    r_max = r[-1]
-    r_outside = np.linspace(
-        r_max, 1000 * r_max, 800
-    )  # from surface to 1000 Earth radii
-    Phi_outside = -G * M_total / r_outside
-
-    # Compute gravitational potential inside Earth
-    Phi_inside = np.zeros_like(r)
-    Phi_inside[1:] = 2 * Phi_outside[0] + G * M_r[1:] / r[1:]
-    Phi_inside[0] = 2 * Phi_outside[0] + G * M_r[1] / r[1]  # avoid zero-division
-
-    # Combine inside and outside
-    r_full = np.concatenate([r, r_outside])
-    Phi_full = np.concatenate([Phi_inside, Phi_outside])
-    # Phi_full -= np.amin(Phi_full)
-
-    # Enforce symmetry: add negative r values
-    r_sym = np.concatenate([-r_full[::-1], r_full])  # mirror and append
-    Phi_sym = np.concatenate([Phi_full[::-1], Phi_full])  # symmetric values
-
-    # Optional: sort to ensure increasing r (for interp1d)
-    sorted_indices = np.argsort(r_sym)
-    r_sym_sorted = r_sym[sorted_indices]
-    Phi_sym_sorted = Phi_sym[sorted_indices]
-
-    # Interpolation function: now Phi_func(-r) = Phi_func(r)
-    Phi_func = interp1d(
-        r_sym_sorted,
-        Phi_sym_sorted,
-        kind="linear",
-        fill_value="extrapolate",
-        bounds_error=False,
-    )
-
-    return Phi_func
-
-
-def get_CumulativeMass():
+def getCumulativeMass():
     """
     Returns the cumulative mass as a function of radius.
     Uses PREM-like model for interior, point-mass approximation for exterior.
     """
-    msgPrefix = f"[{get_CumulativeMass.__name__}]"
+    msgPrefix = f"[{getCumulativeMass.__name__}]"
     radius_m, density_kg_m3 = PREM_density_profile()
     r = radius_m * unit.meter
     rho = density_kg_m3 * (unit.kg / unit.meter**3)
@@ -172,26 +112,91 @@ def get_CumulativeMass():
     return r, M_r
 
 
+def _earth_grav_potential_profile():
+    """Return the PREM potential profile with ``Phi(infinity) = 0``.
+
+    For a spherical Earth, ``dPhi/dr = G M(<r) / r**2``.  Integrating this
+    relation inward from the surface boundary condition includes the constant
+    potential contribution from all shells exterior to each radius.
+    """
+    r, M_r = getCumulativeMass()
+    phi_surface = -const.G * M_r[-1] / r[-1]
+    dphi_dr = np.zeros(r.shape) * (unit.joule / unit.kg / unit.meter)
+    dphi_dr[1:] = const.G * M_r[1:] / r[1:] ** 2
+
+    shell_integrals = 0.5 * (dphi_dr[:-1] + dphi_dr[1:]) * np.diff(r)
+    phi_inside = np.zeros(r.shape) * (unit.joule / unit.kg)
+    phi_inside[-1] = phi_surface
+    phi_inside[:-1] = phi_surface - np.cumsum(shell_integrals[::-1])[::-1]
+
+    return r, phi_inside
+
+
+def earth_grav_potential_infty():
+    """
+    Returns a function Phi(r[m]) [J/kg], valid both inside and outside Earth.
+    Uses PREM-like model for interior, point-mass approximation for exterior.
+    """
+    msgPrefix = f"[{earth_grav_potential_infty.__name__}]"
+    r, Phi_inside = _earth_grav_potential_profile()
+    M_total = getCumulativeMass()[1][-1]
+
+    # Extend to radii beyond Earth's surface
+    r_max = r[-1]
+    # Resolve the near-Earth profile while still extending to 1000 R_earth.
+    r_outside = np.geomspace(1, 1000, 800) * r_max
+    Phi_outside = -const.G * M_total / r_outside
+
+    # Combine inside and outside
+    r_full = np.concatenate([r, r_outside])
+    Phi_full = np.concatenate(
+        [
+            Phi_inside,
+            Phi_outside,
+        ]
+    )
+    # Phi_full -= np.amin(Phi_full)
+
+    # Enforce symmetry: add negative r values
+    r_sym = np.concatenate([-r_full[::-1], r_full])  # mirror and append
+    Phi_sym = np.concatenate([Phi_full[::-1], Phi_full])  # symmetric values
+
+    # Optional: sort to ensure increasing r (for interp1d)
+    sorted_indices = np.argsort(r_sym)
+    r_sym_sorted = r_sym[sorted_indices]
+    Phi_sym_sorted = Phi_sym[sorted_indices]
+
+    # Interpolation function: now Phi_func(-r) = Phi_func(r)
+    r_unit = unit.R_earth
+    Phi_unit = unit.megajoule / unit.kilogram
+
+    # Interpolation function: now Phi_func(-r) = Phi_func(r)
+    Phi_func = interp1d(
+        r_sym_sorted.to_value(r_unit),
+        Phi_sym_sorted.to_value(Phi_unit),
+        kind="linear",
+        fill_value="extrapolate",
+        bounds_error=False,
+    )
+
+    return Phi_func, r_unit, Phi_unit
+
+
 def earth_grav_potential_earth_center():
     """
     Returns a function Phi(r), valid both inside and outside Earth.
     Uses PREM-like model for interior, point-mass approximation for exterior.
     """
     msgPrefix = f"[{earth_grav_potential_earth_center.__name__}]"
-    r, M_r = get_CumulativeMass()
-    M_total = M_r[-1]
+    r, Phi_inside = _earth_grav_potential_profile()
+    M_total = getCumulativeMass()[1][-1]
 
     # Extend to radii beyond Earth's surface
     r_max = r[-1]
     r_outside = np.linspace(
         r_max, 1000 * r_max, 100000
     )  # from surface to 1000 Earth radii
-    Phi_outside: Quantity = -const.G * M_total / r_outside  # G = 6.67430e-11 m³/kg/s²
-
-    # Compute gravitational potential inside Earth
-    Phi_inside = np.zeros_like(r) / r.unit * Phi_outside[0].unit
-    Phi_inside[1:] = 2 * Phi_outside[0] + const.G * M_r[1:] / r[1:]
-    Phi_inside[0] = 2 * Phi_outside[0] + const.G * M_r[1] / r[1]  # avoid zero-division
+    Phi_outside: Quantity = -const.G * M_total / r_outside
 
     # Combine inside and outside
     r_full = np.concatenate([r, r_outside])
@@ -206,6 +211,7 @@ def earth_grav_potential_earth_center():
     sorted_indices = np.argsort(r_sym)
     r_sym_sorted = r_sym[sorted_indices]
     Phi_sym_sorted = Phi_sym[sorted_indices]
+    # Keep the historical convention of this helper: Phi(center) = 0.
     Phi_sym_sorted -= np.amin(Phi_sym_sorted)
 
     # Interpolation function: now Phi_func(-r) = Phi_func(r)
@@ -222,19 +228,20 @@ def earth_grav_potential_earth_center():
     return Phi_func, r_unit, Phi_unit
 
 
-def plot_earth_grav_potential(showplot=True):
-    msgPrefix = f"[{plot_earth_grav_potential.__name__}]"
+def plot_earth_grav_potential_infty(showplot=True):
+    msgPrefix = f"[{plot_earth_grav_potential_infty.__name__}]"
     radius_m, density_kg_m3 = PREM_density_profile()
     density_r = radius_m * unit.meter
     density_rho = density_kg_m3 * (unit.kg / unit.meter**3)
+    density_unit = unit.g / unit.cm**3
 
     # cumulative mass
-    mass_r, mass_M_r = get_CumulativeMass()
+    mass_r, mass_M_r = getCumulativeMass()
 
-    # potential referring to earth center
-    Phi_func, r_unit, Phi_unit = earth_grav_potential_earth_center()
+    # potential referenced to infinity
+    Phi_func, r_unit, Phi_unit = earth_grav_potential_infty()
     # extend to radii beyond Earth's surface
-    r_extended = np.linspace(0, 3 * mass_r[-1], 1000)
+    r_extended = np.linspace(0, 3, 1000) * unit.R_earth
     Phi_extended = Phi_func(r_extended.to_value(r_unit)) * Phi_unit
 
     # use units for plotting:
@@ -255,33 +262,32 @@ def plot_earth_grav_potential(showplot=True):
 
     cm = 1 / 2.54  # convert cm to inch
 
-    fig = plt.figure(figsize=(8.5 * cm, 8.5 * cm), dpi=300)  # initialize a figure
+    fig = plt.figure(figsize=(8.5 * cm, 10.5 * cm), dpi=300)  # initialize a figure
 
-    gs = gridspec.GridSpec(nrows=3, ncols=1)  # create grid for multiple figures
+    gs = gridspec.GridSpec(nrows=3, ncols=1)
 
-    # # fix the margins
-    # left=
-    # bottom=
-    # right=
-    # top=
-    # wspace=
-    # hspace=
-    # fig.subplots_adjust(left=left, top=top, right=right,
-    #                     bottom=bottom, wspace=wspace, hspace=hspace)
+    # fix the margins
+    left=.15
+    bottom=.11
+    right=.954
+    top=.926
+    wspace=.2
+    hspace=.1
+    fig.subplots_adjust(left=left, top=top, right=right,
+                        bottom=bottom, wspace=wspace, hspace=hspace)
 
     density_ax = fig.add_subplot(gs[0, 0])
-    mass_ax = fig.add_subplot(gs[1, 0], sharex=density_ax)
-    pot_ax = fig.add_subplot(gs[2, 0], sharex=density_ax)
+    mass_ax = fig.add_subplot(gs[1, 0])
+    pot_ax = fig.add_subplot(gs[2, 0])
 
     # density profile
     density_ax.plot(
         density_r.to_value(r_unit),
-        density_rho.to_value(density_rho.unit),
+        density_rho.to_value(density_unit),
         label="Density Profile",
         color="darkblue",
     )
-    density_ax.set_xlabel("Radius (earth radius)")
-    density_ax.set_ylabel(f"Density ({density_rho.unit})")
+    density_ax.set_ylabel("Density $(\\mathrm{g}\\,\\mathrm{cm}^{-3})$")
 
     # cumulative mass
     mass_ax.plot(
@@ -290,8 +296,7 @@ def plot_earth_grav_potential(showplot=True):
         label="Mass Profile",
         color="darkgreen",
     )
-    mass_ax.set_xlabel("Radius (earth radius)")
-    mass_ax.set_ylabel("Enclosed Mass ($10^{24}\\,$kg)")
+    mass_ax.set_ylabel("Enclosed mass $(10^{24}\\,\\mathrm{kg})$")
     mass_ax.ticklabel_format(useOffset=False)
 
     # gravitational potential
@@ -301,26 +306,147 @@ def plot_earth_grav_potential(showplot=True):
         label="Earth grav. pot.",
         color="darkorange",
     )
-    pot_ax.axvline(
-        x=(1 * unit.R_earth).to_value(r_unit),
-        color="k",
-        linestyle="dotted",
-        linewidth=1,
-        alpha=0.8,
-        label="Earth radius",
-    )
+    # pot_ax.axvline(
+    #     x=(1 * unit.R_earth).to_value(r_unit),
+    #     color="k",
+    #     linestyle="dotted",
+    #     linewidth=1,
+    #     alpha=0.8,
+    #     # label="Earth radius",
+    # )
 
     pot_ax.set_xlabel("Radius (earth radius)")
-    pot_ax.set_ylabel("Grav. Pot. (MJ/kg) ref. to $\\infty$")
-    pot_ax.legend()
+    # pot_ax.set_ylabel("Grav. Pot. (MJ/kg) ref. to $\\infty$")
+    pot_ax.set_ylabel("$\\Phi_\\oplus\\, (\\mathrm{MJ}\\,\\mathrm{kg}^{-1})$")
+    # pot_ax.legend()
 
-    fig.suptitle("Earth Profiles (from PEM Data)")
-    fig.tight_layout()
+    density_ax.set_ylim(-0.4, 13.6)
+    pot_ax.set_ylim(-130, 7)
+
+    pot_ax.set_yticks([-120, -80, -40, 0])
+
+    xlimits = pot_ax.get_xlim()
+    density_ax.set_xlim(xlimits)
+    mass_ax.set_xlim(xlimits)
+    density_ax.set_xticklabels([])
+    mass_ax.set_xticklabels([])
+
+    fig.suptitle("Earth Profiles (from PREM Data)")
+    fig.align_ylabels([density_ax, mass_ax, pot_ax])
+    # fig.tight_layout()
+    plt.savefig("Earth-profiles-(PREM-data).png", transparent=False)
+    if showplot:
+        plt.show()
+    else:
+        plt.close(fig)
+
+
+def plot_earth_grav_potential_earth_center(showplot=True):
+    msgPrefix = f"[{plot_earth_grav_potential_earth_center.__name__}]"
+    radius_m, density_kg_m3 = PREM_density_profile()
+    density_r = radius_m * unit.meter
+    density_rho = density_kg_m3 * (unit.kg / unit.meter**3)
+    density_unit = unit.g / unit.cm**3
+
+    # cumulative mass
+    mass_r, mass_M_r = getCumulativeMass()
+
+    # potential referenced to infinity
+    Phi_func, r_unit, Phi_unit = earth_grav_potential_earth_center()
+    # extend to radii beyond Earth's surface
+    r_extended = np.linspace(0, 3, 1000) * unit.R_earth
+    Phi_extended = Phi_func(r_extended.to_value(r_unit)) * Phi_unit
+
+    # ------------- Plot ---------------------
+
+    # plot style
+    plt.rc("font", size=6)  # font size for all figures
+    # plt.rcParams['font.family'] = 'serif'
+    plt.rcParams["font.family"] = "Times New Roman"
+    # plt.rcParams['mathtext.fontset'] = 'dejavuserif'
+
+    # Make math text match Times New Roman
+    plt.rcParams["mathtext.fontset"] = "cm"
+    plt.rcParams["mathtext.rm"] = "Times New Roman"
+
+    cm = 1 / 2.54  # convert cm to inch
+
+    fig = plt.figure(figsize=(8.5 * cm, 10.5 * cm), dpi=300)  # initialize a figure
+
+    gs = gridspec.GridSpec(nrows=3, ncols=1)
+
+    # fix the margins
+    left = 0.15
+    bottom = 0.11
+    right = 0.954
+    top = 0.926
+    wspace = 0.2
+    hspace = 0.12
+    fig.subplots_adjust(
+        left=left, top=top, right=right, bottom=bottom, wspace=wspace, hspace=hspace
+    )
+
+    density_ax = fig.add_subplot(gs[0, 0])
+    mass_ax = fig.add_subplot(gs[1, 0])
+    pot_ax = fig.add_subplot(gs[2, 0])
+
+    # density profile
+    density_ax.plot(
+        density_r.to_value(r_unit),
+        density_rho.to_value(density_unit),
+        label="Density Profile",
+        color="darkblue",
+    )
+    density_ax.set_ylabel("Density $(\\mathrm{g}\\,\\mathrm{cm}^{-3})$")
+
+    # cumulative mass
+    mass_ax.plot(
+        mass_r.to_value(r_unit),
+        mass_M_r.to_value(unit.kg) / 1e24,
+        label="Mass Profile",
+        color="darkgreen",
+    )
+    mass_ax.set_ylabel("Enclosed mass $(10^{24}\\,\\mathrm{kg})$")
+    mass_ax.ticklabel_format(useOffset=False)
+
+    # gravitational potential
+    pot_ax.plot(
+        r_extended.to_value(r_unit),
+        Phi_extended.to_value(Phi_unit),
+        label="Earth grav. pot.",
+        color="darkorange",
+    )
+    # pot_ax.axvline(
+    #     x=(1 * unit.R_earth).to_value(r_unit),
+    #     color="k",
+    #     linestyle="dotted",
+    #     linewidth=1,
+    #     alpha=0.8,
+    #     # label="Earth radius",
+    # )
+
+    pot_ax.set_xlabel("Radius (earth radius)")
+    # pot_ax.set_ylabel("Grav. Pot. (MJ/kg) ref. to $\\infty$")
+    pot_ax.set_ylabel("$\\Phi_\\oplus\\, (\\mathrm{MJ}\\,\\mathrm{kg}^{-1})$")
+    # pot_ax.legend()
+
+    density_ax.set_ylim(-0.4, 13.6)
+    pot_ax.set_ylim(-7, 130)
+
+    pot_ax.set_yticks([0, 40, 80, 120])
+
+    fig.suptitle("Earth Profiles (from PREM Data)")
+    fig.align_ylabels([density_ax, mass_ax, pot_ax])
+    # fig.tight_layout()
     # plt.savefig("figures/Earth-Profiles-(PEM-Data).png", transparent=False)
     if showplot:
         plt.show()
     else:
         plt.close(fig)
+
+
+# Backward-compatible alias for callers using the original name.
+plot_earth_grav_potential = plot_earth_grav_potential_infty
 
 
 class EarthBoundAxionHalo(GravBoundAxionHalo):
@@ -759,3 +885,8 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
 
         if showPlot:
             plt.show()
+
+
+if __name__ == "__main__":
+    plot_earth_grav_potential_infty()
+    # plot_earth_grav_potential_earth_center()
