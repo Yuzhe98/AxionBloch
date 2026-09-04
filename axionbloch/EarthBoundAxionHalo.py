@@ -228,8 +228,8 @@ def earth_grav_potential_earth_center():
     return Phi_func, r_unit, Phi_unit
 
 
-def plot_earth_grav_potential_infty(showplot=True):
-    msgPrefix = f"[{plot_earth_grav_potential_infty.__name__}]"
+def plot_earth_grav_potential(showplot=True):
+    msgPrefix = f"[{plot_earth_grav_potential.__name__}]"
     radius_m, density_kg_m3 = PREM_density_profile()
     density_r = radius_m * unit.meter
     density_rho = density_kg_m3 * (unit.kg / unit.meter**3)
@@ -238,11 +238,17 @@ def plot_earth_grav_potential_infty(showplot=True):
     # cumulative mass
     mass_r, mass_M_r = getCumulativeMass()
 
-    # potential referenced to infinity
+    # Compare both potential conventions in the bottom panel.
     Phi_func, r_unit, Phi_unit = earth_grav_potential_infty()
+    Phi_center_func, center_r_unit, center_Phi_unit = (
+        earth_grav_potential_earth_center()
+    )
     # extend to radii beyond Earth's surface
     r_extended = np.linspace(0, 3, 1000) * unit.R_earth
-    Phi_extended = Phi_func(r_extended.to_value(r_unit)) * Phi_unit
+    Phi_extended = Phi_func(r_extended.to_value(r_unit)) * (Phi_unit)
+    Phi_center_extended = (
+        Phi_center_func(r_extended.to_value(center_r_unit)) * center_Phi_unit
+    )
 
     # use units for plotting:
     r_unit = unit.R_earth
@@ -262,126 +268,17 @@ def plot_earth_grav_potential_infty(showplot=True):
 
     cm = 1 / 2.54  # convert cm to inch
 
-    fig = plt.figure(figsize=(8.5 * cm, 10.5 * cm), dpi=300)  # initialize a figure
-
-    gs = gridspec.GridSpec(nrows=3, ncols=1)
-
-    # fix the margins
-    left=.15
-    bottom=.11
-    right=.954
-    top=.926
-    wspace=.2
-    hspace=.1
-    fig.subplots_adjust(left=left, top=top, right=right,
-                        bottom=bottom, wspace=wspace, hspace=hspace)
-
-    density_ax = fig.add_subplot(gs[0, 0])
-    mass_ax = fig.add_subplot(gs[1, 0])
-    pot_ax = fig.add_subplot(gs[2, 0])
-
-    # density profile
-    density_ax.plot(
-        density_r.to_value(r_unit),
-        density_rho.to_value(density_unit),
-        label="Density Profile",
-        color="darkblue",
-    )
-    density_ax.set_ylabel("Density $(\\mathrm{g}\\,\\mathrm{cm}^{-3})$")
-
-    # cumulative mass
-    mass_ax.plot(
-        mass_r.to_value(r_unit),
-        mass_M_r.to_value(unit.kg) / 1e24,
-        label="Mass Profile",
-        color="darkgreen",
-    )
-    mass_ax.set_ylabel("Enclosed mass $(10^{24}\\,\\mathrm{kg})$")
-    mass_ax.ticklabel_format(useOffset=False)
-
-    # gravitational potential
-    pot_ax.plot(
-        r_extended.to_value(r_unit),
-        Phi_extended.to_value(Phi_unit),
-        label="Earth grav. pot.",
-        color="darkorange",
-    )
-    # pot_ax.axvline(
-    #     x=(1 * unit.R_earth).to_value(r_unit),
-    #     color="k",
-    #     linestyle="dotted",
-    #     linewidth=1,
-    #     alpha=0.8,
-    #     # label="Earth radius",
-    # )
-
-    pot_ax.set_xlabel("Radius (earth radius)")
-    # pot_ax.set_ylabel("Grav. Pot. (MJ/kg) ref. to $\\infty$")
-    pot_ax.set_ylabel("$\\Phi_\\oplus\\, (\\mathrm{MJ}\\,\\mathrm{kg}^{-1})$")
-    # pot_ax.legend()
-
-    density_ax.set_ylim(-0.4, 13.6)
-    pot_ax.set_ylim(-130, 7)
-
-    pot_ax.set_yticks([-120, -80, -40, 0])
-
-    xlimits = pot_ax.get_xlim()
-    density_ax.set_xlim(xlimits)
-    mass_ax.set_xlim(xlimits)
-    density_ax.set_xticklabels([])
-    mass_ax.set_xticklabels([])
-
-    fig.suptitle("Earth Profiles (from PREM Data)")
-    fig.align_ylabels([density_ax, mass_ax, pot_ax])
-    # fig.tight_layout()
-    plt.savefig("Earth-profiles-(PREM-data).png", transparent=False)
-    if showplot:
-        plt.show()
-    else:
-        plt.close(fig)
-
-
-def plot_earth_grav_potential_earth_center(showplot=True):
-    msgPrefix = f"[{plot_earth_grav_potential_earth_center.__name__}]"
-    radius_m, density_kg_m3 = PREM_density_profile()
-    density_r = radius_m * unit.meter
-    density_rho = density_kg_m3 * (unit.kg / unit.meter**3)
-    density_unit = unit.g / unit.cm**3
-
-    # cumulative mass
-    mass_r, mass_M_r = getCumulativeMass()
-
-    # potential referenced to infinity
-    Phi_func, r_unit, Phi_unit = earth_grav_potential_earth_center()
-    # extend to radii beyond Earth's surface
-    r_extended = np.linspace(0, 3, 1000) * unit.R_earth
-    Phi_extended = Phi_func(r_extended.to_value(r_unit)) * Phi_unit
-
-    # ------------- Plot ---------------------
-
-    # plot style
-    plt.rc("font", size=6)  # font size for all figures
-    # plt.rcParams['font.family'] = 'serif'
-    plt.rcParams["font.family"] = "Times New Roman"
-    # plt.rcParams['mathtext.fontset'] = 'dejavuserif'
-
-    # Make math text match Times New Roman
-    plt.rcParams["mathtext.fontset"] = "cm"
-    plt.rcParams["mathtext.rm"] = "Times New Roman"
-
-    cm = 1 / 2.54  # convert cm to inch
-
-    fig = plt.figure(figsize=(8.5 * cm, 10.5 * cm), dpi=300)  # initialize a figure
+    fig = plt.figure(figsize=(8.5 * cm, 8.5 * cm), dpi=300)  # initialize a figure
 
     gs = gridspec.GridSpec(nrows=3, ncols=1)
 
     # fix the margins
     left = 0.15
     bottom = 0.11
-    right = 0.954
-    top = 0.926
+    right = 0.865
+    top = 0.88
     wspace = 0.2
-    hspace = 0.12
+    hspace = 0.1
     fig.subplots_adjust(
         left=left, top=top, right=right, bottom=bottom, wspace=wspace, hspace=hspace
     )
@@ -410,11 +307,20 @@ def plot_earth_grav_potential_earth_center(showplot=True):
     mass_ax.ticklabel_format(useOffset=False)
 
     # gravitational potential
-    pot_ax.plot(
+    (infinity_line,) = pot_ax.plot(
         r_extended.to_value(r_unit),
         Phi_extended.to_value(Phi_unit),
-        label="Earth grav. pot.",
+        label="$\\Phi(\\infty)=0$",
         color="darkorange",
+        linestyle="-",
+    )
+    center_ax = pot_ax.twinx()
+    (center_line,) = center_ax.plot(
+        r_extended.to_value(r_unit),
+        Phi_center_extended.to_value(Phi_unit),
+        label="$\\Phi(0)=0$",
+        color="tab:purple",
+        linestyle="--",
     )
     # pot_ax.axvline(
     #     x=(1 * unit.R_earth).to_value(r_unit),
@@ -427,18 +333,47 @@ def plot_earth_grav_potential_earth_center(showplot=True):
 
     pot_ax.set_xlabel("Radius (earth radius)")
     # pot_ax.set_ylabel("Grav. Pot. (MJ/kg) ref. to $\\infty$")
-    pot_ax.set_ylabel("$\\Phi_\\oplus\\, (\\mathrm{MJ}\\,\\mathrm{kg}^{-1})$")
-    # pot_ax.legend()
+    pot_ax.set_ylabel(
+        "$\\Phi_\\oplus$ ($\\mathrm{MJ}\\,\\mathrm{kg}^{-1}$), $\\Phi(\\infty)=0$"
+    )
+    center_ax.set_ylabel(
+        "$\\Phi_\\oplus$ ($\\mathrm{MJ}\\,\\mathrm{kg}^{-1}$), $\\Phi(0)=0$"
+    )
+    pot_ax.legend(
+        [infinity_line, center_line],
+        [infinity_line.get_label(), center_line.get_label()],
+        loc="lower right",
+        frameon=False,
+    )
 
-    density_ax.set_ylim(-0.4, 13.6)
-    pot_ax.set_ylim(-7, 130)
+    density_ax.set_ylim(-0.5, 15.5)
+    pot_ax.set_ylim(-130, 5)
+    phi_infinity_center = Phi_extended[0].to_value(Phi_unit)
+    center_ax.set_ylim(-130 - phi_infinity_center, -phi_infinity_center + 5)
+    center_ax.set_yticks([0, 25, 50, 75, 100])
 
-    pot_ax.set_yticks([0, 40, 80, 120])
+    pot_ax.set_yticks([-125, -100, -75, -50, -25, 0])
+
+    xlimits = (0, 3)
+    pot_ax.set_xlim(xlimits)
+    density_ax.set_xlim(xlimits)
+    mass_ax.set_xlim(xlimits)
+    density_ax.set_xticklabels([])
+    mass_ax.set_xticklabels([])
+
+    # Show radius in km at the top of the density panel.
+    density_km_ax = density_ax.twiny()
+    density_km_ax.set_xlim(
+        xlimits[0] * (1 * unit.R_earth).to_value(unit.km),
+        xlimits[1] * (1 * unit.R_earth).to_value(unit.km),
+    )
+    density_km_ax.set_xlabel("Radius (km)")
+    density_km_ax.tick_params(direction="in", pad=2)
 
     fig.suptitle("Earth Profiles (from PREM Data)")
     fig.align_ylabels([density_ax, mass_ax, pot_ax])
     # fig.tight_layout()
-    # plt.savefig("figures/Earth-Profiles-(PEM-Data).png", transparent=False)
+    plt.savefig("Earth-profiles-(PREM-data).png", transparent=False)
     if showplot:
         plt.show()
     else:
@@ -446,7 +381,7 @@ def plot_earth_grav_potential_earth_center(showplot=True):
 
 
 # Backward-compatible alias for callers using the original name.
-plot_earth_grav_potential = plot_earth_grav_potential_infty
+plot_earth_grav_potential = plot_earth_grav_potential
 
 
 class EarthBoundAxionHalo(GravBoundAxionHalo):
@@ -888,5 +823,4 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
 
 
 if __name__ == "__main__":
-    plot_earth_grav_potential_infty()
-    # plot_earth_grav_potential_earth_center()
+    plot_earth_grav_potential()
