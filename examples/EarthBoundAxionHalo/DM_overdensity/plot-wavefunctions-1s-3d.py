@@ -11,12 +11,13 @@ from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo
 
 
 halo = EarthBoundAxionHalo(
-    nu_a=1e-1 * 1. * unit.MHz,  # axion Compton frequency in Hz
+    nu_a=1e-0 * 1. * unit.MHz,  # axion Compton frequency in Hz
     # m_a=10**(-11.5) * unit.eV / const.c**2,
-    N=2**10,
-    extent=2**5 * unit.R_earth,
+    N=2**12,
+    extent=2**8 * unit.R_earth,
     verbose=True,
 )
+# 
 
 # Solve enough radial states for l = 0, 1, 2 to include:
 # 1s, 2s, 2p, 3s, 3p, 3d.
@@ -44,18 +45,18 @@ for idx, name in enumerate(state_names):
         linewidth=1.4,
     )
 
-ax.axvline(
-    x=1.0,
-    color="k",
-    linestyle="dotted",
-    linewidth=1,
-    alpha=0.8,
-    label="Earth radius",
-)
+# ax.axvline(
+#     x=1.0,
+#     color="k",
+#     linestyle="dotted",
+#     linewidth=1,
+#     alpha=0.8,
+#     label="Earth radius",
+# )
 
-ax.set_xlabel("r (Earth radii)")
+ax.set_xlabel("r (Earth radius)")
 ax.set_ylabel("$R_r$")
-# ax.legend(loc="upper right", fontsize=8, ncol=2)
+ax.legend(loc="upper right", fontsize=8, ncol=2)
 ax.set_xlim(-0.02, 2.2)
 fig.tight_layout()
 plt.show()
