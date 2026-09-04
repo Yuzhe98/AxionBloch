@@ -22,24 +22,26 @@ halo = EarthBoundAxionHalo(
 # Solve enough radial states for l = 0, 1, 2 to include:
 # 1s, 2s, 2p, 3s, 3p, 3d.
 halo.solve_TISE_3D(
-    l_vals=[0, 1, 2],
-    max_n_r=3,
+    # l_vals=[0, 1, 2],
+    l_vals=[1],
+    max_n_r=20,
     verbose=False,
 )
 
-state_names = ["1s", "2s", "2p", "3s", "3p", "3d"]
+# state_names = ["1s", "2s", "2p", "3s", "3p", "3d"]
 # state_names = ["2s"]
+state_names = ["2p", "3p", "4p", "5p", "6p", "7p", "8p", "9p", "10p"]
 colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 
 fig, ax = plt.subplots(figsize=(8.5 / 2.54, 5.5 / 2.54), dpi=300)
 
-start_idx = halo.N // 2 + 1  # avoid the r=0 singularity
+start_idx = halo.N // 2 - 1  # avoid the r=0 singularity
 
 for idx, name in enumerate(state_names):
     state = halo.states[name]
     ax.plot(
         halo.r[start_idx:].to_value(unit.R_earth),
-        state["R_r"][start_idx:].real,
+        state["u_r"][start_idx:].real,
         label=name,
         color=colors[idx % len(colors)],
         linewidth=1.4,
