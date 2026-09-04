@@ -1,4 +1,5 @@
 from scipy.interpolate import interp1d
+from scipy.integrate import cumulative_trapezoid
 from scipy.signal import correlate as correlate
 
 from axionbloch.dependency import *
@@ -112,33 +113,23 @@ def getCumulativeMass():
     return r, M_r
 
 
-def _earth_grav_potential_profile():
-    """Return the PREM potential profile with ``Phi(infinity) = 0``.
-
-    For a spherical Earth, ``dPhi/dr = G M(<r) / r**2``.  Integrating this
-    relation inward from the surface boundary condition includes the constant
-    potential contribution from all shells exterior to each radius.
-    """
-    r, M_r = getCumulativeMass()
-    phi_surface = -const.G * M_r[-1] / r[-1]
-    dphi_dr = np.zeros(r.shape) * (unit.joule / unit.kg / unit.meter)
-    dphi_dr[1:] = const.G * M_r[1:] / r[1:] ** 2
-
-    shell_integrals = 0.5 * (dphi_dr[:-1] + dphi_dr[1:]) * np.diff(r)
-    phi_inside = np.zeros(r.shape) * (unit.joule / unit.kg)
-    phi_inside[-1] = phi_surface
-    phi_inside[:-1] = phi_surface - np.cumsum(shell_integrals[::-1])[::-1]
-
-    return r, phi_inside
-
-
 def earth_grav_potential_infty():
     """
     Returns a function Phi(r[m]) [J/kg], valid both inside and outside Earth.
     Uses PREM-like model for interior, point-mass approximation for exterior.
     """
     msgPrefix = f"[{earth_grav_potential_infty.__name__}]"
-    r, Phi_inside = _earth_grav_potential_profile()
+
+    # Build the interior profile by integrating dPhi/dr inward from the
+    # surface, where the exterior point-mass boundary condition is known.
+    r, M_r = getCumulativeMass()
+    phi_surface = -const.G * M_r[-1] / r[-1]
+    dphi_dr = np.zeros(r.shape) * (unit.joule / unit.kg / unit.meter)
+    dphi_dr[1:] = const.G * M_r[1:] / r[1:] ** 2
+    shell_integrals = 0.5 * (dphi_dr[:-1] + dphi_dr[1:]) * np.diff(r)
+    Phi_inside = np.zeros(r.shape) * (unit.joule / unit.kg)
+    Phi_inside[-1] = phi_surface
+    Phi_inside[:-1] = phi_surface - np.cumsum(shell_integrals[::-1])[::-1]
     M_total = getCumulativeMass()[1][-1]
 
     # Extend to radii beyond Earth's surface
@@ -182,51 +173,89 @@ def earth_grav_potential_infty():
     return Phi_func, r_unit, Phi_unit
 
 
+def earth_grav_potential_infty2():
+    """Return the PREM gravitational potential using the explicit shell integral.
+
+    For radii inside Earth this evaluates
+
+    ``Phi(r) = -G * (M(<r) / r + integral_r^R dM(r') / r')``.
+
+    The potential is normalized so that ``Phi(infinity) = 0`` and is extended
+    outside Earth with the point-mass expression ``-G M_earth / r``.
+    """
+    msgPrefix = f"[{earth_grav_potential_infty2.__name__}]"  # Diagnostic prefix.
+    r, M_r = getCumulativeMass()  # Radius grid and enclosed mass profile.
+    density_rho = PREM_density(  # Evaluate the PREM density on that grid.
+        r.to_value(unit.km)
+    ) * (
+        unit.g / unit.cm**3
+    )  # Attach the density's original PREM units.
+    density_rho = density_rho.to(  # Convert density to SI for the integral.
+        unit.kg / unit.meter**3
+    )
+
+    # A spherical shell has dM = 4*pi*r'^2*rho(r')*dr'.
+    # Therefore dM/r' = 4*pi*r'*rho(r')*dr', which is the integrand below.
+    shell_integrand = 4.0 * np.pi * density_rho * r  # Units: kg / m^2.
+    shell_integral_values = np.zeros(r.size)
+    # Reverse the grid so SciPy integrates from the surface inward.
+    reversed_integrand = shell_integrand.to_value(unit.kg / unit.meter**2)[::-1]
+    reversed_radius = r.to_value(unit.meter)[::-1]  # Radius values for SciPy.
+    # The reversed radius decreases, so negate the result to obtain
+    # the positive integral from each radius r to the surface R_earth.
+    shell_integral_values[:-1] = -cumulative_trapezoid(
+        reversed_integrand, reversed_radius
+    )[::-1]
+    # Restore the physical units removed for the SciPy calculation.
+    shell_integral = shell_integral_values * (unit.kg / unit.meter)
+    # Compute the interior-mass term M(r)/r, excluding r=0 to avoid 0/0.
+    mass_over_radius = np.zeros(r.size) * (unit.kg / unit.meter)
+    mass_over_radius[1:] = M_r[1:] / r[1:]  # Units: kg / m.
+    # Combine both terms in Phi(r) = -G*[M(r)/r + integral dM(r')/r'].
+    phi_inside = -const.G * (mass_over_radius + shell_integral)
+
+    r_max = r[-1]  # Earth's modeled surface radius.
+    r_outside = (
+        np.geomspace(1.0, 1000.0, 800)  # Log-spaced exterior grid to 1000 Earth radii.
+        * r_max
+    )
+    phi_outside = -const.G * M_r[-1] / r_outside  # Exterior point-mass potential.
+
+    r_full = np.concatenate([r, r_outside])  # Join interior and exterior radii.
+    phi_full = np.concatenate([phi_inside, phi_outside])  # Join potential values.
+    r_sym = np.concatenate([-r_full[::-1], r_full])  # Mirror for |r| symmetry.
+    phi_sym = np.concatenate([phi_full[::-1], phi_full])  # Mirror potential.
+    sorted_indices = np.argsort(r_sym)  # Ensure increasing radius for interp1d.
+
+    r_unit = unit.R_earth  # Public radius unit expected by callers.
+    Phi_unit = unit.megajoule / unit.kilogram  # Public potential unit.
+    return (
+        interp1d(
+            r_sym[sorted_indices].to_value(r_unit),
+            phi_sym[sorted_indices].to_value(Phi_unit),
+            kind="linear",
+            fill_value="extrapolate",
+            bounds_error=False,
+        ),
+        r_unit,
+        Phi_unit,
+    )
+
+
 def earth_grav_potential_earth_center():
     """
     Returns a function Phi(r), valid both inside and outside Earth.
     Uses PREM-like model for interior, point-mass approximation for exterior.
     """
     msgPrefix = f"[{earth_grav_potential_earth_center.__name__}]"
-    r, Phi_inside = _earth_grav_potential_profile()
-    M_total = getCumulativeMass()[1][-1]
+    Phi_infinity, r_unit, Phi_unit = earth_grav_potential_infty()
+    center_value = Phi_infinity(0.0)
 
-    # Extend to radii beyond Earth's surface
-    r_max = r[-1]
-    r_outside = np.linspace(
-        r_max, 1000 * r_max, 100000
-    )  # from surface to 1000 Earth radii
-    Phi_outside: Quantity = -const.G * M_total / r_outside
+    def Phi_func(radius):
+        """Shift the infinity-normalized potential so Phi(0) = 0."""
+        return Phi_infinity(radius) - center_value
 
-    # Combine inside and outside
-    r_full = np.concatenate([r, r_outside])
-    Phi_full = np.concatenate([Phi_inside, Phi_outside])
-    # Phi_full -= np.amin(Phi_full)
-
-    # Enforce symmetry: add negative r values
-    r_sym = np.concatenate([-r_full[::-1], r_full])  # mirror and append
-    Phi_sym = np.concatenate([Phi_full[::-1], Phi_full])  # symmetric values
-
-    # Optional: sort to ensure increasing r (for interp1d)
-    sorted_indices = np.argsort(r_sym)
-    r_sym_sorted = r_sym[sorted_indices]
-    Phi_sym_sorted = Phi_sym[sorted_indices]
-    # Keep the historical convention of this helper: Phi(center) = 0.
-    Phi_sym_sorted -= np.amin(Phi_sym_sorted)
-
-    # Interpolation function: now Phi_func(-r) = Phi_func(r)
-    r_unit = unit.R_earth
-    Phi_unit = unit.megajoule / unit.kilogram
-
-    Phi_func = interp1d(
-        r_sym_sorted.to_value(r_unit),
-        Phi_sym_sorted.to_value(Phi_unit),
-        kind="linear",
-        fill_value="extrapolate",
-        bounds_error=False,
-    )
     return Phi_func, r_unit, Phi_unit
-
 
 def plot_earth_grav_potential(showplot=True):
     msgPrefix = f"[{plot_earth_grav_potential.__name__}]"
@@ -240,6 +269,9 @@ def plot_earth_grav_potential(showplot=True):
 
     # Compare both potential conventions in the bottom panel.
     Phi_func, r_unit, Phi_unit = earth_grav_potential_infty()
+    Phi_integral_func, integral_r_unit, integral_Phi_unit = (
+        earth_grav_potential_infty2()
+    )
     Phi_center_func, center_r_unit, center_Phi_unit = (
         earth_grav_potential_earth_center()
     )
@@ -248,6 +280,9 @@ def plot_earth_grav_potential(showplot=True):
     Phi_extended = Phi_func(r_extended.to_value(r_unit)) * (Phi_unit)
     Phi_center_extended = (
         Phi_center_func(r_extended.to_value(center_r_unit)) * center_Phi_unit
+    )
+    Phi_integral_extended = (
+        Phi_integral_func(r_extended.to_value(integral_r_unit)) * integral_Phi_unit
     )
 
     # use units for plotting:
@@ -310,18 +345,28 @@ def plot_earth_grav_potential(showplot=True):
     (infinity_line,) = pot_ax.plot(
         r_extended.to_value(r_unit),
         Phi_extended.to_value(Phi_unit),
-        label="$\\Phi(\\infty)=0$",
+        label="$\\Phi(r)=-G[M(r)/r+\\int_r^{R_\\oplus}dM(r')/r']$",
         color="darkorange",
         linestyle="-",
+        # zorder=8,
+    )
+    (infinity_integral_line,) = pot_ax.plot(
+        r_extended.to_value(r_unit),
+        Phi_integral_extended.to_value(Phi_unit),
+        label="$\\Phi(r)=-G[M(r)/r+\\int_r^{R_\\oplus}dM(r')/r']$",
+        color="tab:purple",
+        linestyle=":",
+        # zorder=10,
     )
     center_ax = pot_ax.twinx()
-    (center_line,) = center_ax.plot(
-        r_extended.to_value(r_unit),
-        Phi_center_extended.to_value(Phi_unit),
-        label="$\\Phi(0)=0$",
-        color="tab:purple",
-        linestyle="--",
-    )
+    # (center_line,) = center_ax.plot(
+    #     r_extended.to_value(r_unit),
+    #     Phi_center_extended.to_value(Phi_unit),
+    #     label="$\\Phi(0)=0$",
+    #     color="tab:red",
+    #     linestyle="--",
+    #     zorder=1,
+    # )
     # pot_ax.axvline(
     #     x=(1 * unit.R_earth).to_value(r_unit),
     #     color="k",
@@ -339,19 +384,32 @@ def plot_earth_grav_potential(showplot=True):
     center_ax.set_ylabel(
         "$\\Phi_\\oplus$ ($\\mathrm{MJ}\\,\\mathrm{kg}^{-1}$), $\\Phi(0)=0$"
     )
+    # pot_ax.legend(
+    #     [infinity_line, infinity_integral_line, center_line],
+    #     [
+    #         infinity_line.get_label(),
+    #         infinity_integral_line.get_label(),
+    #         center_line.get_label(),
+    #     ],
+    #     loc="lower right",
+    #     frameon=False,
+    # )
     pot_ax.legend(
-        [infinity_line, center_line],
-        [infinity_line.get_label(), center_line.get_label()],
+        [infinity_line, infinity_integral_line],
+        [
+            infinity_line.get_label(),
+            infinity_integral_line.get_label(),
+        ],
         loc="lower right",
         frameon=False,
     )
-
+    # density
     density_ax.set_ylim(-0.5, 15.5)
+    # potential
     pot_ax.set_ylim(-130, 5)
     phi_infinity_center = Phi_extended[0].to_value(Phi_unit)
     center_ax.set_ylim(-130 - phi_infinity_center, -phi_infinity_center + 5)
     center_ax.set_yticks([0, 25, 50, 75, 100])
-
     pot_ax.set_yticks([-125, -100, -75, -50, -25, 0])
 
     xlimits = (0, 3)
@@ -402,7 +460,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         m_a: Quantity[unit.g] | None = None,
         N: int = int(2**12),
         extent: Quantity[unit.m] = 128.0 * unit.R_earth,
-        getPot=earth_grav_potential_earth_center,
+        getPot=earth_grav_potential_infty,
         a_0: Quantity[unit.eV] | None = None,
         totalMassEnclosed: Quantity[unit.kg] | None = 4e-9 * unit.M_earth,
         g_aNN: Quantity[unit.GeV**-1] = 1e-9 * unit.GeV**-1,
