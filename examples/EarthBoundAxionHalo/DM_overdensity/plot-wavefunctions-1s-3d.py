@@ -4,20 +4,20 @@ This example solves the 1s, 2s, 2p, 3s, 3p, and 3d states and overlays the
 real part of their radial wavefunctions ``R_r`` on a single plot.
 """
 
-from pathlib import Path
-
 from axionbloch.dependency import *
 from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo
 
-
 halo = EarthBoundAxionHalo(
-    nu_a=1e-0 * 1. * unit.MHz,  # axion Compton frequency in Hz
+    # specify axion Compton frequency
+    nu_a=1e-0 * 1.0 * unit.MHz,
+    # you can use a fixed axion mass instead of nu_a, e.g.
     # m_a=10**(-11.5) * unit.eV / const.c**2,
+    # number of grid points for the radial solver
     N=2**12,
+    # radial extent of the solver grid
     extent=2**8 * unit.R_earth,
     verbose=True,
 )
-# 
 
 # Solve enough radial states for l = 0, 1, 2 to include:
 # 1s, 2s, 2p, 3s, 3p, 3d.
@@ -44,15 +44,6 @@ for idx, name in enumerate(state_names):
         color=colors[idx % len(colors)],
         linewidth=1.4,
     )
-
-# ax.axvline(
-#     x=1.0,
-#     color="k",
-#     linestyle="dotted",
-#     linewidth=1,
-#     alpha=0.8,
-#     label="Earth radius",
-# )
 
 ax.set_xlabel("r (Earth radius)")
 ax.set_ylabel("$R_r$")
