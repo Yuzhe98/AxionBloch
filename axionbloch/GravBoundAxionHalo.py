@@ -103,7 +103,7 @@ class GravBoundAxionHalo:
         else:  # m_a is not None
             self.m_a = m_a.to(unit.kg, equivalencies=unit.mass_energy())
             self.nu_a = m_a * const.c**2 / const.h
-        
+
         if verbose:
             print(msgPrefix, "axion Compton frequency =", self.nu_a.to(unit.Hz))
             print(
@@ -229,7 +229,7 @@ class GravBoundAxionHalo:
             print(f"* {self.pot.unit}")
 
         # Skip the first half of the grid (r < 0) plus a few extra points to avoid r=0 singularity
-        start_index = self.N // 2 + 5
+        start_index = self.N // 2 + 3
 
         # For l>0 the even-indexed eigenstates carry the correct parity; skip odd ones
         if l == 0:
@@ -244,6 +244,7 @@ class GravBoundAxionHalo:
             R_r = u_r / self.r
 
             # Normalize so that 4π ∫ |u(r)|² dr = 1
+            # after normalization, R_r and u_r are arrays of astropy Quantities with units equivalent to 1/m^(3/2) and 1/m^(1/2), respectively.
             integral = np.sqrt(
                 1.0
                 * np.trapezoid(
@@ -251,8 +252,8 @@ class GravBoundAxionHalo:
                     self.r[start_index:],
                 )
             )
-            R_r = R_r / integral
-            u_r = u_r / integral
+            R_r: Quantity = R_r / integral
+            u_r: Quantity = u_r / integral
 
             # Potential energy expectation value ⟨V⟩ = ∫ |u|² V dr
             V_expect = np.trapezoid(
@@ -301,7 +302,7 @@ class GravBoundAxionHalo:
                     T_expect + Veff_expect
                 ),  # TODO check if this is consistent with eigenE
                 "u_r": u_r,
-                "R_r": R_r,
+                "R_r": R_r, 
                 "R_reduced": R_reduced,
             }
 
