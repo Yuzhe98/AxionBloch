@@ -1,3 +1,10 @@
+v0.2.7 (2026-09-04)
+--------------
+
+- removed dependency on PEM or PREM data files
+- corrected and checked computations of the Earth gravitational potential
+- small fixes in variables
+
 v0.2.6 (2026-07-09)
 --------------
 
