@@ -4,7 +4,7 @@ This example solves the 1s, 2s, 2p, 3s, 3p, and 3d states and overlays the
 real part of their radial wavefunctions ``R_r`` on a single plot.
 """
 
-from axionbloch.dependency import *
+from axionbloch.dependency import unit, plt
 from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo
 
 halo = EarthBoundAxionHalo(
