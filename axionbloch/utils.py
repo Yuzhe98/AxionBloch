@@ -3065,3 +3065,21 @@ def deBroglie_wavelength(mass: Quantity, speed: Quantity) -> Quantity:
     gamma = 1 / np.sqrt(1 - (speed.to_value(unit.km / unit.s) / const.c)) ** 2
     lambda_db = (const.h / (gamma * mass * speed)).to(unit.m)
     return lambda_db
+
+
+linestyles = ["-", "--", "-.", ":"]
+
+markers = [
+    ".",
+    ",",
+    "<",
+    "1",
+    "p",
+    "*",
+    "h",
+    "+",
+    "x",
+    "d",
+    "|",
+    "_",
+]
