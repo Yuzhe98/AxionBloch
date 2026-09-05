@@ -496,7 +496,7 @@ class GravBoundAxionHalo:
             )
 
         energy_unit_label = energy_unit.to_string("latex_inline")[1:-1]
-        ax.set_xlim(-0.05 * np.amax(energy_values), 1.05 * np.max(energy_values))
+        # ax.set_xlim(-0.05 * np.amax(energy_values), 1.05 * np.max(energy_values))
         ax.set_xlabel("$m-m_a\\,$" f"$\\left({energy_unit_label}/c^2\\right)$")
         # Leave vertical room for the staggered state labels.
         ax.set_ylim(0, 1.8 * np.max(amplitudes))
@@ -508,20 +508,20 @@ class GravBoundAxionHalo:
         # The upper x axis represents the same E_n values as frequency shifts.
         # twiny() is used because this is a second horizontal scale, not a
         # second dependent variable.
-        frequency_ax = ax.twiny()
-        lower_limits = np.asarray(ax.get_xlim()) * energy_unit
-        upper_limits = (lower_limits / const.h).to_value(frequency_unit)
-        frequency_ax.set_xlim(upper_limits)
-        frequency_unit_label = frequency_unit.to_string("latex_inline")[1:-1]
-        frequency_ax.set_xlabel(
-            "$\\nu-\\nu_a\\,$" f"$\\left({frequency_unit_label}\\right)$"
+        freq_ax = ax.twiny()
+        mass_ax_limits = np.asarray(ax.get_xlim()) * energy_unit
+        freq_ax_limits = (mass_ax_limits / const.h).to_value(frequency_unit)
+        freq_ax.set_xlim(freq_ax_limits)
+        freq_unit_label = frequency_unit.to_string("latex_inline")[1:-1]
+        freq_ax.set_xlabel(
+            "$\\nu-\\nu_a\\,$" f"$\\left({freq_unit_label}\\right)$"
         )
 
         fig.tight_layout()
         if showPlot:
             plt.show()
 
-        return fig, ax, frequency_ax, spectrum
+        return fig, ax, freq_ax, spectrum
 
     def _resolveStateCoefficients(
         self,
