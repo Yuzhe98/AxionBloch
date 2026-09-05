@@ -9,7 +9,7 @@ All constants with units are astropy Quantity objects.
 """
 
 from astropy import units as unit
-from astropy.constants import codata2018 as const
+from astropy.constants import codata2018 as const, Constant
 
 
 def mu_N(m):
@@ -29,4 +29,11 @@ gamma_p = 2.6752218708e8 * unit.rad * unit.Hz / unit.T
 mu_Xe129N = -0.777969 * mu_N(const.m_p)
 
 # Gyromagnetic ratio of Xe129 nucleus
-gamma_Xe129N = -7.441e7 * unit.rad * unit.Hz / unit.T
+gamma_Xe129N = Constant(
+    "gamma_Xe129",
+    "Xe-129 gyromagnetic ratio",
+    -7.451956e7,
+    "rad Hz / T",
+    0.000075e7,
+    reference="https://doi.org/10.3390/magnetochemistry6040065",
+)
