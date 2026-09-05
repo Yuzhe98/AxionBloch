@@ -1,16 +1,29 @@
-"""Plot the real part of several Earth-bound radial eigenfunctions.
+"""Combine the eigenstate spectrum and radial wavefunctions in a 1 x 2 figure.
 
-This example solves the 1s, 2s, 2p, 3s, 3p, and 3d states and overlays the
-real part of their radial wavefunctions ``R_r`` on a single plot.
+Preserve each source example's frequency, grid, and state selection. Set
+USE_MARKERS to True to add sparse markers from axionbloch.utils to the curves.
+Run from the repository root with the axionbloch environment activated::
+
+    python -m examples.EarthBoundAxionHalo.state-amplitude-and-radial-wavefunctions
+"""
+"""Plot eigenstate amplitudes against their eigen-energy shifts.
+
+All states from 1s through 4f are included with equal input coefficients.
+``plotStateAmplitudeVsEigenEnergy`` normalizes the coefficients before plotting,
+so every displayed amplitude is 1 / sqrt(number of states).
 """
 
-from axionbloch.dependency import unit, plt
+from pathlib import Path
+
 from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo
+
+
+from axionbloch.dependency import unit, plt
 from axionbloch.utils import linestyles
 
 halo = EarthBoundAxionHalo(
     # specify axion Compton frequency
-    nu_a=1e-0 * 1.0 * unit.MHz,
+    nu_a=1.0 * unit.MHz,
     # you can use a fixed axion mass instead of nu_a, e.g.
     # m_a=10**(-11.5) * unit.eV / const.c**2,
     # number of grid points for the radial solver
@@ -26,26 +39,28 @@ halo.solve_TISE_3D(
     max_n_r=20,
     verbose=False,
 )
-
-# print the first 20 eigen states (name and eigen-energy) sorted by eigen-energy.
-for name, state in sorted(halo.states.items(), key=lambda x: x[1]["eigenE"]):
-    print(f"{name}: E = {state['eigenE'].to(unit.eV):.3e}")
-
 # Plot the radial wavefunctions
 state_names = ["1s", "2s", "3s", "2p", "4s", "3d", "5s", "3p", "6s", "4f"]
-# 1s: E = -4.549e-18 eV
-# 2s: E = -3.445e-18 eV
-# 3s: E = -2.540e-18 eV
-# 2p: E = -2.478e-18 eV
-# 4s: E = -1.861e-18 eV
-# 3d: E = -1.680e-18 eV
-# 5s: E = -1.398e-18 eV
-# 3p: E = -1.347e-18 eV
-# 6s: E = -1.090e-18 eV
-# 4f: E = -1.088e-18 eV
+
+# Equal coefficients provide an equal coherent superposition. The plotting
+# method normalizes this dictionary, giving |c_nlm| = 1 / sqrt(10).
+stateCoefficients = {
+    "1s": 1,
+    "2s": 1,
+    "3s": 1,
+    "2p": 1,
+    "4s": 1,
+    "3d": 1,
+    "5s": 1,
+    "3p": 1,
+    "6s": 1,
+    "4f": 1,
+}
+
+
 colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 
-fig, ax = plt.subplots(figsize=(8.5 / 2.54, 5.5 / 2.54), dpi=300)
+fig, ax = plt.subplots(figsize=(13 / 2.54, 5.5 / 2.54), dpi=300)
 
 start_idx = halo.N // 2 + 0
 
@@ -64,15 +79,24 @@ ax.set_xlabel("$r\\,(R_\\oplus$)")
 ax.set_ylabel("$r\\,R(r)\\,(R_\\oplus^{-1/2})$")
 # ax.legend(ncol=2, bbox_to_anchor=(1.0, 1.0))
 ax.set_xlim(-0.02, 5.2)
-fig.tight_layout()
-plt.show()
+
+
+
+fig, _, _, _ = halo.plotStateAmplitudeVsEigenEnergy(
+    stateCoefficients=stateCoefficients,
+    energy_unit=unit.attoelectronvolt,
+    frequency_unit=unit.mHz,
+    showPlot=False,
+)
 
 # output_dir = Path(__file__).resolve().parent / "outputs"
 # output_dir.mkdir(parents=True, exist_ok=True)
-# output_path = output_dir / "EarthHalo-wavefunctions-1s-3d-real-Rr.pdf"
+# output_path = output_dir / "EarthHalo-state-amplitude-vs-eigenenergy-1s-to-4f.pdf"
 # fig.savefig(output_path, dpi=300, bbox_inches="tight")
-
 # print(f"Saved figure to {output_path}")
+
+fig.tight_layout()
+plt.show()
 
 """
 halo = EarthBoundAxionHalo(
