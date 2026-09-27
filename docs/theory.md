@@ -451,6 +451,33 @@ is needed. In particular, the old s-state labels included unphysical even
 solutions, so their energies and labels are not directly interchangeable
 with the corrected radial states.
 
+### Future TODO: optional nonuniform radial grids
+
+Deferred: the current uniform-grid solver is sufficiently efficient for
+present needs. The following is a future implementation plan, not a
+description of supported settings. Keep the uniform grid as the default.
+
+- Support explicitly supplied positive interior coordinates and an optional
+  built-in grid concentrated near the origin, preserving the domain
+  `[0, extent]` and zero endpoint values. Decide later between smooth `sinh`
+  stretching and a setting specifying the number of samples inside one Earth
+  radius; neither interface has been selected yet.
+- Replace the constant-spacing kinetic stencil with spacing-dependent
+  coefficients and integration weights. Transform the weighted eigenvalue
+  problem into a symmetric tridiagonal problem before diagonalization;
+  changing the coordinates alone is insufficient.
+- Use consistent grid weights and the same discrete kinetic operator for
+  normalization, orthogonality, and energy expectations. Audit downstream
+  integrations and examples for assumptions about a scalar `dr`.
+- Preserve the buffered, coordinate-based gradient calculation described
+  below when adding nonuniform solver grids.
+- Distinguish a fixed nonuniform grid from adaptive refinement during a
+  solve. If adaptive refinement is added, rebuild the Hamiltonian, weights,
+  derivatives, and interpolators whenever the grid changes.
+- Validate against the uniform-grid solver and analytic radial solutions;
+  test normalization, energy consistency, near-origin behavior, and gradient
+  convergence at Earth's surface. Also check sensitivity to the outer radius.
+
 ### Earth gravitational potential
 
 `EarthBoundAxionHalo` pre-configures the solver with Earth's gravitational
@@ -481,3 +508,21 @@ and its spherical-coordinate gradient is
 The package evaluates each component on a 3-D {math}`(r,\theta,\phi)` mesh,
 then interpolates along the radial line pointing toward the experimental
 station to obtain {math}`\nabla\Psi(r_\mathrm{station})`.
+
+Radial derivatives are computed separately for each state's 1-D radial
+function using its actual sample coordinates, before combining with the
+angular functions. With `truncRadius`, the calculation retains the first
+sample at or above the requested cutoff for interpolation, plus one further
+neighbor for the radial derivative. This extra derivative sample is used
+only in 1-D, so it does not enlarge the 3-D mesh. This buffer prevents an
+artificial one-sided derivative at the requested cutoff while retaining the
+computational savings of truncation.
+
+Physical sample-grid edges use second-order one-sided differences; a grid
+with only two points falls back to first order. `truncRadius` must lie
+between the first and last stored radial samples, avoiding extrapolation
+outside the sampled domain. The returned native radial samples and
+wavefunction exclude samples beyond the cutoff, and the interpolated
+gradient line ends at the cutoff. Omitting `truncRadius` uses the full
+sampled domain. This derivative calculation accepts nonuniform coordinates,
+but the eigenvalue solver still uses a uniform grid.

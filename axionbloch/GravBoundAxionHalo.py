@@ -552,7 +552,11 @@ class GravBoundAxionHalo:
             Geographic station whose latitude, longitude, and elevation define
             the direction.
         truncRadius : Quantity
-            Truncation radius for reducing computation and plotting time.
+            Truncation radius within the sampled grid, for reducing computation
+            and plotting time. An interpolation bracket and a derivative
+            neighbor are retained internally; returned samples do not exceed
+            this radius. Radial derivatives use actual coordinates and
+            second-order endpoint stencils (first order for a two-point grid).
         include_lorentz_boost : bool
             Add the first-order laboratory-frame gradient induced by motion
             through the halo. For each mode, this contribution is
@@ -595,27 +599,28 @@ class GravBoundAxionHalo:
             meas_time=meas_time
         )
 
-        # All stored samples have r > 0.
+        # Keep the interpolation bracket in the 3-D mesh, and one further
+        # neighbor only in the 1-D derivative calculation.
         start_index = 0
-        # stop at a desired radius to make computation more efficient
-        if truncRadius is None or type(truncRadius) != Quantity:
-            stop_index = self.N
-        elif truncRadius.unit.is_equivalent(self.r.unit):
-            # Retain a sample beyond the requested radius for interpolation.
-            cutoff_index = int(np.searchsorted(
-                self.r.to_value(self.r.unit), truncRadius.to_value(self.r.unit)
-            ))
-            stop_index = min(self.N, max(2, cutoff_index + 1))
+        if truncRadius is None:
+            line_end = self.r[-1]
+        elif not isinstance(truncRadius, Quantity) or not truncRadius.unit.is_equivalent(self.r.unit):
+            raise TypeError(msgPrefix + " truncRadius must be a length Quantity.")
         else:
-            raise TypeError(
-                msgPrefix + " truncRadius unit is not equivalent to length. "
-            )
-
+            line_end = truncRadius.to(self.r.unit)
+        if not line_end.isscalar or not np.isfinite(line_end.value):
+            raise ValueError(msgPrefix + " truncRadius must be a finite scalar.")
+        if line_end < self.r[0] or line_end > self.r[-1]:
+            raise ValueError(msgPrefix + " truncRadius must lie within the sampled radial grid.")
+        coordinates = self.r.to_value(self.r.unit)
+        cutoff_index = int(np.searchsorted(coordinates, line_end.to_value(self.r.unit)))
+        stop_index = min(self.N, max(2, cutoff_index + 1))
+        derivative_stop = min(self.N, max(3, stop_index + 1))
+        output_stop = int(np.searchsorted(coordinates, line_end.to_value(self.r.unit), side="right"))
         if verbose:
-            print(msgPrefix, "(start_index, stop_index) =", (start_index, stop_index))
-
-        # update r and Nr
-        r = self.r[start_index:stop_index]
+            print(msgPrefix, "interpolation samples:", stop_index,
+                  "derivative samples:", derivative_stop)
+        r = self.r[:stop_index]
         self.sortByEigenE()
         stateCoefficients = self._resolveStateCoefficients(
             stateCoefficients=stateCoefficients,
@@ -625,7 +630,6 @@ class GravBoundAxionHalo:
         Nr, Ntheta, Nphi = len(r), 100, 100
         theta_1Dgrid = np.linspace(0, PI, Ntheta)
         phi_1Dgrid = np.linspace(0, 2 * PI, Nphi)
-        dr = r[1] - r[0]
         dtheta = theta_1Dgrid[1] - theta_1Dgrid[0]
         dphi = phi_1Dgrid[1] - phi_1Dgrid[0]
 
@@ -661,6 +665,7 @@ class GravBoundAxionHalo:
             np.zeros(R_grid.shape, dtype=complex) * WF_total.unit / unit.s
         )
 
+        grad_r = np.zeros(R_grid.shape, dtype=complex) * WF_total.unit / self.r.unit
         for name in stateNames:
             state = self.states[name]
             n_r, l, m = state["n_r"], state["l"], 0
@@ -674,6 +679,14 @@ class GravBoundAxionHalo:
             # wavefunction
             mode_WF = c * R_nl * Y_lm  # * np.exp(-1j * E * t)
             WF_total += mode_WF
+            # Differentiate on the buffered 1-D coordinates, then broadcast.
+            # The extra neighbor prevents a one-sided stencil at the cutoff.
+            radial = state["R_r"][:derivative_stop]
+            derivative = np.gradient(
+                radial, self.r[:derivative_stop],
+                edge_order=2 if derivative_stop >= 3 else 1,
+            )
+            grad_r += c * derivative[:stop_index, None, None] * Y_lm
             Y_direction = sph_harm_y(
                 l,
                 m,
@@ -689,14 +702,11 @@ class GravBoundAxionHalo:
             )
             angular_frequency_WF_total += mode_angular_frequency * mode_WF
 
-        # radial derivative ∂Ψ/∂r
-        dphi_dr = np.gradient(WF_total, dr, axis=0)
         # angular derivatives
         dWF_dtheta = np.gradient(WF_total, dtheta, axis=1)
         dWF_dphi = np.gradient(WF_total, dphi, axis=2)
 
         # spherical-coordinate gradient components
-        grad_r = dphi_dr
         grad_theta = dWF_dtheta / R_grid
         # small regularization prevents division by zero at theta=0 and π
         grad_phi = dWF_dphi / (R_grid * np.sin(Theta_grid) + 1e-12 * R_grid.unit)
@@ -809,7 +819,6 @@ class GravBoundAxionHalo:
 
         # sample gradient along the radial line toward the station
         Nr_plot = 2**10
-        line_end = r[-1] if truncRadius is None else truncRadius
         r_line = np.linspace(r[0], line_end, Nr_plot)
 
         # points = [[r, theta_direction, phi_direction], ...]
@@ -831,6 +840,9 @@ class GravBoundAxionHalo:
         toc = time.time()
         if verbose:
             print(msgPrefix, f"gradient along station direction time: {toc-tic:.2e} s")
+        # Hide interpolation and derivative buffer samples from callers.
+        r = r[:output_stop]
+        WF_direction = WF_direction[:output_stop]
         if showPlot:
             self.plotGradients(
                 station=station,
