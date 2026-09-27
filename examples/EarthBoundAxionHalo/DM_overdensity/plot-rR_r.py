@@ -8,15 +8,27 @@ from axionbloch.dependency import unit, plt
 from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo
 from axionbloch.utils import linestyles
 
+# halo = EarthBoundAxionHalo(
+#     # specify axion Compton frequency
+#     nu_a=1e-2 * 1.0 * unit.MHz,
+#     # you can use a fixed axion mass instead of nu_a, e.g.
+#     # m_a=10**(-11.5) * unit.eV / const.c**2,
+#     # number of grid points for the radial solver
+#     N=2**13,
+#     # radial extent of the solver grid
+#     extent=2**14 * unit.R_earth,
+#     verbose=True,
+# )
+
 halo = EarthBoundAxionHalo(
     # specify axion Compton frequency
-    nu_a=1e-0 * 1.0 * unit.MHz,
+    nu_a=1e2 * 1.0 * unit.MHz,
     # you can use a fixed axion mass instead of nu_a, e.g.
     # m_a=10**(-11.5) * unit.eV / const.c**2,
     # number of grid points for the radial solver
-    N=2**12,
+    N=2**13,
     # radial extent of the solver grid
-    extent=2**8 * unit.R_earth,
+    extent=2**4 * unit.R_earth,
     verbose=True,
 )
 
@@ -27,9 +39,9 @@ halo.solve_TISE_3D(
     verbose=False,
 )
 
-# print the first 20 eigen states (name and eigen-energy) sorted by eigen-energy.
-for name, state in sorted(halo.states.items(), key=lambda x: x[1]["eigenE"]):
-    print(f"{name}: E = {state['eigenE'].to(unit.eV):.3e}")
+# # print the first 20 eigen states (name and eigen-energy) sorted by eigen-energy.
+# for name, state in sorted(halo.states.items(), key=lambda x: x[1]["eigenE"]):
+#     print(f"{name}: E = {state['eigenE'].to(unit.eV):.3e}")
 
 # Plot the radial wavefunctions
 state_names = ["1s", "2s", "3s", "2p", "4s", "3d", "5s", "3p", "6s", "4f"]
@@ -63,7 +75,7 @@ for idx, name in enumerate(state_names):
 ax.set_xlabel("$r\\,(R_\\oplus$)")
 ax.set_ylabel("$r\\,R(r)\\,(R_\\oplus^{-1/2})$")
 # ax.legend(ncol=2, bbox_to_anchor=(1.0, 1.0))
-ax.set_xlim(-0.02, 5.2)
+# ax.set_xlim(-0.02, 5.2)
 fig.tight_layout()
 plt.show()
 
