@@ -35,7 +35,7 @@ colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 
 fig, ax = plt.subplots(figsize=(8.5 / 2.54, 5.5 / 2.54), dpi=300)
 
-start_idx = halo.N // 2 - 1  # avoid the r=0 singularity
+start_idx = 0  # all stored radii are positive
 
 for idx, name in enumerate(state_names):
     state = halo.states[name]

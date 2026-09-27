@@ -4,8 +4,8 @@ For an eigenstate of the discretized Hamiltonian,
 
     eigenE == <T> + <V_eff>,
 
-up to numerical errors from the finite grid, half-domain integration, and
-finite-difference evaluation of the second derivative.
+up to eigensolver roundoff, using the same discrete inner product and
+zero-endpoint second derivative as the Hamiltonian.
 """
 
 from axionbloch.dependency import *

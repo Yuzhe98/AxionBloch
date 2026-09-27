@@ -44,7 +44,7 @@ meas_times = t0 + np.arange(365) * unit.day
 # comes from the numerical TISE solution, and the boost term is identical to
 # the one in GravBoundAxionHalo.findGradientsAtDirection.
 state = halo.states["2p"]
-start_index = halo.N // 2 + 5
+start_index = 0
 r_positive = halo.r[start_index:]
 R_positive = state["R_r"][start_index:]
 dR_dr_positive = np.gradient(R_positive, r_positive)

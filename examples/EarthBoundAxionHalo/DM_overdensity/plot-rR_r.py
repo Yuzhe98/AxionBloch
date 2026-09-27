@@ -47,7 +47,7 @@ colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 
 fig, ax = plt.subplots(figsize=(8.5 / 2.54, 5.5 / 2.54), dpi=300)
 
-start_idx = halo.N // 2 + 0
+start_idx = 0
 
 for idx, name in enumerate(state_names):
     state = halo.states[name]

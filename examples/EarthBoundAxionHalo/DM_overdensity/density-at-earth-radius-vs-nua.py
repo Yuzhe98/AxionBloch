@@ -72,7 +72,7 @@ with data_path.open("w", encoding="utf-8") as fh:
         )
 
         r_idx = int(np.argmin(np.abs(halo.r - 1 * unit.R_earth)))
-        start_idx = halo.N // 2 + 4
+        start_idx = 0
         nu_a_values.append(halo.nu_a.to_value(unit.Hz))
 
         row = [f"{m_a.to_value(unit.eV / const.c**2):.12e}", f"{nu_a_values[-1]:.12e}"]
@@ -80,7 +80,7 @@ with data_path.open("w", encoding="utf-8") as fh:
         for state_name in state_names:
             state = halo.states[state_name]
             u_r = state["u_r"]
-            u_r_norm = np.trapezoid(np.abs(u_r[start_idx:]) ** 2, halo.r[start_idx:])
+            u_r_norm = halo.dr * np.sum(np.abs(u_r) ** 2)
             print(
                 f"{m_a.to_value(unit.eV / const.c**2):.3e} eV/c^2 {state_name}: "
                 f"int |u_r|^2 dr = {u_r_norm.value:.10e}, "
@@ -94,10 +94,7 @@ with data_path.open("w", encoding="utf-8") as fh:
             # Spherically averaged local density from a single occupied eigenstate.
             rho_r = totalMassEnclosed * np.abs(R_at_earth) ** 2 / (4 * np.pi)
             rho_grid = totalMassEnclosed * np.abs(u_grid) ** 2 / (4 * np.pi * r_grid**2)
-            mass_int = 4 * np.pi * np.trapezoid(
-                rho_grid * r_grid**2,
-                r_grid,
-            )
+            mass_int = 4 * np.pi * halo.dr * np.sum(rho_grid * r_grid**2)
             relerr = np.abs((mass_int - totalMassEnclosed) / totalMassEnclosed)
 
             rho_gevc = rho_r.to_value(

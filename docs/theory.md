@@ -430,11 +430,26 @@ the radial equation for {math}`u(r) = rR_{nl}(r)` becomes
 V_\mathrm{eff}(r) = m_a\,\Phi(r) + \frac{\hbar^2 l(l+1)}{2m_a r^2}.
 ```
 
-The package discretises the Hamiltonian on a uniform 1-D radial grid with
-{math}`N` points spanning {math}`\pm L/2` using a three-point
-finite-difference stencil and diagonalizes the resulting dense matrix with
-`scipy.linalg.eigh`.  Eigenstates are labelled by the spectroscopic convention
+The package uses {math}`N` positive interior samples, with
+{math}`r_i=i\Delta r`, {math}`\Delta r=L/(N+1)`, and {math}`L=\mathrm{extent}`.
+The domain is {math}`[0,L]`. The endpoints satisfy {math}`u(0)=u(L)=0`
+and are not eigenvector unknowns.
+The outer zero boundary approximates decay at infinity; choose it far enough
+from the states of interest and check convergence with the outer radius.
+Neither the centrifugal potential nor {math}`R=u/r` is evaluated at zero.
+The three-point Hamiltonian is solved with `scipy.linalg.eigh_tridiagonal`.
+Normalization and energy expectations use the discrete inner product
+{math}`\Delta r\sum_i u_i^*v_i`, equivalent to trapezoidal integration with
+zero endpoints included. Eigenstates are labelled by the spectroscopic convention
 {math}`n = n_r + l + 1` (1s, 2s, 2p, 3s, …).
+
+`extent` is the outer radius, while all `N` samples resolve the physical
+radial domain. To preserve the cutoff of the former signed grid, pass half
+its old `extent` value. Remove
+any `N // 2` slicing in downstream code. No parity-based eigenstate skipping
+is needed. In particular, the old s-state labels included unphysical even
+solutions, so their energies and labels are not directly interchangeable
+with the corrected radial states.
 
 ### Earth gravitational potential
 

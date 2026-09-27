@@ -41,8 +41,7 @@ print(f"{'state':<6} {'int |u_r|^2 dr':>18} {'|norm-1|':>14} {'rescaled':>12}")
 print("-" * 42)
 for name in state_names:
     u_r = halo.states[name]["u_r"]
-    start_idx_norm = halo.N // 2 + 4
-    norm = np.trapezoid(np.abs(u_r[start_idx_norm:]) ** 2, halo.r[start_idx_norm:])
+    norm = halo.dr * np.sum(np.abs(u_r) ** 2)
     deviation = np.abs(norm - 1.0)
     rescaled = (
         "yes"
@@ -53,15 +52,14 @@ for name in state_names:
 
 fig, ax = plt.subplots(figsize=(8.5 / 2.54, 5.5 / 2.54), dpi=300)
 
-start_idx = halo.N // 2 + 4  # avoid the r=0 singularity
+start_idx = 0  # all stored radii are positive
 rho_to_rhoMW = {}
 rho_gcm3 = {}
 
 for idx, name in enumerate(state_names):
     state = halo.states[name]
     u_r = state["u_r"]
-    start_idx_norm = halo.N // 2 + 4
-    norm = np.trapezoid(np.abs(u_r[start_idx_norm:]) ** 2, halo.r[start_idx_norm:])
+    norm = halo.dr * np.sum(np.abs(u_r) ** 2)
     if np.isfinite(norm.value) and norm.value > 0:
         u_r = u_r / np.sqrt(norm)
     rho_r = totalMassEnclosed * np.abs(u_r) ** 2 / (4 * np.pi * halo.r**2)

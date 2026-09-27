@@ -11,8 +11,7 @@ subclass pre-configured with the Earth's gravitational potential.
 import time
 
 from scipy.interpolate import RegularGridInterpolator
-from scipy.linalg import eigh
-from scipy.sparse import diags
+from scipy.linalg import eigh_tridiagonal
 
 # for wavefunction construction
 from scipy.special import sph_harm_y
@@ -26,7 +25,8 @@ class GravBoundAxionHalo:
     """Solve the TISE for axions gravitationally bound to compact bodies.
 
     Constructs a 1-D radial finite-difference Hamiltonian ``H = T + V`` on a
-    uniform grid spanning ``[-extent/2, extent/2]``, diagonalizes it for each
+    uniform grid inside ``(0, extent)``, with zero Dirichlet values at
+    both endpoints. It diagonalizes the Hamiltonian for each
     requested angular-momentum channel *l*, and stores the resulting
     wavefunctions and energy expectation values in :attr:`states`.
 
@@ -65,9 +65,10 @@ class GravBoundAxionHalo:
         nu_a : Quantity [Hz]
             Axion Compton frequency, used to derive the axion mass.
         N : int
-            Number of grid points (default 4096).
+            Number of positive interior grid points (default 4096).
         extent : Quantity
-            Full radial range of the grid (centred on r = 0).
+            Outer boundary radius of the domain [0, extent]. All N stored
+            samples lie strictly inside the domain; both endpoints are fixed.
         getPot : callable
             Zero-argument function returning ``(Phi_func, r_unit, Phi_unit)``
             where ``Phi_func(r_in_r_unit)`` is the gravitational potential
@@ -112,11 +113,21 @@ class GravBoundAxionHalo:
                 f"= {self.m_a.to_value(unit.eV / const.c**2):g} eV/c^2",
             )
 
+        if not isinstance(N, (int, np.integer)) or N < 2:
+            raise ValueError("N must be an integer >= 2.")
+        if (
+            not extent.unit.is_equivalent(unit.m)
+            or not np.isfinite(extent.value)
+            or extent.value <= 0
+        ):
+            raise ValueError("extent must be a finite positive length.")
         self.N = N
         self.extent: Quantity = extent
-        self.dr: Quantity = self.extent / self.N
-        # symmetric grid centred on r=0
-        self.r: Quantity = np.linspace(-self.extent / 2, self.extent / 2, self.N)
+        self.r_max: Quantity = self.extent
+        self.dr: Quantity = self.r_max / (self.N + 1)
+        # Endpoints u(0)=u(r_max)=0 are fixed, not eigenvector unknowns.
+        # Neither V_eff nor R=u/r is evaluated at the origin.
+        self.r: Quantity = np.arange(1, self.N + 1) * self.dr
         Phi_func, r_unit, Phi_unit = getPot()
         # TODO: Try also to use the infinity as the reference point
         # gravitational potential V = m_a * Phi(r), evaluated on the radial grid
@@ -172,7 +183,7 @@ class GravBoundAxionHalo:
 
         Builds the finite-difference Hamiltonian ``H = T + V_eff`` (with the
         centrifugal barrier included in ``V_eff``), diagonalizes it with
-        ``scipy.linalg.eigh``, normalizes the lowest ``max_n_r`` eigenstates,
+        ``scipy.linalg.eigh_tridiagonal``, normalizes the lowest ``max_n_r`` eigenstates,
         computes expectation values of T, V, and V_eff, and stores the results
         in :attr:`states`.
 
@@ -189,36 +200,31 @@ class GravBoundAxionHalo:
             Print timing and eigen-energy tables.
         """
         msgPrefix = f"[{self.__class__.__name__}.{self.solve_TISE_3D_l.__name__}]"
+        if not isinstance(l, (int, np.integer)) or not 0 <= l < len(self.orbitalLabels):
+            raise ValueError("l must be a supported nonnegative integer.")
+        if not isinstance(max_n_r, (int, np.integer)) or not 1 <= max_n_r <= self.N:
+            raise ValueError("max_n_r must be an integer between 1 and N.")
         # Effective potential including centrifugal term ℏ²l(l+1)/(2m r²)
         Veff = Quantity(
             self.pot + const.hbar**2 * l * (l + 1) / (2 * self.m_a * self.r**2)
         )
 
-        main = -2.0 * np.ones(self.N)
-        off = 1.0 * np.ones(self.N - 1)
-
-        # ----------------- start of dimensionless computation ---------------- #
-        # Kinetic energy operator: T = -(ℏ²/2m) ∇², discretised as a tridiagonal matrix
-        lap = diags([off, main, off], [-1, 0, 1])
-        T = -1 * self.T_magnitude.to_value(self.pot.unit) * lap
-
-        # Hamiltonian H = T + diag(V_eff), all values in self.pot.unit
-        H = T + diags(Veff.to_value(self.pot.unit), 0)
-
-        H_dense = H.toarray()
+        # Missing neighbors in the first/last rows are the fixed zero endpoints.
+        kinetic_scale = self.T_magnitude.to_value(self.pot.unit)
+        diagonal = 2 * kinetic_scale + Veff.to_value(self.pot.unit)
+        off_diagonal = np.full(self.N - 1, -kinetic_scale)
 
         # Solve eigenvalue problem; energies in self.pot.unit, states are dimensionless
         tic = time.time()
-        energies_pot_unit, states = eigh(H_dense)
+        energies_pot_unit, states = eigh_tridiagonal(
+            diagonal, off_diagonal, select="i", select_range=(0, max_n_r - 1)
+        )
         toc = time.time()
         if verbose:
             print(
                 msgPrefix, f"N={self.N} l={l} Eigensolver took {toc - tic:.3f} seconds"
             )
-        # ----------------- end of dimensionless computation ---------------- #
-        energies = np.zeros_like(energies_pot_unit) * self.pot.unit
-        for i, e in enumerate(energies_pot_unit):
-            energies[i] = e * self.pot.unit
+        energies = energies_pot_unit * self.pot.unit
 
         if verbose:
             print(msgPrefix, "Eigen-energies:")
@@ -228,65 +234,27 @@ class GravBoundAxionHalo:
             print("]")
             print(f"* {self.pot.unit}")
 
-        # Skip the first half of the grid (r < 0) plus a few extra points to avoid r=0 singularity
-        start_index = self.N // 2 + 3
-
-        # For l>0 the even-indexed eigenstates carry the correct parity; skip odd ones
-        if l == 0:
-            iter_range = np.arange(max_n_r)
-        else:
-            iter_range = np.arange(2 * max_n_r)[::2]
-
-        for i, _n_r in enumerate(iter_range):
-
-            u_r = states[:, _n_r]
-            # radial wavefunction R(r) = u(r)/r
+        # Every eigenstate satisfies the radial boundary; no parity filtering.
+        for i in range(max_n_r):
+            values = states[:, i]
+            # Fix the arbitrary sign using the first appreciable sample.
+            significant = np.flatnonzero(np.abs(values) > 1e-10 * np.max(np.abs(values)))
+            if values[significant[0]] < 0:
+                values = -values
+            # With zero endpoints, trapezoidal integration is dr * sum(f_i).
+            # This is also the discrete inner product of the Hamiltonian.
+            u_r = values / np.sqrt(self.dr * np.sum(np.abs(values) ** 2))
             R_r = u_r / self.r
+            V_expect = self.dr * np.sum(np.abs(u_r) ** 2 * self.pot)
+            Veff_expect = self.dr * np.sum(np.abs(u_r) ** 2 * Veff)
 
-            # Normalize so that 4π ∫ |u(r)|² dr = 1
-            # after normalization, R_r and u_r are arrays of astropy Quantities with units equivalent to 1/m^(3/2) and 1/m^(1/2), respectively.
-            integral = np.sqrt(
-                1.0
-                * np.trapezoid(
-                    np.abs(u_r[start_index:]) ** 2,
-                    self.r[start_index:],
-                )
+            # Include BOTH endpoint stencils, using the same operator as H.
+            padded = np.pad(u_r.value, (1, 1)) * u_r.unit
+            du2_dr2 = (padded[2:] - 2 * padded[1:-1] + padded[:-2]) / self.dr**2
+            T_expect = -(const.hbar**2 / (2 * self.m_a)) * self.dr * np.sum(
+                np.conj(u_r) * du2_dr2
             )
-            R_r: Quantity = R_r / integral
-            u_r: Quantity = u_r / integral
-
-            # Potential energy expectation value ⟨V⟩ = ∫ |u|² V dr
-            V_expect = np.trapezoid(
-                np.abs(u_r[start_index:]) ** 2 * self.pot[start_index:],
-                self.r[start_index:],
-            )
-
-            # Effective potential expectation value ⟨V_eff⟩ = ∫ |u|² V_eff dr
-            Veff_expect = np.trapezoid(
-                np.abs(u_r[start_index:]) ** 2 * Veff[start_index:],
-                self.r[start_index:],
-            )
-
-            # Kinetic energy via second derivative of u_r: ⟨T⟩ = -(ℏ²/2m) ∫ u* u'' dr
-            # Initialize with correct units: [u''] = [u] / [r]²
-            du2_dr2 = np.zeros(u_r.shape) * u_r.unit / self.r.unit**2
-            du2_dr2[1:-1] = (u_r[2:] - 2 * u_r[1:-1] + u_r[:-2]) / (
-                self.r[1] - self.r[0]
-            ) ** 2
-            T_expect = -(const.hbar**2 / (2 * self.m_a)) * np.trapezoid(
-                np.conj(u_r[start_index:]) * du2_dr2[start_index:], self.r[start_index:]
-            )
-            # Reduced wavefunction normalized by discrete L2 norm (used for plotting only)
-            R_reduced = (
-                1.0
-                * (states[:, _n_r]) ** 1
-                / np.sqrt(np.trapezoid(np.abs(states[:, _n_r]) ** 2, self.r))
-            )
-            # print(
-            #     f"n_r={n_r}, l={l_val}: T={T_expect:.3e}, V={V_expect:.3e}, Veff={Veff_expect:.3e}, \
-            #     E_total={(T_expect+Veff_expect):.3e}, eigen_E={E[n_r]:.3e}"
-            # )
-            # print(f"{T_expect:.6e},")
+            R_reduced = u_r.copy()
             n = i + l + 1
             self.states[f"{n}{self.orbitalLabels[l]}"] = {
                 "key_info": "",
@@ -294,36 +262,18 @@ class GravBoundAxionHalo:
                 "n_r_l": (i, l),
                 "n_r": (i),
                 "l": (l),
-                "eigenE": energies[_n_r],
+                "eigenE": energies[i],
                 "T_expect": T_expect,
                 "V_expect": V_expect,
                 "Veff_expect": Veff_expect,
-                "eigenE_expect": (
-                    T_expect + Veff_expect
-                ),  # TODO check if this is consistent with eigenE
+                "eigenE_expect": T_expect + Veff_expect,
                 "u_r": u_r,
-                "R_r": R_r, 
+                "R_r": R_r,
                 "R_reduced": R_reduced,
             }
 
         if showPlot:
-            R_reduced = (
-                1.0
-                * (states[:, :max_n_r]) ** 1
-                / np.sqrt(
-                    np.trapezoid(np.abs(states[:, :max_n_r]) ** 2, self.r, axis=0)
-                )
-            )
-            # R_reduced.shape = (N, max_n_r)
-            # TODO: complete this
-            # slider_plot_earth(
-            #     dataX=self.r[start_index:],
-            #     dataY=(R_reduced[start_index:, :]),
-            #     title=f"Reduced radial wavefunction (l={l})",
-            #     # xlabel="r (earth_radius)",
-            #     xlim=None,
-            #     show_real_imag=True,
-            # )
+            self.plotEigenStates(numStates=max_n_r, showPlot=True)
 
     def solve_TISE_3D(
         self,
@@ -645,15 +595,17 @@ class GravBoundAxionHalo:
             meas_time=meas_time
         )
 
-        # avoid r=0 singularity
-        start_index = self.N // 2 + 5
+        # All stored samples have r > 0.
+        start_index = 0
         # stop at a desired radius to make computation more efficient
         if truncRadius is None or type(truncRadius) != Quantity:
-            stop_index = -1
+            stop_index = self.N
         elif truncRadius.unit.is_equivalent(self.r.unit):
-            stop_index = start_index + np.argmin(
-                np.abs(self.r[start_index:] - truncRadius)
-            )
+            # Retain a sample beyond the requested radius for interpolation.
+            cutoff_index = int(np.searchsorted(
+                self.r.to_value(self.r.unit), truncRadius.to_value(self.r.unit)
+            ))
+            stop_index = min(self.N, max(2, cutoff_index + 1))
         else:
             raise TypeError(
                 msgPrefix + " truncRadius unit is not equivalent to length. "
@@ -857,7 +809,8 @@ class GravBoundAxionHalo:
 
         # sample gradient along the radial line toward the station
         Nr_plot = 2**10
-        r_line = np.linspace(r[0], truncRadius, Nr_plot)
+        line_end = r[-1] if truncRadius is None else truncRadius
+        r_line = np.linspace(r[0], line_end, Nr_plot)
 
         # points = [[r, theta_direction, phi_direction], ...]
         points = np.array(
@@ -1738,7 +1691,7 @@ class GravBoundAxionHalo:
         u_r = eigenstate["u_r"]
         R_reduced = eigenstate["R_reduced"]
 
-        start_index = self.N // 2 + 5  # avoid r=0 singularity
+        start_index = 0  # all stored radii are positive
 
         plt.rc("font", size=14)  # Default text
         plt.rc("figure", titlesize=14)  # Figure title
@@ -1833,7 +1786,7 @@ class GravBoundAxionHalo:
         #     f"{'n_r':<6} {'l':<4} {'Principal n':<14} {'Name':<6} {'Eigen E (eV)':<15}{'Kinetic T (eV)':<15} {'Mean v (m/s)':<15}"
         # )
         # print("-" * 65)
-        start_index = self.N // 2 + 5  # avoid r=0 singularity
+        start_index = 0  # all stored radii are positive
         axes = []
         i = 0
         for key, eigenstate in list(self.states.items())[
@@ -1928,9 +1881,9 @@ class GravBoundAxionHalo:
         msgPrefix = f"[{self.__class__.__name__}.{self._plotEigenStates.__name__}]"
         self.sortByEigenE()
 
-        startIdx = self.N // 2 + 1  # avoid r=0 singularity
+        startIdx = 0  # all stored radii are positive
         if truncRadius is None or type(truncRadius) != Quantity:
-            stopIdx = -1
+            stopIdx = self.N
         elif truncRadius.unit.is_equivalent(self.r.unit):
             stopIdx = startIdx + np.argmin(np.abs(self.r[startIdx:] - truncRadius))
         else:
@@ -2036,11 +1989,10 @@ class GravBoundAxionHalo:
             cross_x_indx = np.argmin(
                 np.abs(self.pot[start_index:] - eigenstate["eigenE"])
             )
-            xmax = self.extent / 2 - np.abs(self.r[cross_x_indx])
             xmax = np.abs(self.r[cross_x_indx])
             ax.hlines(
                 y=eigenstate["eigenE"],
-                xmin=-xmax,
+                xmin=0,
                 xmax=xmax,
                 colors="k",
                 alpha=0.5,
@@ -2105,7 +2057,7 @@ class GravBoundAxionHalo:
             l_val = eigenstate["n_r_l"][1]
 
             R_reduced = eigenstate["R_reduced"]
-            norm = np.trapezoid(np.abs(R_reduced) ** 2, self.r)
+            norm = self.dr * np.sum(np.abs(R_reduced) ** 2)
             integral = np.trapezoid(
                 np.abs(R_reduced[start_indx:stop_indx]) ** 2,
                 self.r[start_indx:stop_indx],

@@ -840,9 +840,9 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         msgPrefix = f"[{self.__class__.__name__}.{self._plotEigenStates.__name__}]"
         self.sortByEigenE()
 
-        startIdx = self.N // 2 + 1  # avoid r=0 singularity
+        startIdx = 0  # all stored radii are positive
         if truncRadius is None or type(truncRadius) != Quantity:
-            stopIdx = -1
+            stopIdx = self.N
         elif truncRadius.unit.is_equivalent(self.r.unit):
             stopIdx = startIdx + np.argmin(np.abs(self.r[startIdx:] - truncRadius))
         else:
