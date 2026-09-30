@@ -1,12 +1,12 @@
-"""Infer independent single-state halo densities for each frequency preset.
+"""Infer independent single-state halo densities at user-selected frequencies.
 
 Run from the repository root:
     python -m examples.EarthBoundAxionHalo.DM_overdensity.density_by_shell_mass_sweep
 
-Figures and text results are saved beside this script under outputs/frequency_sweep.
+Figures and text results are saved in output_dir below.
 The combined density_at_earth_vs_frequency.txt table contains one row per state
 and frequency, with densities and absolute uncertainties in units of rho_M_DM_SHM.
-The largest presets require substantial memory; edit params to run a subset.
+The largest grids require substantial memory; edit scan_frequencies to select a scan.
 """
 
 from pathlib import Path
@@ -80,11 +80,79 @@ param_30MHz = {
     "extent": 70 * unit.R_earth,
 }
 
-params = [
+example_params = [
     param_1Hz, param_10Hz, param_100Hz, param_1kHz, param_10kHz,
     param_100kHz, param_1MHz, param_10MHz, param_30MHz,
 ]
-output_dir = Path(__file__).resolve().parent / "outputs" / "frequency_sweep"
+
+
+def choose_params(frequency, examples):
+    """Choose a radial grid from the two presets bracketing a frequency.
+
+    Parameters
+    ----------
+    frequency : astropy.units.Quantity
+        Finite scalar frequency within the inclusive range of the examples.
+    examples : sequence of dict
+        At least two presets with distinct positive ``nu_a`` frequencies,
+        positive integer ``N``, and positive length Quantity ``extent``.
+        Presets may be supplied in any order.
+
+    Returns
+    -------
+    dict
+        ``nu_a``, ``extent`` and ``N`` for the solver. Exact preset frequencies
+        retain their original grid. Between presets, extent is the larger of
+        the two extents and N = ceil(extent * max(N_left/extent_left,
+        N_right/extent_right)), preserving at least the finer N/extent ratio.
+
+    Raises
+    ------
+    ValueError
+        If the frequency is outside the example range or inputs are invalid.
+    """
+    # Keep frequency and length units during grid selection.
+    frequency = unit.Quantity(frequency).to(unit.Hz)
+    if not frequency.isscalar or not np.isfinite(frequency):
+        raise ValueError("frequency must be a finite scalar frequency Quantity.")
+    if len(examples) < 2:
+        raise ValueError("Supply at least two example presets.")
+    for preset in examples:
+        nu = unit.Quantity(preset["nu_a"]).to(unit.Hz)
+        extent = unit.Quantity(preset["extent"]).to(unit.m)
+        if (not nu.isscalar or not np.isfinite(nu) or nu <= 0 * unit.Hz
+                or not extent.isscalar or not np.isfinite(extent) or extent <= 0 * unit.m
+                or not isinstance(preset["N"], (int, np.integer)) or preset["N"] <= 0):
+            raise ValueError("Presets require positive scalar frequencies, extents, and integer N.")
+
+    # Sort a new list without changing the user's example presets.
+    ordered = sorted(examples, key=lambda preset: preset["nu_a"])
+    frequencies = unit.Quantity([preset["nu_a"] for preset in ordered]).to(unit.Hz)
+    if np.any(np.diff(frequencies) <= 0 * unit.Hz):
+        raise ValueError("Example frequencies must be distinct.")
+    if frequency < frequencies[0] or frequency > frequencies[-1]:
+        raise ValueError(f"frequency must lie between {frequencies[0]} and {frequencies[-1]}.")
+
+    # Preserve the original grid at an exact preset, including either endpoint.
+    upper = int(np.searchsorted(frequencies, frequency))
+    if frequency == frequencies[upper]:
+        return {"nu_a": frequency, "N": ordered[upper]["N"],
+                "extent": ordered[upper]["extent"]}
+
+    # Combine the larger domain with the finer sampling of the adjacent presets.
+    left, right = ordered[upper - 1], ordered[upper]
+    extent = max(left["extent"], right["extent"])
+    points_per_length = max(left["N"] / left["extent"], right["N"] / right["extent"])
+    count = int(np.ceil((extent * points_per_length).to(unit.one)))
+    return {"nu_a": frequency, "N": count, "extent": extent}
+
+
+# Edit this frequency array for an arbitrary scan, e.g. [5, 25, 80] * unit.kHz.
+scan_frequencies = np.geomspace(1e4, 3e7, 20) * unit.Hz
+# Alternatively: scan_frequencies = np.geomspace(1, 3e7, 20) * unit.Hz
+params = [choose_params(frequency, example_params) for frequency in scan_frequencies]
+
+output_dir = Path(__file__).resolve().parent / "outputs" / "frequency_sweep-2nd"
 output_dir.mkdir(parents=True, exist_ok=True)
 
 # Start a fresh combined table; append each frequency as soon as it is computed.
@@ -98,7 +166,7 @@ density_table_path.write_text(
 
 for param in params:
     # Solve once per frequency; each state is a separate mass hypothesis.
-    frequency_label = f"{param['nu_a'].to_value(unit.Hz):g}_Hz"
+    frequency_label = f"{param['nu_a'].to_value(unit.Hz):.17g}_Hz"
     print(f"\nFrequency: {param['nu_a']}", flush=True)
     halo = EarthBoundAxionHalo(**param)
     halo.solve_TISE_3D(l_vals=[0, 1, 2], max_n_r=10)

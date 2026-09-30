@@ -875,7 +875,8 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
             if any(np.any(profile[key] > 0 * profile[key].unit) for profile in profiles.values()):
                 ax.set_yscale(scales[1])
             ax.grid(alpha=.25)
-            ax.legend(bbox_to_anchor=(1.0, 1.0), loc="upper left")
+            if key == "density":
+                ax.legend(bbox_to_anchor=(1.0, 1.0), loc="upper left")
         # Label the displayed units, then arrange and optionally show the figure.
         if density_unit is None:
             axes[0].set_ylabel("$\\rho^{\\oplus} / \\rho^{\\mathrm{SHM}}$")
