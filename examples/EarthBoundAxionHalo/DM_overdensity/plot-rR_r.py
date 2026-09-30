@@ -1,12 +1,7 @@
-"""Plot the real part of several Earth-bound radial eigenfunctions.
+"""Plot real u(r)=rR(r) for ten states, solving TISE automatically if needed."""
 
-This example solves the 1s, 2s, 2p, 3s, 3p, and 3d states and overlays the
-real part of their radial wavefunctions ``R_r`` on a single plot.
-"""
-
-from axionbloch.dependency import unit, plt
+from axionbloch.dependency import unit
 from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo
-from axionbloch.utils import linestyles
 
 # halo = EarthBoundAxionHalo(
 #     # specify axion Compton frequency
@@ -32,17 +27,6 @@ halo = EarthBoundAxionHalo(
     verbose=True,
 )
 
-# Solve enough radial states
-halo.solve_TISE_3D(
-    l_vals=[0, 1, 2, 3],
-    max_n_r=20,
-    verbose=False,
-)
-
-# # print the first 20 eigen states (name and eigen-energy) sorted by eigen-energy.
-# for name, state in sorted(halo.states.items(), key=lambda x: x[1]["eigenE"]):
-#     print(f"{name}: E = {state['eigenE'].to(unit.eV):.3e}")
-
 # Plot the radial wavefunctions
 state_names = ["1s", "2s", "3s", "2p", "4s", "3d", "5s", "3p", "6s", "4f"]
 # 1s: E = -4.549e-18 eV
@@ -55,29 +39,8 @@ state_names = ["1s", "2s", "3s", "2p", "4s", "3d", "5s", "3p", "6s", "4f"]
 # 3p: E = -1.347e-18 eV
 # 6s: E = -1.090e-18 eV
 # 4f: E = -1.088e-18 eV
-colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-
-fig, ax = plt.subplots(figsize=(8.5 / 2.54, 5.5 / 2.54), dpi=300)
-
-start_idx = 0
-
-for idx, name in enumerate(state_names):
-    state = halo.states[name]
-    ax.plot(
-        halo.r[start_idx:].to_value(unit.R_earth),
-        state["u_r"][start_idx:].real,
-        label=name,
-        color=colors[idx % len(colors)],
-        linestyle=linestyles[idx % len(linestyles)],
-        linewidth=1.4,
-    )
-
-ax.set_xlabel("$r\\,(R_\\oplus$)")
-ax.set_ylabel("$r\\,R(r)\\,(R_\\oplus^{-1/2})$")
-# ax.legend(ncol=2, bbox_to_anchor=(1.0, 1.0))
-# ax.set_xlim(-0.02, 5.2)
-fig.tight_layout()
-plt.show()
+# The class solves TISE automatically when no states have been solved yet.
+fig, ax = halo.plot_u_r(state_names=state_names)
 
 # output_dir = Path(__file__).resolve().parent / "outputs"
 # output_dir.mkdir(parents=True, exist_ok=True)

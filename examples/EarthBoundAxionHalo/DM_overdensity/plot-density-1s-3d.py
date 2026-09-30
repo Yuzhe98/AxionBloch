@@ -11,10 +11,9 @@ angularly averaged density is approximated as
 on a single plot.
 """
 
-from pathlib import Path
-
 from axionbloch.dependency import *
 from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo
+from axionbloch.utils import markers
 
 halo = EarthBoundAxionHalo(
     nu_a=1.348 * unit.MHz,  # axion Compton frequency in Hz
@@ -71,7 +70,10 @@ for idx, name in enumerate(state_names):
         rho_to_rhoMW[name][start_idx:],
         label=name,
         color=colors[idx % len(colors)],
-        linewidth=1.4,
+        marker=markers[idx % len(markers)],
+        markevery=0.1,
+        markersize=2,
+        # linewidth=1.4,
     )
 
 ax.axvline(
