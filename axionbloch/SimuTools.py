@@ -38,7 +38,7 @@ from axionbloch.MilkyWayAxionHalo import MilkyWayAxionHalo
 from axionbloch.Sample import Sample
 from axionbloch.SimuTypes import SimuEntry, SimuParams
 from axionbloch.Station import Station
-from axionbloch.utils import PhysicalObject, check, getDateAndTime, save_phys_quantity
+from axionbloch.utils import PhysicalObject, check, getDateAndTime, save_phys_quantity, _getLocationPrefix
 
 RECORD_RUNTIME = True
 
@@ -330,21 +330,21 @@ class MagField(PhysicalObject):
         N = len(tip_angles)
         if len(delays) != N:
             raise ValueError(
-                msgPrefix + " delay and tip_angles must have the same length"
+                f"{_getLocationPrefix()} {msgPrefix} delay and tip_angles must have the same length"
             )
         if phases is None:
             phases = [0.0 * unit.rad] * N
         if len(phases) != N:
             raise ValueError(
-                msgPrefix + " phases_rad and tip_angles must have the same length"
+                f"{_getLocationPrefix()} {msgPrefix} phases_rad and tip_angles must have the same length"
             )
 
         pulseLen = int(np.round(pulseDur / timeStep))
         if pulseLen < 2:
-            print(msgPrefix, f"WARNING: pulseLen = {pulseLen} < 2")
+            print(f"{_getLocationPrefix()} {msgPrefix} WARNING: pulseLen = {pulseLen} < 2")
         pulseDur = pulseLen * timeStep  # snap to grid
         if verbose:
-            print(msgPrefix, f"pulseLen = {pulseLen}, pulseDur = {pulseDur:.4e} s")
+            print(f"{_getLocationPrefix()} {msgPrefix} pulseLen = {pulseLen}, pulseDur = {pulseDur:.4e} s")
 
         B90 = PI / (gamma * pulseDur)
 
@@ -368,7 +368,7 @@ class MagField(PhysicalObject):
             if actual_len <= 0:
                 if verbose:
                     print(
-                        msgPrefix, f"Pulse {i}: starts beyond simulation end, skipping"
+                        f"{_getLocationPrefix()} {msgPrefix} Pulse {i}: starts beyond simulation end, skipping"
                     )
                 break
 
@@ -495,7 +495,7 @@ class MagField(PhysicalObject):
                 toc = time.perf_counter()
                 timeConsumption = toc - tic
                 print(
-                    msgPrefix, f"ifft total time consumption = {timeConsumption:.3e} s"
+                    f"{_getLocationPrefix()} {msgPrefix} ifft total time consumption = {timeConsumption:.3e} s"
                 )
 
             if verbose:
@@ -560,10 +560,10 @@ class MagField(PhysicalObject):
             phases = np.asarray(phases)
 
         assert len(frequencies) == len(amplitudes), (
-            msgPrefix + " frequencies and amplitudes must have the same length"
+            f"{_getLocationPrefix()} {msgPrefix} frequencies and amplitudes must have the same length"
         )
         assert len(frequencies) == len(phases), (
-            msgPrefix + " frequencies and phases must have the same length"
+            f"{_getLocationPrefix()} {msgPrefix} frequencies and phases must have the same length"
         )
 
         numSteps = timeLen - 1
@@ -1055,7 +1055,7 @@ class Simulation(PhysicalObject):
         # get the equilibrium magnetization M0
         self.M0eqb = self.sample.getM0eqb(B_pol=self.magnet.B0, verbose=verbose)
         if verbose:
-            print(msgPrefix, f"self.M0eqb = {self.M0eqb}")
+            print(f"{_getLocationPrefix()} {msgPrefix} self.M0eqb = {self.M0eqb}")
         # normalize the magnetization by the equilibrium magnetization M0, so that init_M is dimensionless and represents the initial polarization
 
         if self.sample.pol is not None:
@@ -1120,7 +1120,7 @@ class Simulation(PhysicalObject):
             )
         )
         if verbose:
-            print(msgPrefix, f"numPt = {numPt}")
+            print(f"{_getLocationPrefix()} {msgPrefix} numPt = {numPt}")
         # numPt = 500
         # TODO choose better numPt for magnet
         if numPt <= 1:
@@ -1169,7 +1169,7 @@ class Simulation(PhysicalObject):
         )
         if self.magnet.numPt < 2 * variation.to_value(unit.one):
             warnings.warn(
-                msgPrefix + " magnet_det.numPt may be too few.",
+                f"{_getLocationPrefix()} {msgPrefix} magnet_det.numPt may be too few.",
                 UserWarning,
                 stacklevel=2,
             )
@@ -1238,13 +1238,13 @@ class Simulation(PhysicalObject):
         RBW = (1 / self.duration).to(unit.Hz)
 
         if verbose:
-            print(msgPrefix, f"Larmor frequency range = [{nu_L_min:g}, {nu_L_max:g}]")
+            print(f"{_getLocationPrefix()} {msgPrefix} Larmor frequency range = [{nu_L_min:g}, {nu_L_max:g}]")
             print(
                 msgPrefix,
                 f"the maximum of (absolute) Larmor frequencies  = {nu_L_abs_max:g}",
             )
-            print(msgPrefix, f"T2 relaxation rate = {nu_L_abs_max:g}")
-            print(msgPrefix, f"resolution bandwidth (RBW) = {RBW:g}")
+            print(f"{_getLocationPrefix()} {msgPrefix} T2 relaxation rate = {nu_L_abs_max:g}")
+            print(f"{_getLocationPrefix()} {msgPrefix} resolution bandwidth (RBW) = {RBW:g}")
         # from experience, simulation rate should be 20 times greater than the max. of signal frequency in the rotating frame
         rate = np.amax([21 * nu_L_abs_max, 10 * T2Rate, 10 * RBW])
         return rate
@@ -1316,7 +1316,7 @@ class Simulation(PhysicalObject):
                 f"excField.B_vec has invalid shape {self.excField.B_vec.shape}, expected (numFields, numSteps, 3) or (numSteps, 3)"
             )
         if verbose:
-            print(msgPrefix, f"B_vec       shape={self.excField.B_vec.shape}")
+            print(f"{_getLocationPrefix()} {msgPrefix} B_vec       shape={self.excField.B_vec.shape}")
             print(
                 msgPrefix,
                 f"B_spread    shape={self.magnet.B_spread.shape}  range=[{self.magnet.B_spread.min():g}, {self.magnet.B_spread.max():g}]",
@@ -1329,13 +1329,13 @@ class Simulation(PhysicalObject):
                 msgPrefix,
                 f"gamma       = {(self.sample.gamma).to_value(unit.rad * unit.Hz / unit.T):.6g} rad·Hz/T",
             )
-            print(msgPrefix, f"timeStep    = {self.timeStep.to(unit.s):g}")
-            print(msgPrefix, f"T1          = {self.sample.T1.to(unit.s):g}")
-            print(msgPrefix, f"T2          = {self.sample.T2.to(unit.s):g}")
-            print(msgPrefix, f"RCF_freq    = {self.RCF_freq.to(unit.Hz):g}")
-            print(msgPrefix, f"M0          = ({Mx0:g}, {My0:g}, {Mz0:g})")
-            print(msgPrefix, f"M0eqb_norm  = {M0eqb_norm}")
-            print(msgPrefix, f"integrator  = {integrator!r}")
+            print(f"{_getLocationPrefix()} {msgPrefix} timeStep    = {self.timeStep.to(unit.s):g}")
+            print(f"{_getLocationPrefix()} {msgPrefix} T1          = {self.sample.T1.to(unit.s):g}")
+            print(f"{_getLocationPrefix()} {msgPrefix} T2          = {self.sample.T2.to(unit.s):g}")
+            print(f"{_getLocationPrefix()} {msgPrefix} RCF_freq    = {self.RCF_freq.to(unit.Hz):g}")
+            print(f"{_getLocationPrefix()} {msgPrefix} M0          = ({Mx0:g}, {My0:g}, {Mz0:g})")
+            print(f"{_getLocationPrefix()} {msgPrefix} M0eqb_norm  = {M0eqb_norm}")
+            print(f"{_getLocationPrefix()} {msgPrefix} integrator  = {integrator!r}")
 
         # Use the kinetic simulation function from blochsimulation to generate trajectories
         self.trjry, self.dMdt, self.d2Mdt2 = bs.generateTrajectories(
@@ -1628,10 +1628,10 @@ class Simulation(PhysicalObject):
                 del self.excField.B_vec
         else:
             assert hasattr(self.excField, "B_vec_mean"), (
-                msgPrefix + "No excField.B_vec nor B_vec_mean"
+                f"{_getLocationPrefix()} {msgPrefix}No excField.B_vec nor B_vec_mean"
             )
             assert hasattr(self.excField, "B_vec_std"), (
-                msgPrefix + "No excField.B_vec nor B_vec_std"
+                f"{_getLocationPrefix()} {msgPrefix}No excField.B_vec nor B_vec_std"
             )
 
         if hasattr(self, "trjry"):
@@ -1674,10 +1674,10 @@ class Simulation(PhysicalObject):
                     Mz,
                 )
         else:
-            assert hasattr(self, "Mxy_mrs"), msgPrefix + "No trjry nor Mxy_mrs"
-            assert hasattr(self, "Mxy_srs"), msgPrefix + "No trjry nor Mxy_srs"
-            assert hasattr(self, "Mxy_rms"), msgPrefix + "No trjry nor Mxy_rms"
-            assert hasattr(self, "Mxy_rss"), msgPrefix + "No trjry nor Mxy_rss"
+            assert hasattr(self, "Mxy_mrs"), f"{_getLocationPrefix()} {msgPrefix}No trjry nor Mxy_mrs"
+            assert hasattr(self, "Mxy_srs"), f"{_getLocationPrefix()} {msgPrefix}No trjry nor Mxy_srs"
+            assert hasattr(self, "Mxy_rms"), f"{_getLocationPrefix()} {msgPrefix}No trjry nor Mxy_rms"
+            assert hasattr(self, "Mxy_rss"), f"{_getLocationPrefix()} {msgPrefix}No trjry nor Mxy_rss"
 
     def displayTrjries(
         self,

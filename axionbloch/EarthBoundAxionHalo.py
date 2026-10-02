@@ -7,7 +7,7 @@ from scipy.signal import correlate as correlate
 from axionbloch.dependency import *
 from axionbloch.GravBoundAxionHalo import GravBoundAxionHalo
 from axionbloch.Station import Station
-from axionbloch.utils import check, linestyles, markers
+from axionbloch.utils import check, linestyles, markers, _getLocationPrefix
 
 
 def PREM_density(radius_km):
@@ -1334,7 +1334,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
             stopIdx = startIdx + np.argmin(np.abs(self.r[startIdx:] - truncRadius))
         else:
             raise TypeError(
-                msgPrefix + " truncRadius unit is not equivalent to length. "
+                f"{_getLocationPrefix()} {msgPrefix} truncRadius unit is not equivalent to length. "
             )
 
         plt.rcParams["font.serif"] = ["Times New Roman"]

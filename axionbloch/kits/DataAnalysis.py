@@ -717,7 +717,7 @@ class Signal(NMRio):
         for file in candidate_files:
             if not os.path.isfile(file):
                 if verbose:
-                    print(msgPrefix, f"file not found: {file}")
+                    print(f"{_getLocationPrefix()} {msgPrefix} file not found: {file}")
                 continue
 
             creation_time = os.path.getctime(file)
@@ -7575,7 +7575,7 @@ class Signal(NMRio):
             self.saveToH5group(group=demods_group, verbose=verbose)
 
         if verbose:
-            print(msgPrefix, f"Saved to {filePath}")
+            print(f"{_getLocationPrefix()} {msgPrefix} Saved to {filePath}")
 
     def saveToH5group(
         self,

@@ -1,7 +1,7 @@
 from functools import partial
 
 from axionbloch.dependency import *
-from axionbloch.utils import Lorentzian_0edge
+from axionbloch.utils import Lorentzian_0edge, _getLocationPrefix
 
 
 class Magnet:
@@ -69,7 +69,7 @@ class Magnet:
         assert nFWHM >= 0
         self.nFWHM = nFWHM
         if B0 is None or FWHM is None:
-            raise ValueError(msgPrefix + " B0 and FWHM must be provided")
+            raise ValueError(f"{_getLocationPrefix()} {msgPrefix} B0 and FWHM must be provided")
 
         self.B0 = B0
         self.direction = direction
@@ -116,8 +116,8 @@ class Magnet:
         elif self.numPt is None:
             self.numPt = 1
         if verbose:
-            print(msgPrefix, f"numPt = {numPt}")
-            print(msgPrefix, f"self.numPt = {self.numPt}")
+            print(f"{_getLocationPrefix()} {msgPrefix}numPt = {numPt}")
+            print(f"{_getLocationPrefix()} {msgPrefix} self.numPt = {self.numPt}")
         # homogeneous field
         if self.numPt == 1 or self.FWHM_B0 == 0.0 or self.nFWHM == 0:
             self.B_spread = np.ones(1) * self.B0
@@ -132,7 +132,7 @@ class Magnet:
                 offset=0,
             )
             if verbose:
-                print(msgPrefix, f"inhomogeneous field. self.numPt = {self.numPt}")
+                print(f"{_getLocationPrefix()} {msgPrefix} inhomogeneous field. self.numPt = {self.numPt}")
             # uniform sampling over [-1, 1]
             uni_samp = np.linspace(start=-1, stop=1, num=self.numPt, endpoint=True)
             # transform uniform sampling to the desired distribution
@@ -140,7 +140,7 @@ class Magnet:
                 self.nFWHM * np.sign(uni_samp) * np.abs(uni_samp) ** 2
             ) * self.FWHM_B0 + self.B0
             if verbose:
-                print(msgPrefix, f"B_spread.shape = {self.B_spread.shape}")
+                print(f"{_getLocationPrefix()} {msgPrefix} B_spread.shape = {self.B_spread.shape}")
                 print(
                     f"{msgPrefix} B_spread: {len(self.B_spread)} points  "
                     f"range=[{self.B_spread.min():.6g}, {self.B_spread.max():.6g}]"
@@ -218,4 +218,4 @@ class Magnet:
                 plt.show()
 
             if verbose:
-                print(msgPrefix, f"self.ratios normalized sum={self.ratios.sum():g}")
+                print(f"{_getLocationPrefix()} {msgPrefix} self.ratios normalized sum={self.ratios.sum():g}")

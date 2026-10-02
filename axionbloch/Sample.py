@@ -9,6 +9,7 @@ import numpy as np
 from astropy import units as unit
 from astropy.constants import codata2018 as const
 from astropy.units import Quantity
+from axionbloch.utils import _getLocationPrefix
 
 
 class Sample:
@@ -156,7 +157,7 @@ class Sample:
         M0 = (self.mu * pol * self.totalNumOfSpins / self.vol).to(unit.A / unit.m)
         # self.M0_SPN = (self.mu * ns_SPN).to(unit.A / unit.m)
         if verbose:
-            print(msgPrefix, f"Magnetization M0 is {M0}")
+            print(f"{_getLocationPrefix()} {msgPrefix} Magnetization M0 is {M0}")
         return M0
 
     def getM0_SPN(
@@ -181,7 +182,7 @@ class Sample:
         )
         self.M0_SPN = M0_SPN
         if verbose:
-            print(msgPrefix, f"Spin projection noise magnetization M0_SPN is {M0_SPN}")
+            print(f"{_getLocationPrefix()} {msgPrefix} Spin projection noise magnetization M0_SPN is {M0_SPN}")
         return M0_SPN
 
     def getM0eqb(

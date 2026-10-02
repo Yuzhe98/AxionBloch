@@ -27,6 +27,7 @@ from mpl_toolkits.mplot3d import proj3d
 from axionbloch.dependency import *
 
 
+
 def getDateAndTime() -> str:
     """Return the current date and time as a compact string ``'YYYYMMDD_HHMMSS'``."""
     timestr = Time.now().datetime.strftime("%Y%m%d_%H%M%S")
@@ -97,10 +98,10 @@ def check(arg):
             str_arg = str(arg)
             str_arg = str_arg if str_arg.isprintable() else repr(arg)
 
-            print(position, "" + caller_lines + " : ", end="")
-            print(arg.__class__.__name__ + "(" + str_arg + ")", additional)
+            print(_getLocationPrefix(), position, "" + caller_lines + " : ", end="")
+            print(_getLocationPrefix(), arg.__class__.__name__ + "(" + str_arg + ")", additional)
         else:
-            print("check: couldn't find caller context")
+            print(_getLocationPrefix(), "check: couldn't find caller context")
     finally:
         del frame
         del callerframeinfo
@@ -338,6 +339,7 @@ def estimateLorzfit(
     offset = 0
     if verbose:
         print(
+            _getLocationPrefix(),
             "estimateLorzfit [center, gamma, area, offset] ",
             [center, gamma, area, offset],
         )
@@ -1324,7 +1326,7 @@ def stdPSD(
     # S1 = np.sum(window_arr)
     S2 = np.sum(window_arr**2)
     if verbose:
-        print(f"S2 = {S2:g}")
+        print(_getLocationPrefix(), f"S2 = {S2:g}")
 
     # Compute frequency axis from time-series length and sampling rate
     frequencies = np.fft.fftfreq(
@@ -1462,7 +1464,7 @@ def stdLIAPSD(
     # S1 = np.sum(window_arr)
     S2 = np.sum(window_arr**2)
     if verbose:
-        print(f"S2 = {S2:g}")
+        print(_getLocationPrefix(), f"S2 = {S2:g}")
 
     # Compute frequency axis from time-series length and sampling rate
     frequencies: np.ndarray = np.fft.fftfreq(
@@ -1583,11 +1585,11 @@ def stdLIAPSD(
     # TSPower == np.mean(PSD) * samprate
 
     if verbose:
-        print("attenuation ", attenuation)
-        print("FFT.shape ", FFT.shape)
-        print("filtercomp.shape ", filtercomp.shape)
-        print("S2 ", S2)
-        print("samprate ", samprate)
+        print(_getLocationPrefix(), "attenuation ", attenuation)
+        print(_getLocationPrefix(), "FFT.shape ", FFT.shape)
+        print(_getLocationPrefix(), "filtercomp.shape ", filtercomp.shape)
+        print(_getLocationPrefix(), "S2 ", S2)
+        print(_getLocationPrefix(), "samprate ", samprate)
 
     return np.sort(frequencies), PSD[np.argsort(frequencies)]
     # return frequencies, PSD
@@ -1706,7 +1708,7 @@ def stdLIAFFT(
     # S1 = np.sum(window_arr)
     S2 = np.sum(window_arr**2)
     if verbose:
-        print(f"S2 = {S2:g}")
+        print(_getLocationPrefix(), f"S2 = {S2:g}")
 
     # Compute frequency axis from time-series length and sampling rate
     frequencies = np.fft.fftfreq(
@@ -2154,26 +2156,26 @@ def Add_vector(
 def sanCheck(var, tag: str = None):
     print("")
     if tag is not None:
-        print(tag)
+        print(_getLocationPrefix(), tag)
 
     # Convert to numpy array only for checking NaN
     arr = np.asarray(var)
 
     # Warn if any NaN
     if np.isnan(arr).any():
-        print("Variable contains NaN values!")
+        print(_getLocationPrefix(), "Variable contains NaN values!")
 
     # Scalar case
     if np.isscalar(var):
-        print("(scalar) value =", var)
+        print(_getLocationPrefix(), "(scalar) value =", var)
         return
 
     # Array case
-    print("shape =", arr.shape)
-    print("mean =", np.nanmean(arr))
-    print("std =", np.nanstd(arr))
-    print("min =", np.nanmin(arr))
-    print("max =", np.nanmax(arr))
+    print(_getLocationPrefix(), "shape =", arr.shape)
+    print(_getLocationPrefix(), "mean =", np.nanmean(arr))
+    print(_getLocationPrefix(), "std =", np.nanstd(arr))
+    print(_getLocationPrefix(), "min =", np.nanmin(arr))
+    print(_getLocationPrefix(), "max =", np.nanmax(arr))
     print("")
 
 
@@ -2489,7 +2491,8 @@ def record_runtime_YorN(RECORD_RUNTIME):
                 end_time = time.time()
                 clear_lines()
                 print(
-                    f"Function {func.__name__} took {end_time - start_time:.2g} (s) to run."
+                    _getLocationPrefix(),
+                    f"Function {func.__name__} took {end_time - start_time:.2g} (s) to run.",
                 )
                 sys.stdout.flush()
             else:
@@ -2535,14 +2538,14 @@ def clear_lines():
 def exampleofprogress():
     # Example usage
     total = 100
-    print("Starting the process...")
+    print(_getLocationPrefix(), "Starting the process...")
     sys.stdout.flush()
     # time.sleep(2)
     for i in range(total + 1):
         if i % 10 == 0:
             clear_lines()
-            print(f"i = {i}, asdafdqw=")
-            print(f"i = {i}, asdafdqw=")
+            print(_getLocationPrefix(), f"i = {i}, asdafdqw=")
+            print(_getLocationPrefix(), f"i = {i}, asdafdqw=")
             sys.stdout.flush()
         time.sleep(0.1)  # Simulate some work being done
         print_progress_bar(i, total, prefix="Progress", suffix="Complete", length=50)
@@ -2726,6 +2729,7 @@ class PhysicalObject:
                 pass
             else:
                 print(
+                    _getLocationPrefix(),
                     "WARNING: the variable "
                     + attr_name
                     + " should be an instance of Quantity but it is not. "
@@ -2733,6 +2737,7 @@ class PhysicalObject:
 
         if verbose:
             print(
+                _getLocationPrefix(),
                 f"Converted quantities to common units: {list(self.quantities.keys())}"
             )
 
@@ -2756,10 +2761,12 @@ class PhysicalObject:
 
         if verbose:
             print(
+                _getLocationPrefix(),
                 f"[{self.__class__.__name__}.{self.saveToH5group.__name__}] self.quantities = ",
                 self.quantities,
             )
             print(
+                _getLocationPrefix(),
                 f"[{self.__class__.__name__}.{self.saveToH5group.__name__}] self.generalQuantities = ",
                 self.generalQuantities,
             )
@@ -2787,7 +2794,7 @@ class PhysicalObject:
             "str": h5py.string_dtype(encoding="utf-8"),
         }
         if verbose:
-            print("self.quantities = ", self.quantities)
+            print(_getLocationPrefix(), "self.quantities = ", self.quantities)
         for attr_name, dtype_str in self.generalQuantities.items():
             value = getattr(self, attr_name, None)
             if value is not None:
@@ -2825,6 +2832,7 @@ class PhysicalObject:
             # Optional: consistency check
             if unit_expected is not None and unit_stored != unit_expected:
                 print(
+                    _getLocationPrefix(),
                     f"Warning: unit mismatch for {name}: "
                     f"{unit_stored} (file) vs {unit_expected} (expected)"
                 )
@@ -2872,7 +2880,7 @@ class PhysicalObject:
         path = os.path.join(fileDir, f"{fileName}.pkl")
 
         while os.path.exists(path) and not overwrite:
-            print(f"File already exists: {path}")
+            print(_getLocationPrefix(), f"File already exists: {path}")
             new = input(
                 "Enter a new filename (without .pkl) or press Enter to overwrite: "
             ).strip()
@@ -2885,7 +2893,7 @@ class PhysicalObject:
             pickle.dump(self, f, protocol=pickle.HIGHEST_PROTOCOL)
 
         if verbose:
-            print(f"Saved object to {path}")
+            print(_getLocationPrefix(), f"Saved object to {path}")
 
     def loadFromPkl(self, path: str, verbose: bool = False):
         """
@@ -2902,7 +2910,7 @@ class PhysicalObject:
             raise TypeError(f"Pickle contains {(obj)}, expected {self}")
 
         if verbose:
-            print(f"Loaded object from {path}")
+            print(_getLocationPrefix(), f"Loaded object from {path}")
 
         return obj
 
@@ -2980,7 +2988,7 @@ def coh_time_g1(x, dt):
     tic = time.time()
     corr = np.correlate(E, E.conj(), mode="full")
     toc = time.time()
-    print(f"Time taken for correlation: {toc - tic:.3f} seconds")
+    print(_getLocationPrefix(), f"Time taken for correlation: {toc - tic:.3f} seconds")
 
     corr = corr[N - 1 :]
     check(corr.std())
@@ -3066,6 +3074,18 @@ def deBroglie_wavelength(mass: Quantity, speed: Quantity) -> Quantity:
     lambda_db = (const.h / (gamma * mass * speed)).to(unit.m)
     return lambda_db
 
+
+def _getLocationPrefix():
+    """Get file location (filename:lineno) of the caller for clickable output."""
+    frame = inspect.currentframe()
+    if frame and frame.f_back:
+        caller_frame = frame.f_back
+        caller_info = inspect.getframeinfo(caller_frame)
+        filename = caller_info.filename
+        lineno = caller_info.lineno
+        # Format: filename:lineno for VS Code clickability
+        return f"{filename}:{lineno}"
+    return ""
 
 linestyles = ["-", "--", "-.", ":"]
 

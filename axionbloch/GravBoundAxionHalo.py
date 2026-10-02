@@ -18,7 +18,7 @@ from scipy.special import sph_harm_y
 
 from axionbloch.dependency import *
 from axionbloch.Station import Station
-from axionbloch.utils import high_contrast_extended as colors
+from axionbloch.utils import high_contrast_extended as colors, _getLocationPrefix
 
 
 class GravBoundAxionHalo:
@@ -222,7 +222,7 @@ class GravBoundAxionHalo:
         toc = time.time()
         if verbose:
             print(
-                msgPrefix, f"N={self.N} l={l} Eigensolver took {toc - tic:.3f} seconds"
+                f"{_getLocationPrefix()} {msgPrefix} N={self.N} l={l} Eigensolver took {toc - tic:.3f} seconds"
             )
         energies = energies_pot_unit * self.pot.unit
 
@@ -301,7 +301,7 @@ class GravBoundAxionHalo:
         msgPrefix = f"[{self.__class__.__name__}.{self.solve_TISE_3D.__name__}]"
         for l in l_vals:
             if verbose:
-                print(msgPrefix, f"Solving for l={l}")
+                print(f"{_getLocationPrefix()} {msgPrefix} Solving for l={l}")
             self.solve_TISE_3D_l(
                 l=l,
                 showPlot=showPlot,
@@ -587,7 +587,7 @@ class GravBoundAxionHalo:
         )
 
         # --- Resolve direction from station ---
-        assert station is not None, msgPrefix + " Please provide a Station."
+        assert station is not None, f"{_getLocationPrefix()} {msgPrefix} Please provide a Station."
 
         if meas_time is None:
             print(
@@ -605,13 +605,13 @@ class GravBoundAxionHalo:
         if truncRadius is None:
             line_end = self.r[-1]
         elif not isinstance(truncRadius, Quantity) or not truncRadius.unit.is_equivalent(self.r.unit):
-            raise TypeError(msgPrefix + " truncRadius must be a length Quantity.")
+            raise TypeError(f"{_getLocationPrefix()} {msgPrefix} truncRadius must be a length Quantity.")
         else:
             line_end = truncRadius.to(self.r.unit)
         if not line_end.isscalar or not np.isfinite(line_end.value):
-            raise ValueError(msgPrefix + " truncRadius must be a finite scalar.")
+            raise ValueError(f"{_getLocationPrefix()} {msgPrefix} truncRadius must be a finite scalar.")
         if line_end < self.r[0] or line_end > self.r[-1]:
-            raise ValueError(msgPrefix + " truncRadius must lie within the sampled radial grid.")
+            raise ValueError(f"{_getLocationPrefix()} {msgPrefix} truncRadius must lie within the sampled radial grid.")
         coordinates = self.r.to_value(self.r.unit)
         cutoff_index = int(np.searchsorted(coordinates, line_end.to_value(self.r.unit)))
         stop_index = min(self.N, max(2, cutoff_index + 1))
@@ -734,7 +734,7 @@ class GravBoundAxionHalo:
             speed = np.linalg.norm(velocity)
             beta = (speed / const.c).to(unit.one)
             if beta >= 1 * unit.one:
-                raise ValueError(msgPrefix + " relative_velocity must be below c.")
+                raise ValueError(f"{_getLocationPrefix()} {msgPrefix} relative_velocity must be below c.")
 
             # here Theta_grid and Phi_grid are grid of the space
             theta_values = Theta_grid.to_value(unit.rad)
@@ -815,7 +815,7 @@ class GravBoundAxionHalo:
         )
         toc = time.time()
         if verbose:
-            print(msgPrefix, f"interpolation time: {toc-tic:.2e} s")
+            print(f"{_getLocationPrefix()} {msgPrefix} interpolation time: {toc-tic:.2e} s")
 
         # sample gradient along the radial line toward the station
         Nr_plot = 2**10
@@ -839,7 +839,7 @@ class GravBoundAxionHalo:
         grad_phi_line = np.asarray(interp_phi(points)) * grad_phi.unit
         toc = time.time()
         if verbose:
-            print(msgPrefix, f"gradient along station direction time: {toc-tic:.2e} s")
+            print(f"{_getLocationPrefix()} {msgPrefix} gradient along station direction time: {toc-tic:.2e} s")
         # Hide interpolation and derivative buffer samples from callers.
         r = r[:output_stop]
         WF_direction = WF_direction[:output_stop]
@@ -1065,7 +1065,7 @@ class GravBoundAxionHalo:
 
         for i, meas_time in enumerate(meas_times):
             if verbose:
-                print(msgPrefix, f"step {i}/{len(meas_times)}  t={meas_time.iso}")
+                print(f"{_getLocationPrefix()} {msgPrefix} step {i}/{len(meas_times)}  t={meas_time.iso}")
             _, _, r_line, grad_r_line, grad_theta_line, grad_phi_line = (
                 self.findGradientsAtDirection(
                     stateCoefficients=stateCoefficients,
@@ -1083,7 +1083,7 @@ class GravBoundAxionHalo:
             grad_theta_vals.append(grad_theta_line[idx])
             grad_phi_vals.append(grad_phi_line[idx])
         # if verbose:
-        #     print(msgPrefix, f"grid + interpolators built in {_time.time()-tic:.2f} s")
+        #     print(f"{_getLocationPrefix()} {msgPrefix} grid + interpolators built in {_time.time()-tic:.2f} s")
 
         return {
             "times": meas_times,
@@ -1255,9 +1255,9 @@ class GravBoundAxionHalo:
         rms_phi = np.sqrt(np.mean(Omega_a_phi**2))
 
         if verbose:
-            print(msgPrefix, f"RMS Omega_a_r = {rms_r}")
-            print(msgPrefix, f"RMS Omega_a_theta = {rms_theta}")
-            print(msgPrefix, f"RMS Omega_a_phi = {rms_phi}")
+            print(f"{_getLocationPrefix()} {msgPrefix} RMS Omega_a_r = {rms_r}")
+            print(f"{_getLocationPrefix()} {msgPrefix} RMS Omega_a_theta = {rms_theta}")
+            print(f"{_getLocationPrefix()} {msgPrefix} RMS Omega_a_phi = {rms_phi}")
 
         return {
             "rms_Omega_a_r": rms_r,
@@ -1321,7 +1321,7 @@ class GravBoundAxionHalo:
 
         for label, stateSelection in stateNamesDict.items():
             if verbose:
-                print(msgPrefix, f"Computing gradients for: {label}")
+                print(f"{_getLocationPrefix()} {msgPrefix} Computing gradients for: {label}")
 
             if not isinstance(stateSelection, dict) or not stateSelection:
                 raise TypeError(
@@ -1900,7 +1900,7 @@ class GravBoundAxionHalo:
             stopIdx = startIdx + np.argmin(np.abs(self.r[startIdx:] - truncRadius))
         else:
             raise TypeError(
-                msgPrefix + " truncRadius unit is not equivalent to length. "
+                f"{_getLocationPrefix()} {msgPrefix} truncRadius unit is not equivalent to length. "
             )
 
         plt.rcParams["font.serif"] = ["Times New Roman"]
@@ -2075,7 +2075,7 @@ class GravBoundAxionHalo:
                 self.r[start_indx:stop_indx],
             )
             # print("key =", key, "; n_r and l are:", n_r, l_val)
-            print(msgPrefix, f"(n_r, l) = ({n_r}, {l_val})")
+            print(f"{_getLocationPrefix()} {msgPrefix} (n_r, l) = ({n_r}, {l_val})")
             print(f"eigen-energy = {eigenstate['eigenE']:.3e} eV")
             print("norm =", norm)
             print("integral =", integral)
