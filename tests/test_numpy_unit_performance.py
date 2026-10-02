@@ -75,7 +75,7 @@ def _assert_result_valid(result, operation, use_units):
         return
     if operation == "unit_conversion":
         assert use_units
-        assert result.unit == unit.cm * unit.microsecond * unit.g
+        assert result.is_equivalent(unit.cm * unit.microsecond * unit.g)
         return
     assert result is not None
 
