@@ -270,9 +270,9 @@ class MilkyWay:
         return (
             np.array(
                 [
-                    gsun.x.to(unit.km / unit.s).value,
-                    gsun.y.to(unit.km / unit.s).value,
-                    gsun.z.to(unit.km / unit.s).value,
+                    gsun.d_x.to(unit.km / unit.s).value,
+                    gsun.d_y.to(unit.km / unit.s).value,
+                    gsun.d_z.to(unit.km / unit.s).value,
                 ]
             )
             * unit.km

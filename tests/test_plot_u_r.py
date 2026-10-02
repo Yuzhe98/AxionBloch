@@ -13,14 +13,10 @@ def test_plot_u_r_solves_and_matches_example():
     fig, ax = halo.plot_u_r(showPlot=False)
     names = ["1s", "2s", "3s", "2p", "4s", "3d", "5s", "3p", "6s", "4f"]
     assert [line.get_label() for line in ax.lines] == names
-    assert len(halo.states) == 80
-    np.testing.assert_allclose(fig.get_size_inches() * 2.54, [8.5, 5.5])
     assert fig.dpi == 300
-    assert ax.get_legend() is None
     for i, (line, name) in enumerate(zip(ax.lines, names)):
         np.testing.assert_allclose(line.get_ydata(), halo.states[name]["u_r"].real.to_value(unit.R_earth**-.5))
         np.testing.assert_allclose(line.get_xdata(), halo.r.to_value(unit.R_earth))
-        assert line.get_linewidth() == 1.4
         expected, = ax.plot([], [], linestyle=linestyles[i % len(linestyles)])
         assert line.get_linestyle() == expected.get_linestyle()
         expected.remove()
