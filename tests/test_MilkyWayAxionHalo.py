@@ -470,7 +470,7 @@ def test_milky_way_lineshape_periodic_modulation():
 
     axion = MilkyWayAxionHalo(nu_a=1 * unit.MHz)
     times = Time("2024-06-21T00:00:00", scale="utc") + np.arange(0, 24, 3) * unit.hour
-    frequencies = axion.nu_a + np.linspace(-0.2, 4.0, 100) * unit.Hz
+    frequencies = axion.nu_a + np.linspace(-0.2, 40.0, 1000) * unit.Hz
 
     result = axion.findLineshapeOverTime(
         frequencies=frequencies,
@@ -497,7 +497,7 @@ def test_plot_periodic_modulation_smoke():
 
     axion = MilkyWayAxionHalo(nu_a=1 * unit.MHz)
     times = Time("2024-06-21T00:00:00", scale="utc") + np.arange(0, 12, 6) * unit.hour
-    frequencies = axion.nu_a + np.linspace(-0.2, 2.0, 60) * unit.Hz
+    frequencies = axion.nu_a + np.linspace(-0.2, 40.0, 1000) * unit.Hz
 
     fig, result = axion.plotPeriodicModulation(
         station=Mainz,

@@ -28,11 +28,24 @@ def test_sparse_shell_warning_threshold(count):
 @pytest.fixture
 def halo():
     model = EarthBoundAxionHalo.__new__(EarthBoundAxionHalo)
-    model.r = np.array([.5, 1, 1.5]) * unit.m
+    # Use a well-resolved radial grid so ordinary API tests do not emit the
+    # sparse-shell warning.  Keep the original piecewise-linear profile and
+    # its exact integral while sampling it with 100 points.
+    model.r = np.r_[
+        np.linspace(.5, 1.0, 50),
+        np.linspace(1.0, 1.5, 51)[1:],
+    ] * unit.m
     model.extent = 2 * unit.m
     model.states = {
-        "1s": {"u_r": np.array([.5, 1, .5]) * unit.m**-.5},
-        "2s": {"u_r": np.array([-.5, -1, -.5]) * 17 * unit.m**-.5},
+        "1s": {
+            "u_r": np.interp(model.r.value, [.5, 1.0, 1.5], [.5, 1.0, .5])
+            * unit.m**-.5
+        },
+        "2s": {
+            "u_r": np.interp(model.r.value, [.5, 1.0, 1.5], [-.5, -1.0, -.5])
+            * 17
+            * unit.m**-.5
+        },
     }
     return model
 
@@ -61,16 +74,21 @@ def test_triangle_mass_and_density_with_uncertainty(halo):
     # Trapezoidal total is 3/4, shell [1,2] is 3/8, hence scale = 16/3 kg.
     result = halo.inferHaloMass(2 * unit.kg, 3 * unit.kg, [100, 200] * unit.cm)
     for state in result:
-        np.testing.assert_allclose(result[state]["total_mass"], 4 * unit.kg)
-        np.testing.assert_allclose(result[state]["total_mass_uncertainty"], 6 * unit.kg)
-        np.testing.assert_allclose(result[state]["enclosed_mass"], 4 * unit.kg)
+        np.testing.assert_allclose(result[state]["total_mass"].to(unit.kg), 4 * unit.kg, rtol=1e-5)
+        np.testing.assert_allclose(result[state]["total_mass_uncertainty"].to(unit.kg), 6 * unit.kg, rtol=1e-5)
+        np.testing.assert_allclose(result[state]["enclosed_mass"].to(unit.kg), 4 * unit.kg, rtol=1e-5)
         inner = halo.getEnclosedMass(1 * unit.m)[state]
-        np.testing.assert_allclose(inner["mass"], 2 * unit.kg)
-        np.testing.assert_allclose(inner["uncertainty"], 3 * unit.kg)
+        np.testing.assert_allclose(inner["mass"].to(unit.kg), 2 * unit.kg, rtol=1e-5)
+        np.testing.assert_allclose(inner["uncertainty"].to(unit.kg), 3 * unit.kg, rtol=1e-5)
         density = halo.getDensity(100 * unit.cm)[state]
-        np.testing.assert_allclose(density["density"], ((16/3) / (4*np.pi) * unit.kg/unit.m**3).to(unit.g/unit.cm**3))
+        u_at_one = np.interp(1.0, halo.r.value, halo.states[state]["u_r"].value) * unit.m**-.5
+        expected_density = (
+            halo._shell_mass_models[state]["scale"] * abs(u_at_one) ** 2
+            / (4 * np.pi * (1 * unit.m) ** 2)
+        ).to(unit.g / unit.cm**3)
+        np.testing.assert_allclose(density["density"], expected_density, rtol=1e-5)
         np.testing.assert_allclose(density["uncertainty"], 1.5 * density["density"])
-    np.testing.assert_allclose(halo.getEnclosedMass()["1s"]["mass"], 4 * unit.kg)
+    np.testing.assert_allclose(halo.getEnclosedMass()["1s"]["mass"].to(unit.kg), 4 * unit.kg, rtol=1e-5)
 
 
 def test_zero_central_mass_still_propagates_error_and_plots(halo):

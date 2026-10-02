@@ -18,11 +18,20 @@ def test_partial_cell_integral_and_complex_amplitude():
 
 
 def test_shell_normalization_is_independent_of_wavefunction_scale():
-    # A triangular wavefunction: exact piecewise-linear test with zero endpoints.
+    # A triangular wavefunction sampled on 100 points, avoiding a sparse-shell
+    # warning while retaining the exact piecewise-linear profile.
     halo = EarthBoundAxionHalo.__new__(EarthBoundAxionHalo)
-    halo.r = np.array([.5, 1., 1.5]) * unit.R_earth
+    halo.r = np.r_[
+        np.linspace(.5, 1.0, 50),
+        np.linspace(1.0, 1.5, 51)[1:],
+    ] * unit.R_earth
     halo.extent = 2 * unit.R_earth
-    halo.states = {"1s": {"u_r": np.array([.5, 1., .5]) * unit.R_earth**-.5}}
+    halo.states = {
+        "1s": {
+            "u_r": np.interp(halo.r.value, [.5, 1.0, 1.5], [.5, 1.0, .5])
+            * unit.R_earth**-.5
+        }
+    }
     row, density = infer_state(halo, "1s", .7 * unit.R_earth, 1.7 * unit.R_earth, 2e-9 * unit.M_earth, np.array([.5, 1., 1.7]) * unit.R_earth)
     halo.states["1s"]["u_r"] *= -17
     scaled_row, scaled_density = infer_state(halo, "1s", .7 * unit.R_earth, 1.7 * unit.R_earth, 2e-9 * unit.M_earth, np.array([.5, 1., 1.7]) * unit.R_earth)
