@@ -28,7 +28,7 @@ def test_magnet_uses_astropy_quantities_by_default():
     """Magnet stores B0 in Tesla and FWHM as dimensionless; homogeneous by default (numPt=1)."""
     magnet = Magnet(B0=1.5 * unit.T, FWHM=2.0 * ppm, nFWHM=10, verbose=PRINT_RESULTS)
 
-    assert magnet.B0.is_equivalent(unit.T)
+    assert magnet.B0.unit.is_equivalent(unit.T)
     assert magnet.B0.to_value(unit.T) == pytest.approx(1.5)
     assert magnet.FWHM.unit.is_equivalent(unit.one)
     assert magnet.FWHM.to_value(unit.one) == pytest.approx(2.0e-6)

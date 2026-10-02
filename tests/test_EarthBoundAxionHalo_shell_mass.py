@@ -93,7 +93,7 @@ def test_density_plot_uses_shm_units_and_requested_size(halo):
         axes[0].lines[0].get_ydata(),
         (profiles["1s"]["density"] / halo.rho_M_DM_SHM).to_value(unit.one),
     )
-    assert halo.getEnclosedMass()["1s"]["mass"].is_equivalent(unit.M_earth)
+    assert halo.getEnclosedMass()["1s"]["mass"].unit.is_equivalent(unit.M_earth)
     plt.close(fig)
 
 

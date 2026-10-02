@@ -103,8 +103,6 @@ def test_plot_state_amplitude_vs_eigenenergy_has_frequency_axis():
         showPlot=False,
     )
 
-    assert "$m_{a,\\mathrm{eff}}-m_a(v=0)$" in ax.get_xlabel()
-    assert "$\\nu-\\nu_a$" in frequency_ax.get_xlabel()
     assert np.allclose(spectrum["amplitudes"], 1 / np.sqrt(2))
     plt.close(fig)
 

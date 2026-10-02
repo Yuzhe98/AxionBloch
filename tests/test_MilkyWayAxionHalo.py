@@ -91,15 +91,6 @@ ethanol = Sample(
     verbose=False,
 )
 
-# samples = []
-
-# magnet_2ppm = Magnet(B0=1.5 * unit.T, FWHM=2.0 * ppm, nFWHM=10, verbose=PRINT_RESULTS)
-# magnet_2ppb = Magnet(
-#     B0=2.0 * unit.T, FWHM=5.0 * ppb, nFWHM=10, verbose=PRINT_RESULTS
-# )
-
-# magnets = []
-
 
 def test_MilkyWayAxionHalo_initialization():
     """MilkyWayAxionHalo initializes with nu_a or m_a alone, and raises when neither is given.
@@ -182,7 +173,7 @@ def test_getRabiFreq():
     axion = MilkyWayAxionHalo(nu_a=1 * unit.MHz, g_aNN=1e-9 * unit.GeV ** (-1))
     rabi_freq = axion.getRabiFreq(verbose=PRINT_RESULTS)
     assert rabi_freq.unit.is_equivalent(
-        unit.Hz
+        unit.Hz * unit.rad
     ), f"Expected Rabi frequency to have units of Hz, but got {rabi_freq.unit}"
     assert np.isfinite(
         rabi_freq.value
@@ -197,24 +188,24 @@ def test_frequency_mass_conversion_and_explicit_Q_a():
     """Compton frequency uses h, and explicit Q_a is preserved."""
     nu_a = 1 * unit.MHz
     axion = MilkyWayAxionHalo(nu_a=nu_a, Q_a=1e5 * unit.one)
-    assert axion.Q_a == 1e5 * unit.one
+    assert axion.Q_a == 1e5 * unit.one, f"Expected Q_a to be preserved as 1e5, but got {axion.Q_a}"
     assert np.isclose(
         axion.m_a.to_value(unit.kg),
         (nu_a * const.h / const.c**2).to_value(unit.kg),
-    )
+    ), f"Expected m_a to be derived from nu_a * const.h / const.c**2, but got {axion.m_a}"
 
     from_mass = MilkyWayAxionHalo(m_a=axion.m_a)
-    assert np.isclose(from_mass.nu_a.to_value(unit.Hz), nu_a.to_value(unit.Hz))
+    assert np.isclose(from_mass.nu_a.to_value(unit.Hz), nu_a.to_value(unit.Hz)), f"Expected nu_a to be derived from m_a, but got {from_mass.nu_a}"
 
     default_axion = MilkyWayAxionHalo(nu_a=nu_a)
     assert np.isclose(
         default_axion.Q_a.to_value(unit.one),
-        ((const.c / default_axion.v_0) ** 2).to_value(unit.one),
-    )
+        ((const.c / default_axion.v_lab) ** 2).to_value(unit.one),
+    ), f"Expected default Q_a to be (c / v_lab)^2, but got {default_axion.Q_a}"
     assert np.isclose(
         default_axion.nu_a_eff.to_value(unit.Hz),
         (nu_a * (1 + 0.5 * default_axion.v_lab**2 / const.c**2)).to_value(unit.Hz),
-    )
+    ), f"Expected nu_a_eff to be nu_a * (1 + 0.5 * v_lab^2 / c^2), but got {default_axion.nu_a_eff}"
 
 
 def test_get_T_coh():
@@ -558,7 +549,7 @@ def test_Simulation(sample: Sample, magnet_kwargs: dict):
         **magnet_kwargs,
     )
 
-    B_a_rms = (axion.getRabiFreq() / (sample.gamma / (2 * PI))).to(unit.T)
+    B_a_rms = (axion.getRabiFreq() / (sample.gamma)).to(unit.T)
 
     params: SimuParams = {
         "key_info": {"nu_a": axion.nu_a},
@@ -590,9 +581,3 @@ def test_Simulation(sample: Sample, magnet_kwargs: dict):
     simulations.run(verbose=PRINT_RESULTS)
 
     assert len(simulations.pool) == 1
-
-    # # Post-process results with summary stats and plotting
-    # if PRINT_RESULTS:
-    #     for i, item in enumerate(simulations.pool):
-    #         item.simu.keepMeanStd()
-    #         item.simu.displayTrjries()

@@ -101,7 +101,7 @@ def test_sample_initialization_runs(sample: Sample):
     assert sample.spinNumDensity.unit.is_equivalent(unit.cm ** (-3))
     assert np.isfinite(sample.spinNumDensity.value)
 
-    assert sample.totalNumOfSpins.is_equivalent(unit.one)
+    assert sample.totalNumOfSpins.unit.is_equivalent(unit.one)
     assert np.isfinite(sample.totalNumOfSpins.value)
 
 
@@ -109,7 +109,7 @@ def test_getThermalPol_runs(sample: Sample):
     """getThermalPol returns a finite dimensionless polarization for T > 0."""
     pol = sample.getThermalPol(B_pol=1.0 * unit.T, temp=300.0 * unit.K)
 
-    assert pol.is_equivalent(unit.one)
+    assert pol.unit.is_equivalent(unit.one)
     assert np.isfinite(pol.value)
 
 

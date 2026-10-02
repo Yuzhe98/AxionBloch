@@ -63,12 +63,12 @@ class TestEarthVelocity:
         assert v.unit.is_equivalent(unit.km / unit.s)
 
     def test_v_lab_magnitude_reasonable(self, mw_june):
-        """v_lab should be in 210–310 km/s (Sun's rotation + Earth's orbit)."""
+        """v_lab should be in 210-310 km/s (Sun's rotation + Earth's orbit)."""
         v_mag = mw_june.get_v_lab_magnitude().to(unit.km / unit.s).value
         assert 210 < v_mag < 310, f"|v_lab| = {v_mag:.1f} km/s — outside expected range"
 
     def test_v_lab_annual_modulation(self, mw_june, mw_dec):
-        """v_lab magnitude should differ by ~20–40 km/s between June and December."""
+        """v_lab magnitude should differ by ~20-40 km/s between June and December."""
         v_june = mw_june.get_v_lab_magnitude().to(unit.km / unit.s).value
         v_dec = mw_dec.get_v_lab_magnitude().to(unit.km / unit.s).value
         delta = abs(v_june - v_dec)
@@ -99,7 +99,7 @@ class TestGalactocentricPosition:
         assert pos.unit.is_equivalent(unit.kpc)
 
     def test_galactocentric_radius_close_to_sun(self, mw_june):
-        """Earth–GC distance should be ~8 kpc (close to galcen_distance = 8.122 kpc)."""
+        """Earth-GC distance should be ~8 kpc (close to galcen_distance = 8.122 kpc)."""
         r = mw_june.get_galactocentric_radius().to(unit.kpc).value
         assert 7.5 < r < 8.8, f"r_GC = {r:.3f} kpc"
 
@@ -112,10 +112,10 @@ class TestGalactocentricPosition:
         """Sun should be at ~8.122 kpc from GC."""
         pos, _ = mw_june.get_sun_galactocentric()
         r = float(np.sqrt(np.sum(pos.to(unit.kpc).value ** 2)))
-        assert abs(r - 8.122) < 0.05, f"Sun–GC = {r:.3f} kpc"
+        assert abs(r - 8.122) < 0.05, f"Sun-GC = {r:.3f} kpc"
 
     def test_sun_velocity_magnitude(self, mw_june):
-        """Sun's galactic velocity should be ~245–250 km/s."""
+        """Sun's galactic velocity should be ~245-250 km/s."""
         _, vel = mw_june.get_sun_galactocentric()
         v_mag = float(np.sqrt(np.sum(vel.to(unit.km / unit.s).value ** 2)))
         assert 230 < v_mag < 260, f"|v_sun| = {v_mag:.1f} km/s"
@@ -128,7 +128,7 @@ class TestGalactocentricPosition:
 
 class TestHeliocentricVelocity:
     def test_magnitude(self, mw_june):
-        """Earth's heliocentric speed should be ~29–31 km/s."""
+        """Earth's heliocentric speed should be ~29-31 km/s."""
         v = mw_june.get_earth_heliocentric_velocity()
         v_mag = float(np.sqrt(np.sum(v.to(unit.km / unit.s).value ** 2)))
         assert 25 < v_mag < 35, f"|v_helio| = {v_mag:.2f} km/s"
@@ -275,7 +275,7 @@ class TestEarthRotation:
         assert v.unit.is_equivalent(unit.km / unit.s)
 
     def test_magnitude_at_mainz(self, mw_june):
-        """At Mainz (lat ~50°), rotation speed should be ~0.25–0.35 km/s."""
+        """At Mainz (lat ~50°), rotation speed should be ~0.25-0.35 km/s."""
         v_rot = float(
             np.linalg.norm(
                 mw_june.get_earth_rotation_velocity().to(unit.km / unit.s).value
