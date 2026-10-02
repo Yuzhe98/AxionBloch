@@ -33,7 +33,7 @@ def test_station_PSD_and_FWHM_update():
     assert "frequency" not in lineshape
     assert "PSD" not in lineshape
     assert lineshape["FWHM_freq"] > 0 * unit.Hz
-    assert lineshape["FWHM_freq"].is_equivalent(unit.Hz)
+    assert lineshape["FWHM_freq"].unit.is_equivalent(unit.Hz)
     assert lineshape["FWHM"] == lineshape["FWHM_a"]
     assert lineshape["FWHM_a"].unit.is_equivalent(ppm)
     assert axion.FWHM_freq == lineshape["FWHM_freq"]
@@ -48,7 +48,7 @@ def test_station_PSD_and_FWHM_update():
     assert "FWHM_frequency" not in fwhm
     assert "FWHM_fraction" not in fwhm
     assert fwhm["FWHM_freq"] > 0 * unit.Hz
-    assert fwhm["FWHM_freq"].is_equivalent(unit.Hz)
+    assert fwhm["FWHM_freq"].unit.is_equivalent(unit.Hz)
     assert fwhm["FWHM_a"].unit.is_equivalent(ppm)
     assert fwhm["tau_a"] > 0 * unit.s
     assert axion.FWHM_frequency == fwhm["FWHM_freq"]
@@ -118,7 +118,7 @@ def test_FWHM_reuses_cached_station_lineshape(monkeypatch):
     assert fwhm["lineshape"] is lineshape["lineshape"]
     assert fwhm["FWHM_freq"] > 0 * unit.Hz
     assert axion.v_lab == lineshape["v_lab_magnitude"][0]
-    assert axion.windAngle == lineshape["alpha"]
+    assert axion.windAngle == lineshape["alpha"], f"windAngle {axion.windAngle} does not match lineshape alpha {lineshape['alpha']}"
 
 
 def test_kinematics_cache_reuses_matching_inputs(monkeypatch):
