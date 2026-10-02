@@ -1284,6 +1284,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
                 self.states[name]["u_r"].real.to_value(unit.R_earth**-0.5),
                 label=name,
                 color=colors[idx % len(colors)],
+                linestyle=linestyles[idx % len(linestyles)],
                 marker=markers[idx % len(markers)],
                 markevery=0.1,
                 markersize=2,

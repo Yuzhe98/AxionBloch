@@ -447,7 +447,7 @@ class GravBoundAxionHalo:
 
         energy_unit_label = energy_unit.to_string("latex_inline")[1:-1]
         # ax.set_xlim(-0.05 * np.amax(energy_values), 1.05 * np.max(energy_values))
-        ax.set_xlabel("$m-m_a\\,$" f"$\\left({energy_unit_label}/c^2\\right)$")
+        ax.set_xlabel("$m-m_a\\,$" + f"$\\left({energy_unit_label}/c^2\\right)$")
         # Leave vertical room for the staggered state labels.
         ax.set_ylim(0, 1.8 * np.max(amplitudes))
         # ax.set_ylabel("$|c_{nlm}|$")
@@ -464,7 +464,7 @@ class GravBoundAxionHalo:
         freq_ax.set_xlim(freq_ax_limits)
         freq_unit_label = frequency_unit.to_string("latex_inline")[1:-1]
         freq_ax.set_xlabel(
-            "$\\nu-\\nu_a\\,$" f"$\\left({freq_unit_label}\\right)$"
+            "$\\nu-\\nu_a\\,$" + f"$\\left({freq_unit_label}\\right)$"
         )
 
         fig.tight_layout()
