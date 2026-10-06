@@ -30,7 +30,7 @@ sample = Sample(
     vol=1 * unit.cm**3,
     mu=mu_Xe129N,  # magnetic dipole moment
     temp=300 * unit.K,  # room temperature
-    pol=0.5 * unit.one,  # polarization
+    pol=50 * unit.percent,  # polarization
     verbose=False,
 )
 

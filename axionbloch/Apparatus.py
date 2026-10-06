@@ -116,7 +116,7 @@ class Magnet:
         elif self.numPt is None:
             self.numPt = 1
         if verbose:
-            print(f"{_getLocationPrefix()} {msgPrefix}numPt = {numPt}")
+            print(f"{_getLocationPrefix()} {msgPrefix} numPt = {numPt}")
             print(f"{_getLocationPrefix()} {msgPrefix} self.numPt = {self.numPt}")
         # homogeneous field
         if self.numPt == 1 or self.FWHM_B0 == 0.0 or self.nFWHM == 0:
