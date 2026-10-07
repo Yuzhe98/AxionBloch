@@ -1,6 +1,6 @@
 # Mass and density inferred from a measured shell
 
-`shell_normalized_density.py` is the short example: edit quantities at the
+`density_by_shell_mass.py` is the short example: edit quantities at the
 top of the file, solve the desired states, and call the class methods.
 Run from the repository root:
 
@@ -14,22 +14,22 @@ or `main()` function. Each selected eigenstate is an independent hypothesis.
 
 ## Class methods
 
-- `halo.inferHaloMass(shell_mass, mass_uncertainty, radius_range, state_names)`
+- `halo.inferHaloMass(shell_mass_limit, radius_range, state_names)`
   infers halo masses from already-normalized wavefunctions without changing them. It returns each state's shell fraction,
-  total mass over `[0, extent]`, mass inside the outer shell radius, and the
-  corresponding quoted uncertainties, all masses in Earth masses. Omit `state_names` to use all solved
+  total mass over `[0, extent]` and mass inside the outer shell radius, in
+  Earth masses. The default cap limits central mass inside Earth to
+  `0.5 * unit.M_earth`. Omit `state_names` to use all solved
   states. The instance stores independent inferred mass scales for later calls.
-- `halo.getEnclosedMass(radius)` returns `mass` and `uncertainty` per state.
+- `halo.getEnclosedMass(radius)` returns `mass` per state.
   Omit `radius` for the total mass over the simulated domain.
-- `halo.getDensity(radii)` returns angularly averaged `density` and
-  `uncertainty` per state, for a scalar or array of positive radii.
-- `halo.plotDensity(radii, showPlot=True)` returns `(figure, axes, profiles)`.
-  Central densities and uncertainty magnitudes appear in separate panels,
-  in units of `halo.rho_M_DM_SHM`. The figure is 13 cm wide at 300 dpi and
+- `halo.getDensity(radii)` returns angularly averaged `density` per state,
+  for a scalar or array of positive radii.
+- `halo.plotDMdensity(radii, showPlot=True)` returns `(figure, axes, profiles)`.
+  Densities are plotted in units of `halo.rho_M_DM_SHM`. The figure is 13 cm wide at 300 dpi and
   uses `tight_layout`. Returned profiles retain physical mass-density units.
   Use `showPlot=False` to save or customize the figure without displaying it.
 
-Masses, radii, profiles, and uncertainties are Astropy quantities throughout.
+Masses, radii, and profiles are Astropy quantities throughout.
 Only plotting and serialization convert to plain numerical arrays. Optional
 `state_names` on the query and plot methods selects a subset of states with inferred mass scales.
 Inferences retain wavefunction copies; after solving new eigenstates,
@@ -42,7 +42,7 @@ separate single-state hypotheses cannot share one total-mass normalization.
 For each state, `I(a,b) = integral_a^b |u(r)|^2 dr`, and
 
 ```text
-scale        = M_shell / I(r_inner, r_outer)
+    scale        = M_shell_limit / I(r_inner, r_outer)
 M(<r)        = scale * I(0, r)
 rho_bar(r)   = scale * |u(r)|^2 / (4*pi*r^2)
 ```
@@ -53,10 +53,9 @@ grid samples and linearly interpolating `u` at both interval endpoints.
 Zero domain boundaries are included. Accuracy still requires grid convergence. Shell probabilities are integrated directly to avoid
 subtracting nearly equal cumulative probabilities.
 
-Quoted uncertainty propagates using the same positive factors, including
-when the central mass is zero. No confidence level, positivity truncation,
-detection, or statistical upper limit is inferred. The supplied constraint
-is consistent with zero. Densities are angular averages; states with nonzero
+The central halo mass uses the shell-mass limit and is capped so the mass
+inside one Earth radius does not exceed the configured maximum. Densities are
+angular averages; states with nonzero
 angular momentum need not have isotropic local densities.
 
 The total over the simulated domain approximates the entire halo only after
@@ -68,10 +67,8 @@ the outer boundary.
 
 ## Detailed comparison
 
-`shell_density_mass_sweep.py` preserves the longer three-mass, six-state
-comparison, resolution/extent checks, saved density tables, and JSON output.
-It now uses the class API through the small compatibility wrappers in
-`shell_density_helpers.py`. Outputs go to `outputs/shell_normalized/`.
+`density_by_shell_mass_sweep.py` scans frequencies and writes density tables
+and per-frequency reports.
 The 1% convergence flag tests Moon-enclosed mass and Earth-surface density,
 not the whole profile. Extremely small plotted tails can reach the
 numerical noise floor. Existing output files are replaced on reruns.
