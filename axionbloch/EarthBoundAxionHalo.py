@@ -452,7 +452,9 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
     N: int = int(2**12)
     extent: Quantity[unit.m] = 128.0 * unit.R_earth
     a_0: Quantity[unit.eV] | None = None
-    totalMassEnclosed: Quantity[unit.kg] | None = 4e-9 * unit.M_earth
+    # Halo masses use Earth masses by default.  Other mass quantities in this
+    # class (for example the axion mass and PREM profile) keep their own units.
+    totalMassEnclosed: Quantity[unit.M_earth] | None = 4e-9 * unit.M_earth
     g_aNN: Quantity[unit.GeV**-1] = 1e-9 * unit.GeV**-1
     rho_M_DM_SHM: Quantity[unit.g / unit.cm**3] = 0.3 * unit.GeV / (const.c**2 * unit.cm**3)
 
@@ -465,7 +467,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         extent: Quantity[unit.m] = 128.0 * unit.R_earth,
         getPot=earth_grav_potential_infty,
         a_0: Quantity[unit.eV] | None = None,
-        totalMassEnclosed: Quantity[unit.kg] | None = 4e-9 * unit.M_earth,
+        totalMassEnclosed: Quantity[unit.M_earth] | None = 4e-9 * unit.M_earth,
         g_aNN: Quantity[unit.GeV**-1] = 1e-9 * unit.GeV**-1,
         rho_M_DM_SHM: Quantity[unit.g / unit.cm**3] = 0.3 * unit.GeV / (const.c**2 * unit.cm**3),
         verbose: bool = False,
@@ -486,6 +488,14 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         self.E_unit = unit.attoelectronvolt
         self.pot = self.pot.to(self.E_unit)
         self.T_magnitude = self.T_magnitude.to(self.E_unit)
+        # Keep the Earth-bound halo mass in the public/default halo unit while
+        # retaining an Astropy Quantity.  Convert to SI only where a consumer
+        # explicitly requests it (for example, density output below).
+        if not isinstance(totalMassEnclosed, Quantity) or not totalMassEnclosed.unit.is_equivalent(unit.kg):
+            raise TypeError("totalMassEnclosed must be a mass Quantity.")
+        totalMassEnclosed = totalMassEnclosed.to(unit.M_earth)
+        if not totalMassEnclosed.isscalar or not np.isfinite(totalMassEnclosed) or totalMassEnclosed < 0 * unit.M_earth:
+            raise ValueError("totalMassEnclosed must be finite, scalar and nonnegative.")
         self.N_a = totalMassEnclosed / self.m_a
         if a_0 is not None:
             self.a_0 = a_0
@@ -590,6 +600,10 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
                 raise TypeError(f"{name} must be a mass Quantity.")
             if not value.isscalar or not np.isfinite(value) or value < 0 * unit.kg:
                 raise ValueError(f"{name} must be finite, scalar and nonnegative.")
+        # Normalize only the inferred Earth-bound halo masses.  Keep the
+        # values as Quantity objects so callers can convert them as needed.
+        shell_mass = shell_mass.to(unit.M_earth)
+        mass_uncertainty = mass_uncertainty.to(unit.M_earth)
         # Interpret the shell as geocentric radii inside the simulated domain.
         bounds = Quantity(radius_range)
         if not bounds.unit.is_equivalent(unit.m):
