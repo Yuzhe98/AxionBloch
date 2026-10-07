@@ -10,8 +10,7 @@ from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo
 
 # Edit these physical inputs.
 # axion_mass = 1e-9 * unit.eV / const.c**2
-shell_mass = 0.3e-9 * unit.M_earth
-mass_uncertainty = 4e-9 * unit.M_earth
+shell_mass_limit = 4e-9 * unit.M_earth
 shell_radii = [12300 * unit.km, 384000 * unit.km]
 states = ["1s", "2s", "2p", "3s", "3p", "3d", "4s", "4p", "4d", "5s", "5p", "5d"]
 
@@ -106,19 +105,19 @@ halo = EarthBoundAxionHalo(
 halo.solve_TISE_3D(l_vals=[0, 1, 2], max_n_r=10)
 fig_u_r, ax_u_r = halo.plot_u_r(state_names=states)
 
-masses = halo.inferHaloMass(shell_mass, mass_uncertainty, shell_radii, states)
+masses = halo.inferHaloMass(shell_mass_limit, shell_radii, states)
 
 for state, result in masses.items():
-    print(f"{state}: total = {result['total_mass']:.2g} +/- {result['total_mass_uncertainty']:.2g}")
-    print(f"    inside Moon = {result['enclosed_mass']:.2g} +/- {result['enclosed_mass_uncertainty']:.2g}")
+    print(f"{state}: total = {result['total_mass']:.2g}")
+    print(f"    inside Moon = {result['enclosed_mass']:.2g}")
     print(f"    shell_fraction = {result['shell_fraction']:.2g}")
 
 # Earth-surface density for the selected single-state hypotheses.
 density_at_earth_radius = halo.getDensityAtEarthSurface(state_names=states)
 for state, result in density_at_earth_radius.items():
-    print(f"{state}: density at Earth radius = ({result['density_ratio']:.2g} +/- {result['uncertainty_ratio']:.2g}) * rho_M_DM_SHM")
+    print(f"{state}: density at Earth radius = {result['density_ratio']:.2g} * rho_M_DM_SHM")
 
-# Plot through the last solver grid point; the measured shell only sets the mass scale.
+# Plot through the last solver grid point; the shell-mass limit sets the mass scale.
 radii = np.geomspace(.01 * unit.R_earth, halo.r[-1], 1000)
 # fig, axes, profiles = halo.plotDMdensity(radii, state_names=states, scales=("linear", "linear"))
 fig, axes, profiles = halo.plotDMdensity(radii, state_names=states, scales=("log", "log"))

@@ -5,7 +5,7 @@ Run from the repository root:
 
 Figures and text results are saved in output_dir below.
 The combined density_at_earth_vs_frequency.txt table contains one row per state
-and frequency, with densities and absolute uncertainties in units of rho_M_DM_SHM.
+and frequency, with densities in units of rho_M_DM_SHM.
 The largest grids require substantial memory; edit scan_frequencies to select a scan.
 """
 
@@ -17,10 +17,8 @@ from astropy import units as unit
 
 from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo
 
-# Physical inputs and active presets from density_by_shell_mass.py.
-shell_mass = 0.3e-9 * unit.M_earth
-
-mass_uncertainty = 4e-9 * unit.M_earth
+# The shell upper limit sets the central inferred halo mass.
+shell_mass_limit = 4e-9 * unit.M_earth
 
 shell_radii = [12300 * unit.km, 384000 * unit.km]
 
@@ -148,19 +146,20 @@ def choose_params(frequency, examples):
 
 
 # Edit this frequency array for an arbitrary scan, e.g. [5, 25, 80] * unit.kHz.
+# scan_frequencies = np.geomspace(1e4, 3e7, 20) * unit.Hz
 scan_frequencies = np.geomspace(1e4, 3e7, 20) * unit.Hz
 # Alternatively: scan_frequencies = np.geomspace(1, 3e7, 20) * unit.Hz
 params = [choose_params(frequency, example_params) for frequency in scan_frequencies]
 
-output_dir = Path(__file__).resolve().parent / "outputs" / "frequency_sweep-2nd"
+output_dir = Path(__file__).resolve().parent / "outputs" / "frequency_sweep-4"
 output_dir.mkdir(parents=True, exist_ok=True)
 
 # Start a fresh combined table; append each frequency as soon as it is computed.
 density_table_path = output_dir / "density_at_earth_vs_frequency.txt"
 density_table_path.write_text(
     "# Density at r = 1 R_earth; each state is an independent hypothesis.\n"
-    "# Density and absolute uncertainty are in units of rho_M_DM_SHM.\n"
-    "# axion_frequency_Hz\tstate\tdensity_over_rho_M_DM_SHM\tuncertainty_over_rho_M_DM_SHM\n",
+    "# Density is in units of rho_M_DM_SHM.\n"
+    "# axion_frequency_Hz\tstate\tdensity_over_rho_M_DM_SHM\n",
     encoding="utf-8",
 )
 
@@ -178,7 +177,7 @@ for param in params:
     fig_u_r.savefig(output_dir / f"u_r_{frequency_label}.png", dpi=300)
     plt.close(fig_u_r)
 
-    masses = halo.inferHaloMass(shell_mass, mass_uncertainty, shell_radii, states)
+    masses = halo.inferHaloMass(shell_mass_limit, shell_radii, states)
     density_at_earth_radius = halo.getDensityAtEarthSurface(state_names=states)
 
     # Convert quantities to numbers only for the tab-separated text output.
@@ -186,22 +185,21 @@ for param in params:
         for state, earth in density_at_earth_radius.items():
             density_table.write(
                 f"{param['nu_a'].to_value(unit.Hz):.16e}\t{state}\t"
-                f"{earth['density_ratio'].to_value(unit.one):.16e}\t"
-                f"{earth['uncertainty_ratio'].to_value(unit.one):.16e}\n"
+                f"{earth['density_ratio'].to_value(unit.one):.16e}\n"
             )
 
-    # Keep readable results with units and quoted absolute uncertainties.
+# Keep readable inferred results with units.
     lines = [f"Frequency: {param['nu_a']}",
              f"N: {param['N']}; extent: {param['extent']}",
              f"Shell radii: {shell_radii}",
-             f"Shell mass: {shell_mass} +/- {mass_uncertainty}"]
+             f"Shell mass limit: {shell_mass_limit}"]
     for state, result in masses.items():
         earth = density_at_earth_radius[state]
         lines.extend([
-            f"{state}: total = {result['total_mass']:.6g} +/- {result['total_mass_uncertainty']:.6g}",
-            f"    inside Moon = {result['enclosed_mass']:.6g} +/- {result['enclosed_mass_uncertainty']:.6g}",
+            f"{state}: total = {result['total_mass']:.6g}",
+            f"    inside Moon = {result['enclosed_mass']:.6g}",
             f"    shell_fraction = {result['shell_fraction']:.6g}",
-            f"    density at Earth radius = ({earth['density_ratio']:.6g} +/- {earth['uncertainty_ratio']:.6g}) * rho_M_DM_SHM",
+            f"    density at Earth radius = {earth['density_ratio']:.6g} * rho_M_DM_SHM",
         ])
     report = "\n".join(lines)
     print(report, flush=True)
