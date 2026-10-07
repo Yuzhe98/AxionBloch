@@ -544,22 +544,19 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         interval_u = np.interp(interval_r, r, u)
         return np.trapezoid(np.abs(interval_u)**2, x=interval_r)
 
-    def inferHaloMass(self, shell_mass, mass_uncertainty, radius_range,
-                           state_names=None):
-        """Infer halo mass from a measured shell mass for each eigenstate.
+    def inferHaloMass(self, shell_mass_limit, radius_range,
+                           state_names=None,
+                           maxEarthEnclosedMass=0.5 * unit.M_earth):
+        """Infer halo mass from a shell-mass limit for each eigenstate.
 
         The solved wavefunctions retain their unit-probability normalization;
         this method does not rescale or modify the stored eigenstates.
 
         Parameters
         ----------
-        shell_mass : astropy.units.Quantity
-            Finite, nonnegative scalar mass measured between the shell radii.
-            Any mass unit is accepted, for example 0.3e-9 * unit.M_earth.
-        mass_uncertainty : astropy.units.Quantity
-            Finite, nonnegative scalar absolute uncertainty on shell_mass, in
-            any mass unit. Propagated linearly, even when shell_mass is zero.
-            No confidence level or positive upper limit is inferred.
+        shell_mass_limit : astropy.units.Quantity
+            Finite, nonnegative scalar upper limit on the mass in the shell.
+            This sets the unconstrained central halo mass scale.
         radius_range : astropy.units.Quantity or sequence of Quantity, shape (2,)
             Geocentric inner and outer radii (not altitudes), with length units.
             Must satisfy 0 <= inner < outer <= self.extent.
@@ -567,13 +564,16 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
             Already-solved eigenstate labels, e.g. ["1s", "2p"]. None selects
             all solved states. Each state is an independent halo hypothesis,
             not a component of a mixture. TISE is not solved automatically.
+        maxEarthEnclosedMass : astropy.units.Quantity or None, optional
+            Maximum allowed central inferred mass inside one Earth radius.
+            Defaults to ``0.5 * unit.M_earth``. Pass ``None`` to disable this
+            constraint.
 
         Returns
         -------
         results : dict
             Mapping from state label to shell_fraction (dimensionless),
-            total_mass, total_mass_uncertainty, enclosed_mass, and
-            enclosed_mass_uncertainty. All masses are Quantity in Earth masses.
+            total_mass and enclosed_mass, both Quantity in Earth masses.
             Total mass covers [0, extent]; enclosed mass covers [0, outer].
 
         Warns
@@ -589,21 +589,34 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         Each call replaces the stored inferred models with the selected states.
         Wavefunction and grid copies preserve the inference if TISE is rerun;
         call this method again to use new solutions. Constructor attributes
-        totalMassEnclosed, N_a and field amplitudes are unchanged.
+        totalMassEnclosed, N_a and field amplitudes are unchanged. The
+        The shell-mass limit sets the inferred central halo mass, subject to
+        the Earth-enclosed-mass cap.
         A UserWarning flags shell fractions at or below float64 machine epsilon.
         This is a sensitivity diagnostic, not an absolute probability accuracy
         limit; check grid-resolution and outer-radius convergence independently.
         """
-        # Validate the measured mass and its absolute uncertainty, retaining units.
-        for name, value in (("shell_mass", shell_mass), ("mass_uncertainty", mass_uncertainty)):
-            if not isinstance(value, Quantity) or not value.unit.is_equivalent(unit.kg):
-                raise TypeError(f"{name} must be a mass Quantity.")
-            if not value.isscalar or not np.isfinite(value) or value < 0 * unit.kg:
-                raise ValueError(f"{name} must be finite, scalar and nonnegative.")
-        # Normalize only the inferred Earth-bound halo masses.  Keep the
-        # values as Quantity objects so callers can convert them as needed.
-        shell_mass = shell_mass.to(unit.M_earth)
-        mass_uncertainty = mass_uncertainty.to(unit.M_earth)
+        # Validate and normalize the shell-mass limit, retaining it as Quantity.
+        if not isinstance(shell_mass_limit, Quantity) or not shell_mass_limit.unit.is_equivalent(unit.kg):
+            raise TypeError("shell_mass_limit must be a mass Quantity.")
+        if (not shell_mass_limit.isscalar or not np.isfinite(shell_mass_limit)
+                or shell_mass_limit < 0 * unit.kg):
+            raise ValueError("shell_mass_limit must be finite, scalar and nonnegative.")
+        shell_mass_limit = shell_mass_limit.to(unit.M_earth)
+        # Normalize the default central-mass constraint while keeping it as a
+        # Quantity.  A disabled constraint is useful for intentionally
+        # unconstrained analyses and small synthetic test domains.
+        if maxEarthEnclosedMass is not None:
+            if (not isinstance(maxEarthEnclosedMass, Quantity)
+                    or not maxEarthEnclosedMass.unit.is_equivalent(unit.kg)):
+                raise TypeError("maxEarthEnclosedMass must be a mass Quantity or None.")
+            maxEarthEnclosedMass = maxEarthEnclosedMass.to(unit.M_earth)
+            if (not maxEarthEnclosedMass.isscalar
+                    or not np.isfinite(maxEarthEnclosedMass)
+                    or maxEarthEnclosedMass < 0 * unit.M_earth):
+                raise ValueError(
+                    "maxEarthEnclosedMass must be finite, scalar and nonnegative."
+                )
         # Interpret the shell as geocentric radii inside the simulated domain.
         bounds = Quantity(radius_range)
         if not bounds.unit.is_equivalent(unit.m):
@@ -642,6 +655,18 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
             total = self._integrateRadialProbability(r, u, r[0], r[-1])
             shell = self._integrateRadialProbability(r, u, lower, upper)
             inside = self._integrateRadialProbability(r, u, r[0], upper)
+            earth_inside = None
+            if maxEarthEnclosedMass is not None:
+                earth_radius = 1 * unit.R_earth
+                if self.extent < earth_radius:
+                    raise ValueError(
+                        "The default Earth-radius mass constraint requires "
+                        "the inferred model domain to reach 1 * unit.R_earth. "
+                        "Pass maxEarthEnclosedMass=None to disable it."
+                    )
+                earth_inside = self._integrateRadialProbability(
+                    r, u, r[0], earth_radius
+                )
             if not np.isfinite(shell) or shell <= 0 or not np.isfinite(total) or total <= 0:
                 raise ValueError(f"{name}: unresolved shell probability; cannot infer halo mass.")
             # Flag very small fractions without treating epsilon as an accuracy cutoff.
@@ -657,18 +682,24 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
                     UserWarning,
                     stacklevel=2,
                 )
-            # Convert probability into mass using the measured shell constraint.
-            # Propagate absolute uncertainty separately so a zero central mass works.
-            scale, error_scale = shell_mass / shell, mass_uncertainty / shell
+            # Use the shell-mass limit as the central shell-mass scale.  Cap
+            # the total halo mass at the scale that places at most the
+            # configured mass inside one Earth radius.
+            scale = shell_mass_limit / shell
+            if maxEarthEnclosedMass is not None:
+                if not np.isfinite(earth_inside) or earth_inside <= 0:
+                    raise ValueError(
+                        f"{name}: unresolved probability inside 1 * unit.R_earth; "
+                        "cannot apply the Earth-enclosed-mass constraint."
+                    )
+                earth_limit_scale = maxEarthEnclosedMass / earth_inside
+                scale = min(scale, earth_limit_scale)
             # Store a snapshot for later density queries and report masses in M_earth.
-            models[name] = {"r": r.copy(), "u": u, "scale": scale,
-                            "error_scale": error_scale}
+            models[name] = {"r": r.copy(), "u": u, "scale": scale}
             results[name] = {
                 "shell_fraction": shell_fraction,
                 "total_mass": (scale * total).to(unit.M_earth),
-                "total_mass_uncertainty": (error_scale * total).to(unit.M_earth),
                 "enclosed_mass": (scale * inside).to(unit.M_earth),
-                "enclosed_mass_uncertainty": (error_scale * inside).to(unit.M_earth),
             }
         # Replace the previous inference only after every selected state succeeds.
         self._shell_mass_models = models
@@ -686,8 +717,8 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         Returns
         -------
         models : dict
-            Mapping from label to stored grid, wavefunction, mass scale and
-            uncertainty scale. Values reference the internal model dictionaries.
+            Mapping from label to stored grid, wavefunction, and mass scale.
+            Values reference the internal model dictionaries.
 
         Raises
         ------
@@ -705,7 +736,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         return {name: models[name] for name in names}
 
     def getEnclosedMass(self, radius=None, state_names=None):
-        """Return enclosed mass and quoted uncertainty for each inferred state.
+        """Return enclosed mass for each inferred state.
 
         Parameters
         ----------
@@ -718,13 +749,13 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         Returns
         -------
         results : dict
-            Mapping from state label to mass and uncertainty, both scalar
-            Quantity in Earth masses. The integral extends from zero to radius.
+            Mapping from state label to scalar mass Quantity in Earth masses.
+            The integral extends from zero to radius.
 
         Notes
         -----
         Requires a prior call to inferHaloMass. Uses its stored wavefunctions
-        and linearly propagated uncertainty, without interpreting confidence levels.
+        and inferred mass scales.
         """
         # Evaluate each independent hypothesis using its saved wavefunction.
         result = {}
@@ -736,14 +767,13 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
                 raise TypeError("radius must be a length Quantity.")
             if not cutoff.isscalar or not np.isfinite(cutoff):
                 raise ValueError("radius must be finite and scalar.")
-            # Scale the probability inside the cutoff into mass and uncertainty.
+            # Scale the probability inside the cutoff into mass.
             fraction = self._integrateRadialProbability(r, model["u"], r[0], cutoff)
-            result[name] = {"mass": (model["scale"] * fraction).to(unit.M_earth),
-                            "uncertainty": (model["error_scale"] * fraction).to(unit.M_earth)}
+            result[name] = {"mass": (model["scale"] * fraction).to(unit.M_earth)}
         return result
 
     def getDensity(self, radii, state_names=None):
-        """Return angularly averaged mass density and its quoted uncertainty.
+        """Return angularly averaged mass density.
 
         Parameters
         ----------
@@ -757,9 +787,9 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         Returns
         -------
         results : dict
-            Mapping from state label to density and uncertainty, both Quantity
-            in g/cm**3 with the same shape as radii. These are physical mass
-            densities, not ratios to rho_M_DM_SHM.
+            Mapping from state label to density Quantity in g/cm**3 with the
+            same shape as radii. These are physical mass densities, not ratios
+            to rho_M_DM_SHM.
 
         Notes
         -----
@@ -781,11 +811,8 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
             u = np.interp(radii, model["r"], model["u"])
             # Divide radial probability density by spherical area for its angular mean.
             profile = abs(u)**2 / (4 * np.pi * radii**2)
-            # Apply the inferred mass and uncertainty scales to the same spatial shape.
-            result[name] = {
-                "density": (model["scale"] * profile).to(unit.g / unit.cm**3),
-                "uncertainty": (model["error_scale"] * profile).to(unit.g / unit.cm**3),
-            }
+            # Apply the inferred mass scale to the spatial profile.
+            result[name] = {"density": (model["scale"] * profile).to(unit.g / unit.cm**3)}
         return result
 
     def getDensityAtEarthSurface(self, state_names=None):
@@ -800,16 +827,14 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         Returns
         -------
         results : dict
-            Mapping from state label to density and uncertainty (scalar
-            Quantity in g/cm**3), plus density_ratio and uncertainty_ratio
-            (dimensionless Quantity in units of self.rho_M_DM_SHM).
+            Mapping from state label to scalar density Quantity in g/cm**3,
+            plus density_ratio in units of self.rho_M_DM_SHM.
 
         Notes
         -----
         Call inferHaloMass first. Uses its saved wavefunctions and mass
         scales without solving TISE again. The model must extend to at
-        least one Earth radius. Densities are angular averages, and the
-        quoted uncertainty is propagated without a confidence-level assumption.
+        least one Earth radius. Densities are angular averages.
         """
         # Reuse the radius-based calculation and its inference/domain checks.
         results = self.getDensity(1 * unit.R_earth, state_names=state_names)
@@ -821,15 +846,14 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         if not reference.isscalar or not np.isfinite(reference) or reference <= 0 * reference.unit:
             raise ValueError("rho_M_DM_SHM must be a positive finite scalar density.")
 
-        # Provide SHM ratios alongside physical densities, keeping all units intact.
+        # Provide the SHM ratio alongside the physical density.
         for result in results.values():
             result["density_ratio"] = (result["density"] / reference).to(unit.one)
-            result["uncertainty_ratio"] = (result["uncertainty"] / reference).to(unit.one)
         return results
 
     def plotDMdensity(self, radii, state_names=None, showPlot=True,
                     radius_unit=unit.R_earth, density_unit=None, scales=("log", "log")):
-        """Plot central densities and quoted uncertainty magnitudes separately.
+        """Plot angularly averaged density profiles for inferred states.
 
         Parameters
         ----------
@@ -855,17 +879,15 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         -------
         fig : matplotlib.figure.Figure
             Figure of width 13 cm at 300 dpi, with tight_layout applied.
-        axes : numpy.ndarray of matplotlib.axes.Axes, shape (2,)
-            Central density panel followed by the quoted uncertainty panel.
+        ax : matplotlib.axes.Axes
+            Density profile axes.
         profiles : dict
             Unscaled physical density results from getDensity, in g/cm**3.
 
         Notes
         -----
-        Requires inferHaloMass first. The separate uncertainty panel avoids
-        implying a positive confidence interval on logarithmic axes. The SHM
-        reference must be a positive finite scalar. Each panel uses a logarithmic
-        y-axis if any selected value is positive, otherwise a linear axis.
+        Requires inferHaloMass first. The SHM reference must be a positive
+        finite scalar.
         """
         # Compute physical profiles first; unit choices below affect only the display.
         profiles = self.getDensity(radii, state_names)
@@ -875,34 +897,27 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         reference = self.rho_M_DM_SHM.to(unit.g / unit.cm**3, equivalencies=unit.mass_energy())
         if not reference.isscalar or not np.isfinite(reference) or reference <= 0 * reference.unit:
             raise ValueError("rho_M_DM_SHM must be a positive finite scalar density.")
-        # Separate central estimates and uncertainties instead of clipping an error band.
-        fig, axes = plt.subplots(2, 1, sharex=True, figsize=(13 / 2.54, 8 / 2.54), dpi=300)
+        # Plot one central density profile per selected state.
+        fig, ax = plt.subplots(figsize=(13 / 2.54, 8 / 2.54), dpi=300)
         for name, profile in profiles.items():
-            for ax, key in zip(axes, ("density", "uncertainty")):
-                # Choose SHM ratios or physical units, converting to numbers only for plotting.
-                plotted = ((profile[key] / reference).to(unit.one)
-                           if density_unit is None else profile[key].to(density_unit))
-                ax.plot(radii.to_value(radius_unit), plotted.value, label=name)
-        # Use logarithmic axes when possible, allowing identically zero panels.
-        for ax, key in zip(axes, ("density", "uncertainty")):
-            ax.set_xscale(scales[0])
-            if any(np.any(profile[key] > 0 * profile[key].unit) for profile in profiles.values()):
-                ax.set_yscale(scales[1])
-            ax.grid(alpha=.25)
-            if key == "density":
-                ax.legend(bbox_to_anchor=(1.0, 1.0), loc="upper left")
+            # Choose SHM ratios or physical units, converting to numbers only for plotting.
+            plotted = ((profile["density"] / reference).to(unit.one)
+                       if density_unit is None else profile["density"].to(density_unit))
+            ax.plot(radii.to_value(radius_unit), plotted.value, label=name)
+        ax.set_xscale(scales[0])
+        ax.set_yscale(scales[1])
+        ax.grid(alpha=.25)
+        ax.legend(bbox_to_anchor=(1.0, 1.0), loc="upper left")
         # Label the displayed units, then arrange and optionally show the figure.
         if density_unit is None:
-            axes[0].set_ylabel("$\\rho^{\\oplus} / \\rho^{\\mathrm{SHM}}$")
-            axes[1].set_ylabel("$\\Delta\\rho^{\\oplus} / \\rho^{\\mathrm{SHM}}$")
+            ax.set_ylabel("$\\rho^{\\oplus} / \\rho^{\\mathrm{SHM}}$")
         else:
-            axes[0].set_ylabel(f"Mean density ({density_unit})")
-            axes[1].set_ylabel(f"Quoted uncertainty ({density_unit})")
-        axes[1].set_xlabel(f"Radius ({radius_unit})")
+            ax.set_ylabel(f"Mean density ({density_unit})")
+        ax.set_xlabel(f"Radius ({radius_unit})")
         fig.tight_layout()
         if showPlot:
             plt.show()
-        return fig, axes, profiles
+        return fig, ax, profiles
 
     # ------------------------------------------------------------------
     # Gradient at arbitrary direction / time
