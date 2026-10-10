@@ -138,53 +138,249 @@ class MagField(PhysicalObject):
         init_phase: Quantity = 0.0 * unit.rad,
         verbose: bool = False,
     ):
-        """Generate a calibrated 90° (π/2) pulse in the rotating frame.
+        """Generate a 90° hard pulse at the beginning of the simulation.
 
-        The pulse amplitude is chosen so that ``gamma * B90 * t90 = π``, giving
-        an exact 90° flip.  The pulse occupies the first ``t90_s`` seconds of
-        the time window; the remainder is zero.
+        ``t90`` is rounded to the nearest simulation step. The amplitude is
+        calibrated for that integer step count using the RK4 rotation angle,
+        so the amplitude and pulse duration use the same discrete grid. This
+        method is a convenience wrapper around :meth:`setXYPulse_new`.
+
+        The calibration assumes an on-resonance spin with negligible
+        relaxation. A sample with detuning, inhomogeneity, or appreciable
+        relaxation during the pulse can have a different ensemble-averaged
+        flip angle or magnetization magnitude.
 
         Parameters
         ----------
-        timeStep_s : float
-            Simulation time step (s).
+        timeStep : Quantity
+            Simulation time step, such as ``1 * unit.ms``.
         timeLen : int
-            Total number of time steps.
-        gamma : float
-            Gyromagnetic ratio in Hz/T (2π factor).
-        t90_s : float
-            Desired 90° pulse duration (s).
+            Number of simulation boundary points; the field contains
+            ``timeLen - 1`` steps.
+        gamma : Quantity
+            Gyromagnetic ratio in ``rad Hz / T``.
+        t90 : Quantity
+            Requested 90° pulse duration. It is snapped to an integer number
+            of time steps before amplitude calibration.
         nu_rot : Quantity
-            Carrier frequency of the rotating frame (Hz).
-        init_phase : float
-            Initial phase offset (rad).
+            Carrier frequency used to rotate the XY field components.
+        init_phase : Quantity
+            Initial phase, which sets the pulse rotation axis.
         verbose : bool
-            Unused; reserved for future diagnostic output.
+            Print the snapped pulse duration and calibrated field amplitude.
         """
-
-        msgPrefix = f"[{self.__class__.__name__}.{self.set90DegPulse.__name__}]"
-        startDelayLen = 0  # this should stay 0. It does not help in anything
-        timeStamp_s = timeStep * np.arange(timeLen - 1)
-        t90Len = int(np.round(t90 / timeStep))
-        B90 = 2 * 0.5 * PI / (gamma * t90)
-        envelope = np.zeros(timeStamp_s.shape) * unit.T
-        t90Len = int(np.round(t90 / (timeStamp_s[1] - timeStamp_s[0])))
-
-        envelope[startDelayLen : startDelayLen + t90Len] = 0.5 * B90
-
-        # excitation along x-axis
-        Bx_envelope = np.multiply(
-            envelope, np.cos(2 * PI * nu_rot * timeStamp_s + init_phase)
+        pulse_steps = int(np.round(t90 / timeStep))
+        self.setXYPulse_new(
+            timeStep=timeStep,
+            timeLen=timeLen,
+            gamma=gamma,
+            pulseSteps=pulse_steps,
+            nu_rot=nu_rot,
+            tip_angle=90 * unit.deg,
+            init_phase=init_phase,
+            verbose=verbose,
         )
-        Bx = np.outer(Bx_envelope, np.array([1, 0, 0]))
 
-        # excitation along y-axis
-        By_envelope = np.multiply(
-            envelope, np.sin(2 * PI * nu_rot * timeStamp_s + init_phase)
+    @staticmethod
+    def _calibratedHardPulseAmplitude(
+        timeStep: Quantity,
+        gamma: Quantity,
+        pulseSteps: int,
+        tip_angle: Quantity,
+    ):
+        """Return the magnetic field amplitude ``B1`` that gives a target RK4 flip angle.
+
+        This helper contains the amplitude calibration only. Pulse builders
+        can reuse the returned field value while independently choosing pulse
+        timing, carrier phase, or sequence structure.
+
+        The Bloch equation for a constant transverse field has rotation
+        eigenvalues ``±i*gamma*B_eff``. RK4 approximates one step with
+        ``R(z)=1+z+z²/2+z³/6+z⁴/24``. For ``z=i*x``, ``angle(R(i*x))`` is
+        the numerical rotation per step. This method solves for ``x`` such
+        that the accumulated phase over ``pulseSteps`` equals ``tip_angle``.
+
+        The solver's circular-XY convention uses Cartesian component
+        magnitudes of ``B1/2``, so the returned value is twice the effective
+        field used in the RK4 equation. The result calibrates rotation angle,
+        not RK4's small magnetization norm drift. It assumes a constant
+        on-resonance field direction and negligible relaxation.
+
+        Parameters
+        ----------
+        timeStep : Quantity
+            Simulation time step. The simulation rate is its reciprocal.
+        gamma : Quantity
+            Gyromagnetic ratio in ``rad Hz / T``.
+        pulseSteps : int
+            Number of equal-duration field updates in the pulse.
+        tip_angle : Quantity
+            Desired signed flip angle, such as ``90 * unit.deg``.
+
+        Returns
+        -------
+        Quantity
+            Calibrated peak XY field amplitude ``B1`` in tesla.
+
+        Raises
+        ------
+        ValueError
+            If an input is invalid or RK4 cannot produce the requested angle
+            in the specified number of steps.
+        """
+        n = int(pulseSteps)
+        if n < 1:
+            raise ValueError("pulseSteps must be at least 1")
+        dt = timeStep.to_value(unit.s)
+        g = gamma.to_value(unit.rad * unit.Hz / unit.T)
+        theta = tip_angle.to_value(unit.rad)
+        if not np.isfinite(dt) or dt <= 0:
+            raise ValueError("timeStep must be a finite positive duration")
+        if not np.isfinite(g) or g == 0:
+            raise ValueError("gamma must be finite and nonzero")
+        if not np.isfinite(theta) or theta == 0:
+            raise ValueError("tip_angle must be finite and nonzero")
+
+        # x = gamma * (B1/2) * dt. For one RK4 step, the polynomial's phase
+        # is the numerical rotation. Repeating the same step n times adds
+        # those phases, even though RK4 also causes a small norm change.
+        def accumulated_angle(x):
+            z = 1 + 1j * x - x**2 / 2 - 1j * x**3 / 6 + x**4 / 24
+            return n * np.angle(z)
+
+        target = abs(theta)
+        # Find the first crossing so the result uses the lowest-amplitude
+        # branch of the RK4 phase curve, before its phase begins to wrap.
+        x_grid = np.linspace(0.0, 10.0, 10001)
+        phase_grid = np.array([accumulated_angle(x) for x in x_grid])
+        crossings = np.flatnonzero(phase_grid >= target)
+        if len(crossings) == 0:
+            raise ValueError(
+                f"RK4 cannot represent a {np.degrees(target):.6g} degree rotation "
+                f"in {n} step(s); increase pulseSteps"
+            )
+
+        # Refine the first crossing with bisection. This solves for x rather
+        # than applying the continuous-time gamma*B*t approximation.
+        hi_index = crossings[0]
+        lo, hi = x_grid[hi_index - 1], x_grid[hi_index]
+        for _ in range(64):
+            mid = (lo + hi) / 2
+            if accumulated_angle(mid) < target:
+                lo = mid
+            else:
+                hi = mid
+
+        # Convert the effective field back to the peak B1 under the existing
+        # convention that each XY Cartesian component carries half the peak.
+        return 2 * hi * np.sign(theta) / (g * dt) * unit.T
+
+    @classmethod
+    def _makeCalibratedXYHardPulse(
+        cls,
+        timeStep: Quantity,
+        gamma: Quantity,
+        pulseSteps: int,
+        tip_angle: Quantity,
+        nu_rot: Quantity,
+        init_phase: Quantity = 0.0 * unit.rad,
+    ):
+        """Build the sampled rectangular XY waveform for one calibrated pulse.
+
+        The amplitude comes from :meth:`_calibratedHardPulseAmplitude`; this
+        method adds the local carrier phase and assembles the x/y/z components.
+        The carrier phase starts at zero time for each pulse, so ``init_phase``
+        sets the rotation axis at that pulse's start.
+
+        Returns an array with shape ``(pulseSteps, 3)`` in tesla.
+        """
+        n = int(pulseSteps)
+        B1 = cls._calibratedHardPulseAmplitude(timeStep, gamma, n, tip_angle)
+        local_time = timeStep * np.arange(n)
+        phase = 2 * PI * nu_rot * local_time + init_phase
+        envelope = 0.5 * B1
+        return np.column_stack(
+            (
+                envelope * np.cos(phase),
+                envelope * np.sin(phase),
+                np.zeros(n) * unit.T,
+            )
         )
-        By = np.outer(By_envelope, np.array([0, 1, 0]))
 
-        self.B_vec = Bx + By
+    def setXYPulse_new(
+        self,
+        timeStep: Quantity,
+        timeLen: int,
+        gamma: Quantity,
+        pulseSteps: int,
+        nu_rot: Quantity,
+        tip_angle: Quantity = 90 * unit.deg,
+        init_phase: Quantity = 0.0 * unit.rad,
+        verbose: bool = False,
+    ):
+        """Set one RK4-calibrated rectangular XY pulse at simulation start.
+
+        The pulse has constant amplitude for exactly ``pulseSteps`` samples
+        and is zero afterward. Its peak amplitude is solved from the RK4
+        discrete rotation, rather than estimated from the continuous-time
+        ``gamma * B * duration`` area. This accounts for the actual number of
+        field samples and the RK4 phase error for a constant, on-resonance
+        transverse field.
+
+        This method builds a single pulse at the start of the field array.
+        The reusable amplitude calculation is
+        :meth:`_calibratedHardPulseAmplitude`; sequence methods call that
+        helper while placing pulses at their own sample indices and phases.
+
+        Calibration scope: one on-resonance spin, negligible relaxation, and
+        a fixed field direction during each RK4 step. RK4 can still change
+        magnetization magnitude slightly; detuning, inhomogeneity, relaxation,
+        and carrier rotation within a step can also move a real simulated
+        result away from the requested angle.
+
+        Parameters
+        ----------
+        timeStep : Quantity
+            Positive simulation time step.
+        timeLen : int
+            Number of simulation boundary points. The output field has
+            ``timeLen - 1`` samples.
+        gamma : Quantity
+            Nonzero gyromagnetic ratio in ``rad Hz / T``.
+        pulseSteps : int
+            Number of consecutive field samples in the pulse. Must be between
+            one and ``timeLen - 1``.
+        nu_rot : Quantity
+            Frequency used for the XY carrier phase in hertz.
+        tip_angle : Quantity
+            Desired signed rotation angle, for example ``90 * unit.deg`` or
+            ``PI / 2``.
+        init_phase : Quantity
+            Initial carrier phase; zero rotates about the x axis.
+        verbose : bool
+            Print the snapped pulse duration and calibrated peak field.
+
+        Raises
+        ------
+        ValueError
+            If the duration, gyromagnetic ratio, angle, or step count is
+            invalid, or if RK4 cannot represent the requested rotation in the
+            requested number of steps.
+        """
+        n = int(pulseSteps)
+        if n < 1 or n > timeLen - 1:
+            raise ValueError("pulseSteps must be between 1 and timeLen - 1")
+        pulse = self._makeCalibratedXYHardPulse(
+            timeStep, gamma, n, tip_angle, nu_rot, init_phase
+        )
+        self.B_vec = np.zeros((timeLen - 1, 3)) * unit.T
+        self.B_vec[:n] = pulse
+        if verbose:
+            peak_field = np.linalg.norm(pulse[0, :2]).to_value(unit.T) * 2
+            print(
+                f"pulseSteps={n}, duration={n*timeStep.to_value(unit.s):.6g} s, "
+                f"B1={peak_field:.6g} T"
+            )
 
     def setCPMGPulseTrain(
         self,
@@ -200,10 +396,14 @@ class MagField(PhysicalObject):
     ):
         """Generate a CPMG (Carr-Purcell-Meiboom-Gill) pulse train in the rotating frame.
 
-        Produces a π/2 pulse followed by ``numEcho`` refocusing π pulses
-        separated by free-precession intervals of length ``tau``.  The
-        envelope schematic uses the pulse-timing notation from the original
-        CPMG paper:
+        Produces a calibrated π/2 pulse followed by ``numEcho`` calibrated
+        refocusing π pulses separated by free-precession intervals of length
+        ``tau``. Both pulse amplitudes use
+        :meth:`_calibratedHardPulseAmplitude`, after snapping their common
+        duration to an integer number of samples. Calibration assumes an
+        on-resonance spin with negligible relaxation; detuning and ensemble
+        effects can change the observed result. The envelope schematic uses the pulse-timing
+        notation from the original CPMG paper:
           90deg pulse       180deg pulse                     180deg pulse
                              ┌───────┐                       ┌───────┐
             ┌───┐            |       |                       |       |
@@ -220,7 +420,8 @@ class MagField(PhysicalObject):
         gamma : Quantity
             Gyromagnetic ratio (e.g. ``gamma_p`` in ``unit.rad * unit.Hz / unit.T``).
         t90 : Quantity
-            Desired 90° pulse duration; 180° pulses use the same duration.
+            Requested 90° pulse duration; 180° pulses use the same snapped
+            duration, with separate amplitude calibrations for 90° and 180°.
         tau : Quantity
             Half-echo spacing: free precession time between π/2 and first π pulse.
         numEcho : int
@@ -241,11 +442,6 @@ class MagField(PhysicalObject):
             warnings.warn(f"t90Len = {t90Len} < 3.", UserWarning, stacklevel=2)
         t180Len = t90Len
 
-        t90 = t90Len * timeStep  # snap to grid
-
-        B90 = PI / (gamma * t90)
-        B180 = 2.0 * B90
-
         tauLen = int(np.round(tau / timeStep))
         if tauLen < 10 * t180Len:
             warnings.warn(
@@ -254,29 +450,23 @@ class MagField(PhysicalObject):
                 UserWarning,
                 stacklevel=2,
             )
-        Bx = np.zeros(timeStamp.shape) * unit.T
-        By = np.zeros(timeStamp.shape) * unit.T
-
-        t90Stamp = 2 * PI * nu_rot * timeStamp[0:t90Len] + init_phase
-        t180Stamp = 2 * PI * nu_rot * timeStamp[0:t180Len] + init_phase
-
-        Bx_90pulse = 0.5 * B90 * np.cos(t90Stamp)
-        By_90pulse = 0.5 * B90 * np.sin(t90Stamp)
-        Bx_180pulse = 0.5 * B180 * np.cos(t180Stamp)
-        By_180pulse = 0.5 * B180 * np.sin(t180Stamp)
-
-        Bx[0:t90Len] = Bx_90pulse
-        By[0:t90Len] = By_90pulse
+        numSteps = len(timeStamp)
+        B_vec = np.zeros((1, numSteps, 3)) * unit.T
+        pulse90 = self._makeCalibratedXYHardPulse(
+            timeStep, gamma, t90Len, 90 * unit.deg, nu_rot, init_phase
+        )
+        pulse180 = self._makeCalibratedXYHardPulse(
+            timeStep, gamma, t180Len, 180 * unit.deg, nu_rot, init_phase
+        )
+        B_vec[0, :t90Len] = pulse90
 
         for i in range(numEcho):
             if (1 + i * 2) * tauLen + t180Len >= len(timeStamp):
                 break
-            Bx[(1 + i * 2) * tauLen : (1 + i * 2) * tauLen + t180Len] = Bx_180pulse
-            By[(1 + i * 2) * tauLen : (1 + i * 2) * tauLen + t180Len] = By_180pulse
+            start = (1 + i * 2) * tauLen
+            B_vec[0, start : start + t180Len] = pulse180
 
-        self.B_vec = np.zeros((1, len(Bx), 3)) * unit.T
-        self.B_vec[0, :, 0] = Bx
-        self.B_vec[0, :, 1] = By
+        self.B_vec = B_vec
 
     def setNPulsesArbDelay(
         self,
@@ -292,34 +482,35 @@ class MagField(PhysicalObject):
     ):
         """Generate N hard pulses at arbitrary times in the rotating frame.
 
-        All pulses share the same duration ``t90_s`` (snapped to the time
-        grid) but each has an independently chosen flip angle and phase.
-        The amplitude of pulse *i* is scaled so that
-        ``gamma * 0.5 * B_i * t90_s = tip_angles[i] * pi/180``.
+        All pulses share the same duration (snapped to an integer number of
+        samples), but each has an independently chosen flip angle and phase.
+        Each waveform uses :meth:`_calibratedHardPulseAmplitude`, rather than
+        a continuous-time area estimate.
+        Calibration assumes an on-resonance spin with negligible relaxation.
 
-        Timing convention: ``delay[i]`` is the free-precession interval
-        between the *end* of pulse *i-1* (or the simulation start for i=0)
-        and the *start* of pulse *i*.
+        In the current placement convention pulse 0 starts at sample zero;
+        after each pulse the corresponding delay is added before the next
+        pulse. Thus ``delays[i]`` is the free-precession interval following
+        pulse *i* (and the final entry is a trailing interval).
 
         Parameters
         ----------
-        timeStep_s : float
+        timeStep : Quantity
             Simulation time step (s).
         timeLen : int
             Total number of time steps (including the final boundary point).
         gamma : Quantity[unit.rad * unit.Hz / unit.T]
             Gyromagnetic ratio in rad·Hz/T (sign is used to set pulse sense).
-        t90_s : float
-            Duration of a 90° pulse (s); all pulses share this duration.
-        tip_angles : list of float
-            Flip angle of each pulse in degrees (e.g. ``[90, 180, 180]``).
-        delay : list of float
-            Free-precession time before each pulse (s). ``delay[0]`` is
-            the initial delay before pulse 0 (usually 0). Must satisfy
-            ``len(delay) == len(tip_angles)``.
-        nu_rot_Hz : float
+        pulseDur : Quantity
+            Requested common pulse duration, rounded to the nearest step.
+        tip_angles : list of Quantity
+            Signed flip angle of each pulse (e.g. ``[90, 180, 180] * unit.deg``).
+        delays : list of Quantity
+            Free-precession intervals following each pulse (s). Must satisfy
+            ``len(delays) == len(tip_angles)``.
+        nu_rot : Quantity
             Carrier frequency in the rotating frame (Hz).
-        phases_rad : list of float or None
+        phases : list of Quantity or None
             Phase offset of each pulse (rad), setting the rotation axis.
             ``None`` defaults to all-zero phases (all pulses along x).
         verbose : bool
@@ -336,7 +527,7 @@ class MagField(PhysicalObject):
             phases = [0.0 * unit.rad] * N
         if len(phases) != N:
             raise ValueError(
-                f"{_getLocationPrefix()} {msgPrefix} phases_rad and tip_angles must have the same length"
+                f"{_getLocationPrefix()} {msgPrefix} phases and tip_angles must have the same length"
             )
 
         pulseLen = int(np.round(pulseDur / timeStep))
@@ -346,22 +537,22 @@ class MagField(PhysicalObject):
         if verbose:
             print(f"{_getLocationPrefix()} {msgPrefix} pulseLen = {pulseLen}, pulseDur = {pulseDur:.4e} s")
 
-        B90 = PI / (gamma * pulseDur)
-
         numSteps = timeLen - 1
-        Bx = np.zeros(numSteps) * unit.T
-        By = np.zeros(numSteps) * unit.T
+        B_vec = np.zeros((1, numSteps, 3)) * unit.T
 
-        # Local time template for one pulse window (phase resets at each pulse start,
-        # so the rotation axis is determined solely by phases_rad[i]).
-        local_t = timeStep * np.arange(pulseLen)
-
+        # Each generated pulse uses a local time origin, so the carrier phase
+        # resets at its start and its axis is set by phases[i].
         current_idx = 0
         for i in range(N):
-
-            tip_angle = tip_angles[i]
-            B_i = (2.0 * tip_angle / (PI)) * B90
             phase_i = phases[i]
+            pulse = self._makeCalibratedXYHardPulse(
+                timeStep,
+                gamma,
+                pulseLen,
+                tip_angles[i],
+                nu_rot,
+                phase_i,
+            )
 
             end_idx = min(current_idx + pulseLen, numSteps)
             actual_len = end_idx - current_idx
@@ -372,24 +563,21 @@ class MagField(PhysicalObject):
                     )
                 break
 
-            stamp = 2 * PI * nu_rot * local_t[:actual_len] + phase_i
-            Bx[current_idx:end_idx] += 0.5 * B_i * np.cos(stamp)
-            By[current_idx:end_idx] += 0.5 * B_i * np.sin(stamp)
+            B_vec[0, current_idx:end_idx] += pulse[:actual_len]
 
             if verbose:
                 t_start = current_idx * timeStep
                 print(
                     msgPrefix,
                     f"Pulse {i}: {tip_angles[i]:.1f}° at t={t_start:.4f} s, "
-                    f"phase={np.degrees(phase_i):.1f}°, B_i={B_i:.4e} T",
+                    f"phase={np.degrees(phase_i):.1f}°, "
+                    f"B_i={2*np.linalg.norm(pulse[0, :2]).to_value(unit.T):.4e} T",
                 )
 
             current_idx += int(np.round(delays[i] / timeStep))
             current_idx += pulseLen
 
-        self.B_vec = np.zeros((1, numSteps, 3)) * unit.T
-        self.B_vec[0, :, 0] = Bx
-        self.B_vec[0, :, 1] = By
+        self.B_vec = B_vec
 
     def setAxionFields(
         self,
@@ -1250,10 +1438,14 @@ class Simulation(PhysicalObject):
         return rate
 
     def getTimeStamp(self):
+        """Return one timestamp for each simulated magnetization sample.
+
+        The solver advances ``timeLen - 1`` intervals, each exactly
+        ``timeStep`` long. Therefore sample ``i`` is at ``i * timeStep``;
+        the last sample is one step before ``timeLen * timeStep``.
+        """
         msgPrefix = f"[{self.__class__.__name__}.{self.getTimeStamp.__name__}]"
-        return np.linspace(
-            start=0, stop=(self.timeLen) * self.timeStep, num=self.timeLen
-        )
+        return np.arange(self.timeLen) * self.timeStep
 
     def estimateRuntime(self, verbose: bool = False) -> Quantity[unit.s]:
         msgPrefix = f"[{self.__class__.__name__}.{self.estimateRuntime.__name__}]"
