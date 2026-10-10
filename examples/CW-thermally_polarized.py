@@ -7,32 +7,19 @@ import time
 
 from axionbloch.Apparatus import Magnet
 from axionbloch.constants import gamma_p, mu_p
-from axionbloch.dependency import *
+from axionbloch.dependency import np, unit, PI
 from axionbloch.Sample import Sample
 from axionbloch.SimuTools import MagField, Simulation
 
 RCF_Freq = 1 * unit.MHz
-signalFreqRot = 0 * unit.Hz
+signalFreqRot = 0.5 * unit.Hz
 T1 = 5 * unit.s
 
-# short Tdelta, long T2
-Tdelta = 10 * unit.ms
+Tdelta = 100 * unit.s
 T2 = 1.0 * unit.s
 
-# # short T2, long Tdelta
-# Tdelta = 10.0 * unit.s
-# T2 = 1.0 * unit.s
-
-# # short Tdelta and T2
-# Tdelta = 1.0 * unit.s
-# T2 = 1.0 * unit.s
-
-# # long Tdelta and T2
-# Tdelta = 10.0 * unit.s
-# T2 = 10.0 * unit.s
-
-simuRate = 2000 * unit.Hz
-duration = 0.1 * unit.s
+simuRate = 500 * unit.Hz
+duration = 20 * unit.s
 
 # CH3CH2OH sample
 sample = Sample(
@@ -59,7 +46,7 @@ magnet = Magnet(
     FWHM=FWHM,
     nFWHM=10.0,
 )
-magnet.setHomogeneity(numPt=500, showPlot=True, verbose=True)
+magnet.setHomogeneity(numPt=2000, showPlot=False, verbose=True)
 print(f"numPt for magnet homogeneity = {magnet.numPt}")
 
 # Excitation field (CW)
@@ -77,15 +64,14 @@ simu = Simulation(
 )
 
 # CW drive: constant-envelope XY pulse at the signal frequency
+B1 = 0.0005 * unit.Hz / (sample.gamma / (2 * PI))
+init_phase = 0 * unit.rad
 simu.excField.setXYPulse(
     timeStep=simu.timeStep,
     timeLen=simu.timeLen,
-    B1=0.005
-    * unit.Hz
-    / (
-        sample.gamma / (2 * PI)
-    ),  # B1 field amplitude in Tesla, converted from Rabi frequency in Hz
+    B1=B1,  # field amplitude corresponding to a 0.005 Hz Rabi frequency
     nu_rot=signalFreqRot,
+    init_phase=init_phase,
 )
 
 tic = time.perf_counter()
@@ -93,7 +79,23 @@ simu.generateTrajectories(integrator="RK4")
 toc = time.perf_counter()
 print(f"generateTrajectories time consumption = {toc - tic:.6f} s")
 
+# # Save raw plotting arrays before keepMeanStd() releases them.
+# timeStamp_s = simu.timeStep.to_value(unit.s) * np.arange(simu.trjry.shape[1])
+# output_path = "CW_thermally_polarized_simu.npz"
+# np.savez_compressed(
+#     output_path,
+#     timeStamp_s=timeStamp_s,
+#     B_vec=simu.excField.B_vec.to_value(unit.T),
+#     trjry=simu.trjry,
+#     T2_s=simu.sample.T2.to_value(unit.s),
+#     Tdelta_s=simu.Tdelta.to_value(unit.s),
+#     signalFreqRot_Hz=signalFreqRot.to_value(unit.Hz),
+#     init_phase_rad=init_phase.to_value(unit.rad),
+#     B1_rot_T=(0.5 * B1).to_value(unit.T),
+#     gamma_rad_s_T=sample.gamma.to_value(unit.rad / unit.s / unit.T),
+# )
+# print(f"Saved plotting data to {output_path}")
+
 simu.keepMeanStd()
 simu.displayTrjries(verbose=True)
 # simu.monitorTrajectories(verbose=True)
-save_data = False

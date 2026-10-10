@@ -1,9 +1,9 @@
 # Example script: spin-echo NMR simulation using a CPMG pulse train
 import time
 
+from axionbloch.dependency import np, unit, PI
 from axionbloch.Apparatus import Magnet
 from axionbloch.constants import gamma_p, mu_p
-from axionbloch.dependency import *
 from axionbloch.Sample import Sample
 from axionbloch.SimuTools import MagField, Simulation
 
