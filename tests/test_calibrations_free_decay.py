@@ -20,19 +20,20 @@ Run both calibration suites::
 
 Free-decay calibration
 ----------------------
-A 90° pulse is applied and the free-decay amplitude envelope |Mxy(t)| =
-sqrt(Mx² + My²) is compared to the analytically expected free-decay kernel.
+A 90° pulse is applied and both post-pulse transverse components, Mx(t) and
+My(t), are compared separately to the analytically expected free-decay
+trajectory.
 
 Physics
 -------
 The simulator runs in a rotating frame at RCF_freq.  B0 is chosen so that
 
-    ν_L = RCF_freq − Delta_nu_L  (Larmor below carrier),
+    nu_L = RCF_freq − Delta_nu_L  (Larmor below carrier),
 
 where Delta_nu_L = rel_detuning × RCF_freq.  After a 90° pulse the
 transverse magnetisation precesses freely.  In the rotating frame:
 
-    M+(t) = exp(−2πi · Delta_nu_L · t) · FD_sub(t)
+    M+(t) = exp(-2πi · Delta_nu_L · t) · FD_sub(t)
 
 where the free-decay kernel is
 
@@ -46,9 +47,9 @@ envelope is independent of Delta_nu_L:
 
     |Mxy(t)| = |FD_sub(t)|.
 
-The test quantifies agreement between simulation and theory via the full
-transverse-vector relative L2 error. ``epsilon_l2_squared`` is retained as
-the squared form used for the tolerance check.
+    The test quantifies agreement in Mx and My separately, using each
+    component's contribution to the full transverse-vector relative L2 error.
+    ``epsilon_l2_squared`` is the sum of those component contributions.
 
 Simulation parameters
 ---------------------
@@ -67,6 +68,7 @@ Parametrisation
 """
 
 import pytest
+from scipy.linalg import expm
 
 from axionbloch.Apparatus import Magnet
 from axionbloch.constants import gamma_p, mu_p
@@ -119,7 +121,7 @@ def _build_free_decay_simulation(
     RCF_freq:
         Rotating-frame carrier frequency.
     Delta_nu_L:
-        Larmor offset below RCF_freq: ν_L = RCF_freq − Delta_nu_L.
+        Larmor offset below RCF_freq: nu_L = RCF_freq − Delta_nu_L.
     FWHM:
         Fractional field inhomogeneity (ppm or dimensionless).
     rate:
@@ -241,17 +243,15 @@ def _plot_free_decay_result(
     """Show a two-panel diagnostic figure for one free-decay test case.
 
     Panel 1 – Mx(t), My(t) after the 90° pulse (oscillation at Delta_nu_L).
-    Panel 2 – |Mxy(t)| vs expected envelope |FD_sub(t)|.
+    Panel 2 – separate simulated and expected Mx(t), My(t) components.
     """
     t_s = simu.getTimeStamp().to_value(unit.s)
     t_sig = t_s[t90_steps:]
     Mx = simu.trjry[0, t90_steps:, 0]
     My = simu.trjry[0, t90_steps:, 1]
-    Mxy = np.sqrt(Mx**2 + My**2)
     expected_vector = _fd_expected_vector(
         simu, t90_steps, Delta_nu_L, Mx[0] + 1j * My[0]
     )
-    expected_curve = np.linalg.norm(expected_vector, axis=1)
 
     marksize = 1
     cm = 1 / 2.54
@@ -270,16 +270,25 @@ def _plot_free_decay_result(
     ax.legend()
 
     ax = axes[1]
-    ax.scatter(t_sig, Mxy, label="$|M_{xy}|$ simulation", s=marksize, color="tab:red")
+    ax.plot(t_sig, Mx, label="$M_x$ simulation", color="tab:blue")
     ax.plot(
         t_sig,
-        expected_curve,
-        label="$|\\mathrm{FD}_\\mathrm{sub}|$ expected",
-        color="tab:purple",
+        expected_vector[:, 0],
+        label="$M_x$ expected",
+        color="tab:blue",
+        linestyle="--",
+    )
+    ax.plot(t_sig, My, label="$M_y$ simulation", color="tab:orange")
+    ax.plot(
+        t_sig,
+        expected_vector[:, 1],
+        label="$M_y$ expected",
+        color="tab:orange",
+        linestyle="--",
     )
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("$M / M_\\mathrm{eqb}$")
-    ax.set_title("$|M_{xy}|$ envelope")
+    ax.set_title("Separate transverse components")
     ax.legend()
 
     fig.suptitle(
@@ -311,11 +320,11 @@ def test_free_decay_envelope(
     FWHM: Quantity,
     show_plots: bool,
 ):
-    """Free-decay |Mxy(t)| envelope matches expected free-decay kernel.
+    """Free-decay Mx(t) and My(t) match the expected component trajectories.
 
-    ν_L = RCF_freq − Delta_nu_L  (spins below carrier).
-    After 90° pulse, |Mxy(t)| = |FD_sub(t)| = |Σᵢ wᵢ exp(2πi · δᵢ · t)|
-    where δᵢ = γ/(2π) · B_spread_i.
+    nu_L = RCF_freq − Delta_nu_L  (spins below carrier).
+    After the pulse, the complex transverse signal is the weighted free-decay
+    sum. Its real and imaginary parts are checked separately as Mx and My.
 
     Tolerance: the full-vector relative L2 error satisfies
     ``epsilon_l2_squared <= _EPSILON_L2_SQUARED_TOLERANCE``.
@@ -334,9 +343,11 @@ def test_free_decay_envelope(
     Mperp_theo = _fd_expected_vector(
         simu, _T90_STEPS, Delta_nu_L, initial_transverse
     )
-    epsilon_l2_squared = float(
-        np.sum((Mperp_simu - Mperp_theo) ** 2) / np.sum(Mperp_theo**2)
-    )
+    denominator = np.sum(Mperp_theo**2)
+    difference = Mperp_simu - Mperp_theo
+    epsilon_mx_squared = float(np.sum(difference[:, 0] ** 2) / denominator)
+    epsilon_my_squared = float(np.sum(difference[:, 1] ** 2) / denominator)
+    epsilon_l2_squared = epsilon_mx_squared + epsilon_my_squared
     epsilon_l2 = np.sqrt(epsilon_l2_squared)
 
     t_end = simu.getTimeStamp()[-1]
@@ -344,11 +355,97 @@ def test_free_decay_envelope(
     if show_plots:
         _plot_free_decay_result(simu, _T90_STEPS, Delta_nu_L, T2star, epsilon_l2)
 
+    assert epsilon_mx_squared <= _EPSILON_L2_SQUARED_TOLERANCE, (
+        f"Mx component error: epsilon_Mx={np.sqrt(epsilon_mx_squared):.2e}, "
+        f"tol={np.sqrt(_EPSILON_L2_SQUARED_TOLERANCE):.2e}"
+    )
+    assert epsilon_my_squared <= _EPSILON_L2_SQUARED_TOLERANCE, (
+        f"My component error: epsilon_My={np.sqrt(epsilon_my_squared):.2e}, "
+        f"tol={np.sqrt(_EPSILON_L2_SQUARED_TOLERANCE):.2e}"
+    )
     assert epsilon_l2_squared <= _EPSILON_L2_SQUARED_TOLERANCE, (
         f"RCF_freq={RCF_freq}, FWHM={FWHM.to(ppm):.4g}, "
         f"T2*_analytic={T2star:.3g}, rel_detuning={rel_detuning}: "
         f"t_end={t_end:.4g} ({(t_end / T2star).to_value(unit.one):.2f}·T2*_analytic), "
         f"epsilon_l2={epsilon_l2:.2e}, "
+        f"epsilon_Mx={np.sqrt(epsilon_mx_squared):.2e}, "
+        f"epsilon_My={np.sqrt(epsilon_my_squared):.2e}, "
         f"epsilon_l2_squared={epsilon_l2_squared:.2e} "
         f"(tol={_EPSILON_L2_SQUARED_TOLERANCE:.0e})"
     )
+
+
+def test_hard_pulse_components_include_relaxation_during_pulse():
+    """Check Mx and My separately against Bloch evolution during a hard pulse.
+
+    A finite ``T2`` reduces the transverse magnetization while the pulse is
+    still rotating it. The expected endpoint is therefore obtained from the
+    constant-field Bloch generator including both ``T1`` and ``T2`` terms,
+    rather than requiring an unphysical unit-length 90° result.
+    """
+    rcf_freq = 1.0 * unit.kHz
+    t1 = 1.0 * unit.s
+    t2 = 0.1 * unit.s
+    rate = 200.0 * unit.Hz
+    pulse_steps = 10
+    sample = Sample(
+        name="relaxing_hard_pulse",
+        gamma=gamma_p,
+        massDensity=0.789 * unit.g / unit.cm**3,
+        molarMass=46.069 * unit.g / unit.mol,
+        numOfSpinsPerMolecule=6 * unit.one,
+        T1=t1,
+        T2=t2,
+        vol=1.0 * unit.cm**3,
+        mu=mu_p,
+        temp=300.0 * unit.K,
+        verbose=False,
+    )
+    magnet = Magnet(
+        name="homogeneous_relaxing_magnet",
+        B0=rcf_freq / (sample.gamma / (2 * PI)),
+        FWHM=1e-12 * unit.one,
+        nFWHM=0.0,
+    )
+    simu = Simulation(
+        name="relaxing_hard_pulse",
+        sample=sample,
+        magnet=magnet,
+        excField=MagField(name="90deg_hard_pulse"),
+        RCF_freq=rcf_freq,
+        rate=rate,
+        duration=1.0 * unit.s,
+        verbose=False,
+    )
+    simu.excField.set90DegPulse(
+        timeStep=simu.timeStep,
+        timeLen=simu.timeLen,
+        gamma=sample.gamma,
+        t90=pulse_steps * simu.timeStep,
+        nu_rot=0.0 * unit.Hz,
+    )
+    simu.generateTrajectories(integrator="RK4")
+
+    # At nu_rot=0 the pulse is a constant x field. Form the affine Bloch
+    # system as a 4x4 matrix so the equilibrium T1 source is included exactly.
+    gamma_value = sample.gamma.to_value(unit.rad * unit.Hz / unit.T)
+    bx = simu.excField.B_vec[0, 0, 0].to_value(unit.T)
+    omega = gamma_value * bx
+    generator = np.array(
+        [
+            [-1.0 / t2.to_value(unit.s), 0.0, 0.0, 0.0],
+            [0.0, -1.0 / t2.to_value(unit.s), omega, 0.0],
+            [0.0, -omega, -1.0 / t1.to_value(unit.s), 1.0 / t1.to_value(unit.s)],
+            [0.0, 0.0, 0.0, 0.0],
+        ]
+    )
+    pulse_duration_s = (pulse_steps * simu.timeStep).to_value(unit.s)
+    expected = (expm(generator * pulse_duration_s) @ np.array([0.0, 0.0, 1.0, 1.0]))[:3]
+    actual = simu.trjry[0, pulse_steps]
+    assert expected[1] < 0.99  # T2 relaxation acts before the pulse has ended.
+
+    # Separate component assertions make a phase/tipping error visible even
+    # when the combined transverse magnitude happens to look correct.
+    assert abs(actual[0] - expected[0]) < 2e-5, (actual[0], expected[0])
+    assert abs(actual[1] - expected[1]) < 2e-5, (actual[1], expected[1])
+    assert abs(actual[2] - expected[2]) < 2e-5, (actual[2], expected[2])

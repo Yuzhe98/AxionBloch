@@ -21,7 +21,8 @@ Run both calibration suites::
 CW NMR calibration
 ------------------
 A weak continuous-wave (CW) RF drive is applied on resonance while the
-transverse magnetization |Mxy| = sqrt(Mx² + My²) is monitored over time.
+transverse magnetization components Mx(t) and My(t) are monitored and checked
+separately against the complex-valued reference trajectory.
 
 Physics
 -------
@@ -296,15 +297,12 @@ def _plot_cw_result(
 
     Panel 1 – time-domain Mx, My (shows oscillation at Delta_nu_L while
                the envelope builds up).
-    Panel 2 – |Mxy(t)| buildup envelope with the free-decay-integral expected curve
-               and the analytic Lorentzian approximation for comparison.
+    Panel 2 – simulated and expected Mx(t), My(t) components.
     """
     t_s = simu.getTimeStamp().to_value(unit.s)
     Mx = simu.trjry[0, :, 0]
     My = simu.trjry[0, :, 1]
-    Mxy = np.sqrt(Mx**2 + My**2)
-
-    expected_curve = np.abs(_cw_expected_curve(simu, B1_eff, Delta_nu_L))
+    expected_curve = _cw_expected_curve(simu, B1_eff, Delta_nu_L)
 
     marksize = 1
     cm = 1 / 2.54  # convert cm to inch
@@ -340,25 +338,26 @@ def _plot_cw_result(
     ax.legend()
 
     ax = axes[1]
-    ax.scatter(
-        t_s,
-        Mxy,
-        label="$|M_{xy} / M_\\mathrm{eqb}|$ simulation",
-        s=marksize,
-        color="tab:red",
-    )
+    ax.plot(t_s, Mx, label="$M_x$ simulation", color="tab:blue")
     ax.plot(
         t_s,
-        expected_curve,
-        # "--",
-        # lw=1.5,
-        label="$|M_{xy} / M_\\mathrm{eqb}|$ (expected)",
-        color="tab:purple",
+        expected_curve.real,
+        label="$M_x$ expected",
+        color="tab:blue",
+        linestyle="--",
+    )
+    ax.plot(t_s, My, label="$M_y$ simulation", color="tab:orange")
+    ax.plot(
+        t_s,
+        expected_curve.imag,
+        label="$M_y$ expected",
+        color="tab:orange",
+        linestyle="--",
     )
 
     ax.set_xlabel("Time (s)")
     ax.set_ylabel("$M / M_\\mathrm{eqb}$")
-    ax.set_title("$|M_{xy}|$ buildup")
+    ax.set_title("Separate transverse components")
     ax.legend()
 
     fig.suptitle(
@@ -423,9 +422,11 @@ def test_cw_signal_buildup(
     Mperp_simu = simu.trjry[0, :, :2]
     expected_complex = _cw_expected_curve(simu, B1_eff, Delta_nu_L)
     Mperp_theo = np.column_stack((expected_complex.real, expected_complex.imag))
-    epsilon_l2_squared = float(
-        np.sum((Mperp_simu - Mperp_theo) ** 2) / np.sum(Mperp_theo**2)
-    )
+    denominator = np.sum(Mperp_theo**2)
+    difference = Mperp_simu - Mperp_theo
+    epsilon_mx_squared = float(np.sum(difference[:, 0] ** 2) / denominator)
+    epsilon_my_squared = float(np.sum(difference[:, 1] ** 2) / denominator)
+    epsilon_l2_squared = epsilon_mx_squared + epsilon_my_squared
     epsilon_l2 = np.sqrt(epsilon_l2_squared)
 
     t_end = simu.getTimeStamp()[-1]
@@ -436,12 +437,22 @@ def test_cw_signal_buildup(
             simu, B1_eff, Delta_nu_L, T2star, float(abs(expected_complex[-1]))
         )
 
+    assert epsilon_mx_squared <= _EPSILON_L2_SQUARED_TOLERANCE, (
+        f"Mx component error: epsilon_Mx={np.sqrt(epsilon_mx_squared):.2e}, "
+        f"tol={np.sqrt(_EPSILON_L2_SQUARED_TOLERANCE):.2e}"
+    )
+    assert epsilon_my_squared <= _EPSILON_L2_SQUARED_TOLERANCE, (
+        f"My component error: epsilon_My={np.sqrt(epsilon_my_squared):.2e}, "
+        f"tol={np.sqrt(_EPSILON_L2_SQUARED_TOLERANCE):.2e}"
+    )
     assert epsilon_l2_squared <= _EPSILON_L2_SQUARED_TOLERANCE, (
         f"RCF_freq={RCF_freq}, FWHM={FWHM.to(ppm):.4g}, "
         f"T2*_analytic={T2star:.3g}, relative detuning={rel_detuning}: "
         f"B1_input={B1_input:.3g} (γ·B1_eff·t_end={nutation:.3f}), "
         f"t_end={t_end:.4g} ({(t_end / T2star).to_value(unit.one):.2f}·T2*_analytic), "
         f"epsilon_l2={epsilon_l2:.2e}, "
+        f"epsilon_Mx={np.sqrt(epsilon_mx_squared):.2e}, "
+        f"epsilon_My={np.sqrt(epsilon_my_squared):.2e}, "
         f"epsilon_l2_squared={epsilon_l2_squared:.2e} "
         f"(tol={_EPSILON_L2_SQUARED_TOLERANCE:.0e})"
     )
