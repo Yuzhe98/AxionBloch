@@ -92,7 +92,7 @@ _NFWHM = 0.0  # uniform field: one spin packet at B0, no precession
 _T90_STEPS = 5  # 90° pulse length in time steps
 
 # χ² tolerance: ‖Mz − Mz_expected‖² / ‖Mz_expected − 1‖²
-_CHI2_TOLERANCE = 1e-7
+_EPSILON_L2_SQUARED_TOLERANCE = 1e-7
 
 # Timing
 _N_T1 = 5.0  # observe for 5 × T1
@@ -226,7 +226,7 @@ def _plot_t1_result(
     simu: Simulation,
     t90_steps: int,
     T1: Quantity,
-    chi2: float,
+    epsilon_l2: float,
 ) -> None:
     """Two-panel diagnostic figure for one T1 test case.
 
@@ -272,7 +272,7 @@ def _plot_t1_result(
     fig.suptitle(
         f"T1 recovery  RCF={simu.RCF_freq:.3g}  "
         f"$T_1$={T1:.3g}  $T_2$={simu.sample.T2:.3g}\n"
-        f"$\\chi^2$={chi2:.2e}"
+        f"$\\epsilon_{{L^2}}$={epsilon_l2:.2e}"
     )
     plt.tight_layout()
     _show_figure(fig, simu.name)
@@ -313,12 +313,17 @@ def test_t1_recovery(
     expected_curve = _t1_expected_curve(simu, _T90_STEPS)
     departure = expected_curve - 1.0  # (Mz0 − 1)·exp(−t/T1), always ≤ 0
 
-    chi2 = float(np.sum((Mz - expected_curve) ** 2) / np.sum(departure**2))
+    epsilon_l2_squared = float(
+        np.sum((Mz - expected_curve) ** 2) / np.sum(departure**2)
+    )
+    epsilon_l2 = np.sqrt(epsilon_l2_squared)
 
     if show_plots:
-        _plot_t1_result(simu, _T90_STEPS, T1, chi2)
+        _plot_t1_result(simu, _T90_STEPS, T1, epsilon_l2)
 
-    assert chi2 <= _CHI2_TOLERANCE, (
+    assert epsilon_l2_squared <= _EPSILON_L2_SQUARED_TOLERANCE, (
         f"RCF_freq={RCF_freq}, T1={T1:.3g}, T2={simu.sample.T2:.3g}: "
-        f"chi2={chi2:.2e} (tol={_CHI2_TOLERANCE:.0e})"
+        f"epsilon_l2={epsilon_l2:.2e}, "
+        f"epsilon_l2_squared={epsilon_l2_squared:.2e} "
+        f"(tol={_EPSILON_L2_SQUARED_TOLERANCE:.0e})"
     )

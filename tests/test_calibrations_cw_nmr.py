@@ -48,9 +48,9 @@ is the free-decay kernel for the Hamming-windowed spin-packet distribution, and
 
 is the detuning of spin packet i in the sub-rotating frame.
 
-The transverse magnitude is the same in the rotating and sub-rotating frames:
-
-    |Mxy(t)| = |M+_sub(t)| = γ · B₁_eff · |∫₀ᵗ FD_sub(t′) dt′|
+The transverse magnitude is the same in the rotating and sub-rotating frames,
+but the calibration comparison uses the full transverse vector reconstructed
+from the complex transverse magnetization.
 
 This is the formula used as the reference in each assertion.
 
@@ -67,7 +67,7 @@ so the ensemble amplitude simplifies to
 The Magnet uses a Hamming-squared window on the spin-packet weights which
 modifies the effective lineshape and makes T₂*_actual ≈ 1.8 × T₂*_analytic.
 Rather than correcting T₂*_analytic, the test computes the expected amplitude
-directly from the FD integral so no approximation is needed.
+directly from the free-decay integral so no approximation is needed.
 
 Weak-drive condition
 --------------------
@@ -117,7 +117,9 @@ _NFWHM = 20.0  # half-width range for spin-packet sampling
 
 # Weak-drive condition: γ·B₁_eff·t_end = 5·TIP_ANGLE << 1 rad
 _TIP_ANGLE = 0.001 * unit.rad  # γ·B₁_eff·T₂*_analytic (rad)
-_CHI2_TOLERANCE = 1e-5  # ||Mxy − expected||² / ||expected||² over full trajectory
+# Full-vector comparison includes the weak-drive approximation error.  The
+# tolerance is expressed in the retained squared form.
+_EPSILON_L2_SQUARED_TOLERANCE = 2e-4
 
 # Adaptive timing (same logic as free-decay calibration)
 _N_T2STAR = 10.0  # observe for 10 × T₂*_analytic
@@ -220,9 +222,9 @@ def _cw_expected_curve(
     B1_eff: Quantity,
     Delta_nu_L: Quantity,
 ) -> np.ndarray:
-    """Expected |Mxy(t)| envelope from the free-decay integral formula.
+    """Expected complex transverse magnetization from the free-decay integral.
 
-    Returns an array of the same length as ``simu.getTimeStamp()``.
+    Returns a complex array of the same length as ``simu.getTimeStamp()``.
     Each spin packet i contributes exp(2πi·δᵢ·t) with detuning
     δᵢ = γ/(2π)·B_spread_i − (RCF_freq − Delta_nu_L).
     """
@@ -241,9 +243,12 @@ def _cw_expected_curve(
         fd += w * np.exp(2j * np.pi * dnu * t_s - t_s / T2_s)
     # fd = 1 - np.exp(- t_s / T2_s)
     return (
-        _GAMMA.to_value(unit.rad * unit.Hz / unit.T)
+        1j
+        * np.exp(2j * np.pi * Delta_nu_L.to_value(unit.Hz) * t_s)
+        * _GAMMA.to_value(unit.rad * unit.Hz / unit.T)
         * B1_eff_T
-        * np.abs(np.cumsum(fd) * dt)
+        * np.cumsum(fd)
+        * dt
     )
 
 
@@ -291,7 +296,7 @@ def _plot_cw_result(
 
     Panel 1 – time-domain Mx, My (shows oscillation at Delta_nu_L while
                the envelope builds up).
-    Panel 2 – |Mxy(t)| buildup envelope with the FD-integral expected curve
+    Panel 2 – |Mxy(t)| buildup envelope with the free-decay-integral expected curve
                and the analytic Lorentzian approximation for comparison.
     """
     t_s = simu.getTimeStamp().to_value(unit.s)
@@ -299,8 +304,7 @@ def _plot_cw_result(
     My = simu.trjry[0, :, 1]
     Mxy = np.sqrt(Mx**2 + My**2)
 
-    expected_curve = _cw_expected_curve(simu, B1_eff, Delta_nu_L)
-    chi2 = float(np.sum((Mxy - expected_curve) ** 2) / np.sum(expected_curve**2))
+    expected_curve = np.abs(_cw_expected_curve(simu, B1_eff, Delta_nu_L))
 
     marksize = 1
     cm = 1 / 2.54  # convert cm to inch
@@ -362,7 +366,7 @@ def _plot_cw_result(
         f"FWHM={simu.magnet.FWHM.to(ppm):.4g}  "
         f"signal={Delta_nu_L.to(unit.Hz):.4g}\n"
         "$T_2^*$" + f"_analytic={T2star:.3g}  "
-        f"$\\chi^2$={chi2:.2e}"
+        f"expected_end={expected:.2e}"
     )
     plt.tight_layout()
     _show_figure(fig, simu.name)
@@ -416,20 +420,28 @@ def test_cw_signal_buildup(
 
     simu = _build_cw_simulation(RCF_freq, Delta_nu_L, FWHM, B1_input, rate, duration)
 
-    Mxy = np.sqrt(simu.trjry[0, :, 0] ** 2 + simu.trjry[0, :, 1] ** 2)
-    expected_curve = _cw_expected_curve(simu, B1_eff, Delta_nu_L)
-    chi2 = float(np.sum((Mxy - expected_curve) ** 2) / np.sum(expected_curve**2))
+    Mperp_simu = simu.trjry[0, :, :2]
+    expected_complex = _cw_expected_curve(simu, B1_eff, Delta_nu_L)
+    Mperp_theo = np.column_stack((expected_complex.real, expected_complex.imag))
+    epsilon_l2_squared = float(
+        np.sum((Mperp_simu - Mperp_theo) ** 2) / np.sum(Mperp_theo**2)
+    )
+    epsilon_l2 = np.sqrt(epsilon_l2_squared)
 
     t_end = simu.getTimeStamp()[-1]
     nutation = (np.abs(_GAMMA) * B1_eff * t_end).to(unit.rad)
 
     if show_plots:
-        _plot_cw_result(simu, B1_eff, Delta_nu_L, T2star, float(expected_curve[-1]))
+        _plot_cw_result(
+            simu, B1_eff, Delta_nu_L, T2star, float(abs(expected_complex[-1]))
+        )
 
-    assert chi2 <= _CHI2_TOLERANCE, (
+    assert epsilon_l2_squared <= _EPSILON_L2_SQUARED_TOLERANCE, (
         f"RCF_freq={RCF_freq}, FWHM={FWHM.to(ppm):.4g}, "
         f"T2*_analytic={T2star:.3g}, relative detuning={rel_detuning}: "
         f"B1_input={B1_input:.3g} (γ·B1_eff·t_end={nutation:.3f}), "
         f"t_end={t_end:.4g} ({(t_end / T2star).to_value(unit.one):.2f}·T2*_analytic), "
-        f"χ²={chi2:.2e} (tol={_CHI2_TOLERANCE:.0e})"
+        f"epsilon_l2={epsilon_l2:.2e}, "
+        f"epsilon_l2_squared={epsilon_l2_squared:.2e} "
+        f"(tol={_EPSILON_L2_SQUARED_TOLERANCE:.0e})"
     )

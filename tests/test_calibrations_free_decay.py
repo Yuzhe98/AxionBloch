@@ -46,11 +46,9 @@ envelope is independent of Delta_nu_L:
 
     |Mxy(t)| = |FD_sub(t)|.
 
-The test quantifies agreement between simulation and theory via
-
-    χ² = ‖|Mxy| − |FD_sub|‖² / ‖|FD_sub|‖²
-
-and asserts χ² ≤ _CHI2_TOLERANCE.
+The test quantifies agreement between simulation and theory via the full
+transverse-vector relative L2 error. ``epsilon_l2_squared`` is retained as
+the squared form used for the tolerance check.
 
 Simulation parameters
 ---------------------
@@ -82,11 +80,11 @@ from axionbloch.SimuTools import MagField, Simulation
 _T1 = 1e6 * unit.s  # negligible longitudinal relaxation
 _T2 = 1e3 * unit.s  # negligible intrinsic T2 → T2* ≈ Tdelta
 _NFWHM = 10.0  # half-width range; larger nFWHM adds outer packets that
-# precess ~1 rad during the 90° pulse, raising χ²
+# precess ~1 rad during the 90° pulse, raising the vector error
 _T90_STEPS = 5  # 90° pulse length in time steps
 
-# χ² tolerance: ‖Mxy − FD_sub‖² / ‖FD_sub‖² over full post-pulse trajectory
-_CHI2_TOLERANCE = 1e-4
+# Squared relative L2 tolerance over the full post-pulse trajectory.
+_EPSILON_L2_SQUARED_TOLERANCE = 1e-4
 
 # Adaptive timing
 _N_T2STAR = 10.0  # observe for 10 × T₂*_analytic
@@ -179,24 +177,33 @@ def _build_free_decay_simulation(
     return simu
 
 
-def _fd_expected_curve(simu: Simulation, t90_steps: int) -> np.ndarray:
-    """Expected |Mxy(t)| envelope from the free-decay kernel.
+def _fd_expected_vector(
+    simu: Simulation,
+    t90_steps: int,
+    Delta_nu_L: Quantity,
+    initial_transverse: complex = 1j,
+) -> np.ndarray:
+    """Expected ``(Mx, My)`` trajectory after the 90-degree pulse.
 
-    Returns an array of length ``simu.timeLen − t90_steps``.
-    Each spin packet i contributes exp(2πi · δᵢ · t) with
-    δᵢ = γ/(2π) · B_spread_i.
+    Returns an array with shape ``(simu.timeLen - t90_steps, 2)``.
+    Each spin packet i contributes exp(-2πi · δᵢ · t), where
+    δᵢ = γ/(2π) · B_i − RCF_freq is the rotating-frame detuning.
     """
     t_s = simu.getTimeStamp().to_value(unit.s)
     t_sig = t_s[t90_steps:] - t_s[t90_steps]  # time since end of pulse
 
     gamma_over_2pi = _GAMMA.to_value(unit.rad * unit.Hz / unit.T) / (2 * np.pi)
     B_spread = simu.magnet.B_spread.to_value(unit.T)
+    detuning_Hz = gamma_over_2pi * B_spread - simu.RCF_freq.to_value(unit.Hz)
 
     T2_s = simu.sample.T2.to_value(unit.s)
     fd = np.zeros(len(t_sig), dtype=complex)
-    for Bs, w in zip(B_spread, simu.magnet.ratios):
-        fd += w * np.exp(2j * np.pi * gamma_over_2pi * Bs * t_sig)
-    return np.abs(fd) * np.exp(-t_sig / T2_s)
+    for detuning, w in zip(detuning_Hz, simu.magnet.ratios):
+        fd += w * np.exp(-2j * np.pi * detuning * t_sig)
+    transverse = (
+        initial_transverse * fd * np.exp(-t_sig / T2_s)
+    )
+    return np.column_stack((transverse.real, transverse.imag))
 
 
 # ---------------------------------------------------------------------------
@@ -229,7 +236,7 @@ def _plot_free_decay_result(
     t90_steps: int,
     Delta_nu_L: Quantity,
     T2star: Quantity,
-    chi2: float,
+    epsilon_l2: float,
 ) -> None:
     """Show a two-panel diagnostic figure for one free-decay test case.
 
@@ -241,7 +248,10 @@ def _plot_free_decay_result(
     Mx = simu.trjry[0, t90_steps:, 0]
     My = simu.trjry[0, t90_steps:, 1]
     Mxy = np.sqrt(Mx**2 + My**2)
-    expected_curve = _fd_expected_curve(simu, t90_steps)
+    expected_vector = _fd_expected_vector(
+        simu, t90_steps, Delta_nu_L, Mx[0] + 1j * My[0]
+    )
+    expected_curve = np.linalg.norm(expected_vector, axis=1)
 
     marksize = 1
     cm = 1 / 2.54
@@ -277,7 +287,7 @@ def _plot_free_decay_result(
         f"FWHM={simu.magnet.FWHM.to(ppm):.4g}  "
         f"signal={Delta_nu_L.to(unit.Hz):.4g}\n"
         "$T_2^*$" + f"_analytic={T2star:.3g}  "
-        f"$\\chi^2$={chi2:.2e}"
+        f"$\\epsilon_{{L^2}}$={epsilon_l2:.2e}"
     )
     plt.tight_layout()
     _show_figure(fig, simu.name)
@@ -307,7 +317,8 @@ def test_free_decay_envelope(
     After 90° pulse, |Mxy(t)| = |FD_sub(t)| = |Σᵢ wᵢ exp(2πi · δᵢ · t)|
     where δᵢ = γ/(2π) · B_spread_i.
 
-    Tolerance: χ² = ‖Mxy − FD_sub‖² / ‖FD_sub‖² ≤ _CHI2_TOLERANCE.
+    Tolerance: the full-vector relative L2 error satisfies
+    ``epsilon_l2_squared <= _EPSILON_L2_SQUARED_TOLERANCE``.
     """
     Tdelta = (1.0 / (np.pi * FWHM.to(unit.one) * RCF_freq)).to(unit.s)
     T2star = (_T2 * Tdelta / (_T2 + Tdelta)).to(unit.s)
@@ -318,20 +329,26 @@ def test_free_decay_envelope(
 
     simu = _build_free_decay_simulation(RCF_freq, Delta_nu_L, FWHM, rate, duration)
 
-    Mxy = np.sqrt(
-        simu.trjry[0, _T90_STEPS:, 0] ** 2 + simu.trjry[0, _T90_STEPS:, 1] ** 2
+    Mperp_simu = simu.trjry[0, _T90_STEPS:, :2]
+    initial_transverse = complex(Mperp_simu[0, 0], Mperp_simu[0, 1])
+    Mperp_theo = _fd_expected_vector(
+        simu, _T90_STEPS, Delta_nu_L, initial_transverse
     )
-    expected_curve = _fd_expected_curve(simu, _T90_STEPS)
-    chi2 = float(np.sum((Mxy - expected_curve) ** 2) / np.sum(expected_curve**2))
+    epsilon_l2_squared = float(
+        np.sum((Mperp_simu - Mperp_theo) ** 2) / np.sum(Mperp_theo**2)
+    )
+    epsilon_l2 = np.sqrt(epsilon_l2_squared)
 
     t_end = simu.getTimeStamp()[-1]
 
     if show_plots:
-        _plot_free_decay_result(simu, _T90_STEPS, Delta_nu_L, T2star, chi2)
+        _plot_free_decay_result(simu, _T90_STEPS, Delta_nu_L, T2star, epsilon_l2)
 
-    assert chi2 <= _CHI2_TOLERANCE, (
+    assert epsilon_l2_squared <= _EPSILON_L2_SQUARED_TOLERANCE, (
         f"RCF_freq={RCF_freq}, FWHM={FWHM.to(ppm):.4g}, "
         f"T2*_analytic={T2star:.3g}, rel_detuning={rel_detuning}: "
         f"t_end={t_end:.4g} ({(t_end / T2star).to_value(unit.one):.2f}·T2*_analytic), "
-        f"χ²={chi2:.2e} (tol={_CHI2_TOLERANCE:.0e})"
+        f"epsilon_l2={epsilon_l2:.2e}, "
+        f"epsilon_l2_squared={epsilon_l2_squared:.2e} "
+        f"(tol={_EPSILON_L2_SQUARED_TOLERANCE:.0e})"
     )

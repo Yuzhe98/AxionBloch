@@ -52,7 +52,7 @@ import matplotlib.ticker as mticker  # noqa: F401
 from matplotlib.axes import Axes  # noqa: F401
 
 # plot style
-plt.rc("font", size=8)  # font size for all figures  TODO check this fontsize
+plt.rc("font", size=8)  # font size for all figures
 # plt.rcParams['font.family'] = 'serif'
 # plt.rcParams['font.serif'] = ['Times New Roman']
 plt.rcParams["font.family"] = "Times New Roman"

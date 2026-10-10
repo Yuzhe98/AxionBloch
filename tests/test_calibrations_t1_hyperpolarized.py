@@ -90,7 +90,7 @@ _NFWHM = 0.0  # uniform field: one spin packet at B0, no precession
 _TEMP = 300.0 * unit.K  # sample temperature for thermal polarization reference
 
 # χ² tolerance: ‖Mz − Mz_expected‖² / ‖Mz_expected − 1‖²
-_CHI2_TOLERANCE = 1e-7
+_EPSILON_L2_SQUARED_TOLERANCE = 1e-7
 
 # Timing
 _N_T1 = 5.0  # observe for 5 × T1
@@ -231,7 +231,7 @@ def _plot_hyperpol_result(
     simu: Simulation,
     T1: Quantity,
     k: float,
-    chi2: float,
+    epsilon_l2: float,
 ) -> None:
     """Two-panel diagnostic figure for one hyperpolarized T1 test case.
 
@@ -285,7 +285,7 @@ def _plot_hyperpol_result(
     fig.suptitle(
         f"Hyperpolarized T1  RCF={simu.RCF_freq:.3g}  "
         f"$T_1$={T1:.3g}  $k$={k:.4g}\n"
-        f"$\\chi^2$={chi2:.2e}"
+        f"$\\epsilon_{{L^2}}$={epsilon_l2:.2e}"
     )
     plt.tight_layout()
     _show_figure(fig, simu.name)
@@ -326,12 +326,17 @@ def test_t1_hyperpolarized(
     expected_curve = _hyperpol_expected_curve(simu)
     departure = expected_curve - 1.0  # (k − 1)·exp(−t/T1), always > 0
 
-    chi2 = float(np.sum((Mz - expected_curve) ** 2) / np.sum(departure**2))
+    epsilon_l2_squared = float(
+        np.sum((Mz - expected_curve) ** 2) / np.sum(departure**2)
+    )
+    epsilon_l2 = np.sqrt(epsilon_l2_squared)
 
     if show_plots:
-        _plot_hyperpol_result(simu, T1, k, chi2)
+        _plot_hyperpol_result(simu, T1, k, epsilon_l2)
 
-    assert chi2 <= _CHI2_TOLERANCE, (
+    assert epsilon_l2_squared <= _EPSILON_L2_SQUARED_TOLERANCE, (
         f"RCF_freq={RCF_freq}, T1={T1:.3g}, k={k:.4g}: "
-        f"chi2={chi2:.2e} (tol={_CHI2_TOLERANCE:.0e})"
+        f"epsilon_l2={epsilon_l2:.2e}, "
+        f"epsilon_l2_squared={epsilon_l2_squared:.2e} "
+        f"(tol={_EPSILON_L2_SQUARED_TOLERANCE:.0e})"
     )
