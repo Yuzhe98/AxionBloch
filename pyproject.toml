@@ -9,6 +9,17 @@ build-backend = "setuptools.build_meta"
 name = "axionbloch"
 version = "0.2.7"
 description = "Simulation tool for axion-induced spin dynamics."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "matplotlib",
+    "astropy",
+    "scipy",
+    "h5py",
+]
 
 authors = [
     { name = "Yuzhe Zhang", email = "yuhzhang@uni-mainz.de" }
@@ -18,21 +29,6 @@ authors = [
 Homepage = "https://github.com/Yuzhe98/AxionBloch"
 Documentation = "https://axionbloch.readthedocs.io/en/latest/"
 Source = "https://github.com/Yuzhe98/AxionBloch"
-
-readme = "README.md"
-
-license = "MIT"
-license-files = ["LICENSE"]
-
-requires-python = ">=3.10"
-
-dependencies = [
-    "numpy",
-    "matplotlib",
-    "astropy",
-    "scipy",
-    "h5py",
-]
 
 [project.optional-dependencies]
 dev = [

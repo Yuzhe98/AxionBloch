@@ -238,8 +238,12 @@ class MagField(PhysicalObject):
             raise ValueError("timeStep must be a finite positive duration")
         if not np.isfinite(g) or g == 0:
             raise ValueError("gamma must be finite and nonzero")
-        if not np.isfinite(theta) or theta == 0:
-            raise ValueError("tip_angle must be finite and nonzero")
+        if not np.isfinite(theta):
+            raise ValueError("tip_angle must be finite")
+        # A zero-angle request is a valid no-op pulse (useful when generating
+        # a Rabi sweep beginning at 0 degrees).
+        if theta == 0:
+            return 0.0 * unit.T
 
         # x = gamma * (B1/2) * dt. For one RK4 step, the polynomial's phase
         # is the numerical rotation. Repeating the same step n times adds
@@ -326,6 +330,11 @@ class MagField(PhysicalObject):
         ``gamma * B * duration`` area. This accounts for the actual number of
         field samples and the RK4 phase error for a constant, on-resonance
         transverse field.
+
+        The amplitude is recalculated from the requested angle, time step,
+        gyromagnetic ratio, and pulse step count on every call. Do not obtain
+        another angle by scaling a calibrated 90-degree amplitude: the RK4
+        phase correction depends on the requested per-step rotation.
 
         This method builds a single pulse at the start of the field array.
         The reusable amplitude calculation is

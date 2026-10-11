@@ -226,6 +226,9 @@ void _generateTrajectories(
         double *Mx = (double *)malloc(numSpinPkts * sizeof(double));
         double *My = (double *)malloc(numSpinPkts * sizeof(double));
         double *Mz = (double *)malloc(numSpinPkts * sizeof(double));
+        // Per-packet Kahan compensation for the stored longitudinal deviation.
+        // It tracks the rounding error from adding tiny RK4 updates to Mz.
+        double *Mz_comp = (double *)calloc(numSpinPkts, sizeof(double));
         double *M0eq = (double *)malloc(numSpinPkts * sizeof(double));
         double *inhomoOz_vec = (double *)malloc(numSpinPkts * sizeof(double));
 
@@ -233,8 +236,10 @@ void _generateTrajectories(
         for (int k = 0; k < numSpinPkts; k++) {
             Mx[k] = ratios[k] * Mx0;
             My[k] = ratios[k] * My0;
-            Mz[k] = ratios[k] * Mz0;
             M0eq[k] = ratios[k] * M0eqb;
+            // Integrate the longitudinal deviation from equilibrium rather
+            // than the absolute magnetization to limit high-rate cancellation.
+            Mz[k] = ratios[k] * (Mz0 - M0eqb);
             inhomoOz_vec[k] = inhomoOmega_vec[k] - RCF_freq_Hz * 2 * M_PI;
         }
 
@@ -268,46 +273,57 @@ void _generateTrajectories(
                 // RK4 integration for spin packet k
 
                 // Step 1: compute k1
-                double k1x = (My[k] * Oz - Mz[k] * Oy) - Mx[k] / T2;
-                double k1y = (Mz[k] * Ox - Mx[k] * Oz) - My[k] / T2;
-                double k1z = (Mx[k] * Oy - My[k] * Ox) - (Mz[k] - M0eq[k]) / T1;
+                // Mz_comp is the rounding correction carried from the previous
+                // update. Subtract it here so tiny RK4 changes are not lost
+                // when accumulated across many high-rate time steps.
+                double Mz_current = Mz[k] - Mz_comp[k];
+                double Mz_physical = Mz_current + M0eq[k];
+                double k1x = (My[k] * Oz - Mz_physical * Oy) - Mx[k] / T2;
+                double k1y = (Mz_physical * Ox - Mx[k] * Oz) - My[k] / T2;
+                double k1z = (Mx[k] * Oy - My[k] * Ox) - Mz_current / T1;
 
                 // Step 2: compute k2
                 double Mx_tmp = Mx[k] + dtHalf * k1x;
                 double My_tmp = My[k] + dtHalf * k1y;
-                double Mz_tmp = Mz[k] + dtHalf * k1z;
+                double Mz_tmp = Mz_current + dtHalf * k1z;
 
-                double k2x = (My_tmp * Oz - Mz_tmp * Oy) - Mx_tmp / T2;
-                double k2y = (Mz_tmp * Ox - Mx_tmp * Oz) - My_tmp / T2;
-                double k2z = (Mx_tmp * Oy - My_tmp * Ox) - (Mz_tmp - M0eq[k]) / T1;
+                double k2x = (My_tmp * Oz - (Mz_tmp + M0eq[k]) * Oy) - Mx_tmp / T2;
+                double k2y = ((Mz_tmp + M0eq[k]) * Ox - Mx_tmp * Oz) - My_tmp / T2;
+                double k2z = (Mx_tmp * Oy - My_tmp * Ox) - Mz_tmp / T1;
 
                 // Step 3: compute k3
                 Mx_tmp = Mx[k] + dtHalf * k2x;
                 My_tmp = My[k] + dtHalf * k2y;
-                Mz_tmp = Mz[k] + dtHalf * k2z;
+                Mz_tmp = Mz_current + dtHalf * k2z;
 
-                double k3x = (My_tmp * Oz - Mz_tmp * Oy) - Mx_tmp / T2;
-                double k3y = (Mz_tmp * Ox - Mx_tmp * Oz) - My_tmp / T2;
-                double k3z = (Mx_tmp * Oy - My_tmp * Ox) - (Mz_tmp - M0eq[k]) / T1;
+                double k3x = (My_tmp * Oz - (Mz_tmp + M0eq[k]) * Oy) - Mx_tmp / T2;
+                double k3y = ((Mz_tmp + M0eq[k]) * Ox - Mx_tmp * Oz) - My_tmp / T2;
+                double k3z = (Mx_tmp * Oy - My_tmp * Ox) - Mz_tmp / T1;
 
                 // Step 4: compute k4
                 Mx_tmp = Mx[k] + timeStep * k3x;
                 My_tmp = My[k] + timeStep * k3y;
-                Mz_tmp = Mz[k] + timeStep * k3z;
+                Mz_tmp = Mz_current + timeStep * k3z;
 
-                double k4x = (My_tmp * Oz - Mz_tmp * Oy) - Mx_tmp / T2;
-                double k4y = (Mz_tmp * Ox - Mx_tmp * Oz) - My_tmp / T2;
-                double k4z = (Mx_tmp * Oy - My_tmp * Ox) - (Mz_tmp - M0eq[k]) / T1;
+                double k4x = (My_tmp * Oz - (Mz_tmp + M0eq[k]) * Oy) - Mx_tmp / T2;
+                double k4y = ((Mz_tmp + M0eq[k]) * Ox - Mx_tmp * Oz) - My_tmp / T2;
+                double k4z = (Mx_tmp * Oy - My_tmp * Ox) - Mz_tmp / T1;
 
                 // Step 5: update M
                 Mx[k] += dt_6 * (k1x + 2 * k2x + 2 * k3x + k4x);
                 My[k] += dt_6 * (k1y + 2 * k2y + 2 * k3y + k4y);
-                Mz[k] += dt_6 * (k1z + 2 * k2z + 2 * k3z + k4z);
+                double dz = dt_6 * (k1z + 2 * k2z + 2 * k3z + k4z);
+                // Kahan summation: add the corrected increment, then retain
+                // the part that floating-point rounding could not represent.
+                double corrected_dz = dz - Mz_comp[k];
+                double next_Mz = Mz[k] + corrected_dz;
+                Mz_comp[k] = (next_Mz - Mz[k]) - corrected_dz;
+                Mz[k] = next_Mz;
 
                 // accumulate total magnetization
                 sumMx += Mx[k];
                 sumMy += My[k];
-                sumMz += Mz[k];
+                sumMz += Mz[k] - Mz_comp[k] + M0eq[k];
             }
 
             // store trajectory for field f
@@ -321,6 +337,7 @@ void _generateTrajectories(
         free(Mx);
         free(My);
         free(Mz);
+        free(Mz_comp);
         free(M0eq);
         free(inhomoOz_vec);
     }
