@@ -2212,7 +2212,6 @@ high_contrast_extended = [
     "#8c564b",
     "#e377c2",
     "#17becf",
-    "#bcbd22",
     "#7f7f7f",
     "#393b79",
     "#637939",
