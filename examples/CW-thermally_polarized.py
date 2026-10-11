@@ -44,7 +44,7 @@ magnet = Magnet(
     name="detection magnet",
     B0=(RCF_Freq - signalFreqRot) / (sample.gamma / (2 * PI)),
     FWHM=FWHM,
-    nFWHM=10.0,
+    nFWHM=100.0,
 )
 magnet.setHomogeneity(numPt=2000, showPlot=False, verbose=True)
 print(f"numPt for magnet homogeneity = {magnet.numPt}")
