@@ -73,6 +73,12 @@ param_1MHz = {
     "extent": 1e2 * unit.R_earth,
 }
 
+param_1_348570MHz = {
+    "nu_a": 1.348570 * unit.MHz,
+    "N": int(1e5),
+    "extent": 1e2 * unit.R_earth,
+}
+
 param_10MHz = {
     "nu_a": 10 * unit.MHz,
     "N": int(1e5),
@@ -100,7 +106,8 @@ param_30MHz = {
 
 halo = EarthBoundAxionHalo(
     # m_a=axion_mass,
-    **param_10kHz
+    **param_1_348570MHz,
+    maxTotalDMmass=.5 * unit.M_earth,
 )
 halo.solve_TISE_3D(l_vals=[0, 1, 2], max_n_r=10)
 fig_u_r, ax_u_r = halo.plot_u_r(state_names=states)

@@ -7,7 +7,7 @@ import numpy as np
 from astropy import constants as const, units as unit
 
 # Edit the input file and the states to include in the plot.
-input_path = Path(__file__).resolve().parent / "outputs" / "frequency_sweep-4" / "density_at_earth_vs_frequency.txt"
+input_path = Path(__file__).resolve().parent / "outputs" / "frequency_sweep-5" / "density_at_earth_vs_frequency.txt"
 state_names = ["1s", 
             #    "2s", "2p", "3s", "3p", "3d",
             # "4s", "4p", "4d", "5s", "5p", "5d"
@@ -46,7 +46,8 @@ ax.set_xlabel(r"Axion frequency $\nu_a$ (Hz)")
 ax.set_ylabel(r"$\rho_\oplus / \rho_{\mathrm{SHM}}$")
 ax.grid(True, which="both", alpha=.25)
 ax.legend(title="Eigenstate")
-ax.set_ylim(bottom=.5e01)
+
+ax.axhline(1, color="k", ls="--", lw=1, alpha=.5, label=r"$\rho = \rho_{\mathrm{SHM}}$", linewidth=1)
 
 # Convert the dimensionless overdensity to mass density on the right axis.
 rho_reference = rho_M_DM_SHM.to_value(unit.g / unit.cm**3)
@@ -68,6 +69,8 @@ ax.callbacks.connect(
     "xlim_changed",
     lambda frequency_ax: mass_ax.set_xlim(np.asarray(frequency_ax.get_xlim()) * mass_per_hz),
 )
+ax.set_ylim(bottom=0.5e01)
+
 fig.tight_layout()
 fig.savefig(output_path, dpi=300)
 print(f"Saved {output_path}")

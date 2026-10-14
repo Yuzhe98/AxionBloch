@@ -454,7 +454,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
     a_0: Quantity[unit.eV] | None = None
     # Halo masses use Earth masses by default.  Other mass quantities in this
     # class (for example the axion mass and PREM profile) keep their own units.
-    maxTotalDMmass: Quantity[unit.M_earth] | None = 4e-9 * unit.M_earth
+    maxTotalDMmass: Quantity[unit.M_earth] | None = .5 * unit.M_earth
     g_aNN: Quantity[unit.GeV**-1] = 1e-9 * unit.GeV**-1
     rho_M_DM_SHM: Quantity[unit.g / unit.cm**3] = 0.3 * unit.GeV / (const.c**2 * unit.cm**3)
 
@@ -467,7 +467,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         extent: Quantity[unit.m] = 128.0 * unit.R_earth,
         getPot=earth_grav_potential_infty,
         a_0: Quantity[unit.eV] | None = None,
-        maxTotalDMmass: Quantity[unit.M_earth] | None = 4e-9 * unit.M_earth,
+        maxTotalDMmass: Quantity[unit.M_earth] | None = .5 * unit.M_earth,
         g_aNN: Quantity[unit.GeV**-1] = 1e-9 * unit.GeV**-1,
         rho_M_DM_SHM: Quantity[unit.g / unit.cm**3] = 0.3 * unit.GeV / (const.c**2 * unit.cm**3),
         verbose: bool = False,

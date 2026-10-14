@@ -10,6 +10,7 @@ The largest grids require substantial memory; edit scan_frequencies to select a 
 """
 
 from pathlib import Path
+from time import perf_counter
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -147,11 +148,11 @@ def choose_params(frequency, examples):
 
 # Edit this frequency array for an arbitrary scan, e.g. [5, 25, 80] * unit.kHz.
 # scan_frequencies = np.geomspace(1e4, 3e7, 20) * unit.Hz
-scan_frequencies = np.geomspace(1e4, 3e7, 20) * unit.Hz
+scan_frequencies = np.geomspace(1e2, 3e7, 20) * unit.Hz
 # Alternatively: scan_frequencies = np.geomspace(1, 3e7, 20) * unit.Hz
 params = [choose_params(frequency, example_params) for frequency in scan_frequencies]
 
-output_dir = Path(__file__).resolve().parent / "outputs" / "frequency_sweep-4"
+output_dir = Path(__file__).resolve().parent / "outputs" / "frequency_sweep-5"
 output_dir.mkdir(parents=True, exist_ok=True)
 
 # Start a fresh combined table; append each frequency as soon as it is computed.
@@ -165,8 +166,13 @@ density_table_path.write_text(
 
 for param in params:
     # Solve once per frequency; each state is a separate mass hypothesis.
+    config_start = perf_counter()
     frequency_label = f"{param['nu_a'].to_value(unit.Hz):.17g}_Hz"
-    print(f"\nFrequency: {param['nu_a']}", flush=True)
+    print(
+        f"\nFrequency: {param['nu_a']}; N: {param['N']}; "
+        f"extent: {param['extent']}",
+        flush=True,
+    )
     halo = EarthBoundAxionHalo(**param)
     halo.solve_TISE_3D(l_vals=[0, 1, 2], max_n_r=10)
 
@@ -213,6 +219,18 @@ for param in params:
     fig.tight_layout()
     fig.savefig(output_dir / f"density_{frequency_label}.png", dpi=300)
     plt.close(fig)
+
+    elapsed_seconds = perf_counter() - config_start
+    elapsed_report = (
+        f"Elapsed time for frequency={param['nu_a']}, N={param['N']}, "
+        f"extent={param['extent']}: {elapsed_seconds:.2f} s "
+        f"({elapsed_seconds / 60:.2f} min)"
+    )
+    print(elapsed_report, flush=True)
+    with (output_dir / f"results_{frequency_label}.txt").open(
+        "a", encoding="utf-8"
+    ) as result_file:
+        result_file.write(elapsed_report + "\n")
 
     # Release the large eigenstate arrays before constructing the next halo.
     del halo
