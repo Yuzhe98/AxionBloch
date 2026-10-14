@@ -1,7 +1,16 @@
 from axionbloch.dependency import *
 from axionbloch.EarthBoundAxionHalo import EarthBoundAxionHalo
-from axionbloch.Station import (Baltimore, BuenosAires, CapeTown, Geneva,
-                                Mainz, Mumbai, Sanya, Sydney, Tokyo)
+from axionbloch.Station import (
+    Baltimore,
+    BuenosAires,
+    CapeTown,
+    Geneva,
+    Mainz,
+    Mumbai,
+    Sanya,
+    Sydney,
+    Tokyo,
+)
 from axionbloch.utils import check
 
 stations = [
@@ -43,7 +52,7 @@ halo.solve_TISE_3D(
 )
 
 # gradient obtain by Equation \ref{{eq:a0_Psi_real}} in the Yuzhe's thesis
-N_a = halo.totalMassEnclosed / halo.m_a
+N_a = halo.maxTotalDMmass / halo.m_a
 gradient_factor = (
     const.c * halo.g_aNN * (2 * N_a * const.hbar**3 * const.c / halo.m_a) ** 0.5
 )

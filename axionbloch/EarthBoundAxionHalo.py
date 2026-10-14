@@ -454,7 +454,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
     a_0: Quantity[unit.eV] | None = None
     # Halo masses use Earth masses by default.  Other mass quantities in this
     # class (for example the axion mass and PREM profile) keep their own units.
-    totalMassEnclosed: Quantity[unit.M_earth] | None = 4e-9 * unit.M_earth
+    maxTotalDMmass: Quantity[unit.M_earth] | None = 4e-9 * unit.M_earth
     g_aNN: Quantity[unit.GeV**-1] = 1e-9 * unit.GeV**-1
     rho_M_DM_SHM: Quantity[unit.g / unit.cm**3] = 0.3 * unit.GeV / (const.c**2 * unit.cm**3)
 
@@ -467,7 +467,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         extent: Quantity[unit.m] = 128.0 * unit.R_earth,
         getPot=earth_grav_potential_infty,
         a_0: Quantity[unit.eV] | None = None,
-        totalMassEnclosed: Quantity[unit.M_earth] | None = 4e-9 * unit.M_earth,
+        maxTotalDMmass: Quantity[unit.M_earth] | None = 4e-9 * unit.M_earth,
         g_aNN: Quantity[unit.GeV**-1] = 1e-9 * unit.GeV**-1,
         rho_M_DM_SHM: Quantity[unit.g / unit.cm**3] = 0.3 * unit.GeV / (const.c**2 * unit.cm**3),
         verbose: bool = False,
@@ -491,19 +491,19 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         # Keep the Earth-bound halo mass in the public/default halo unit while
         # retaining an Astropy Quantity.  Convert to SI only where a consumer
         # explicitly requests it (for example, density output below).
-        if not isinstance(totalMassEnclosed, Quantity) or not totalMassEnclosed.unit.is_equivalent(unit.kg):
-            raise TypeError("totalMassEnclosed must be a mass Quantity.")
-        totalMassEnclosed = totalMassEnclosed.to(unit.M_earth)
-        if not totalMassEnclosed.isscalar or not np.isfinite(totalMassEnclosed) or totalMassEnclosed < 0 * unit.M_earth:
-            raise ValueError("totalMassEnclosed must be finite, scalar and nonnegative.")
-        self.N_a = totalMassEnclosed / self.m_a
+        if not isinstance(maxTotalDMmass, Quantity) or not maxTotalDMmass.unit.is_equivalent(unit.kg):
+            raise TypeError("maxTotalDMmass must be a mass Quantity.")
+        maxTotalDMmass = maxTotalDMmass.to(unit.M_earth)
+        if not maxTotalDMmass.isscalar or not np.isfinite(maxTotalDMmass) or maxTotalDMmass < 0 * unit.M_earth:
+            raise ValueError("maxTotalDMmass must be finite, scalar and nonnegative.")
+        self.N_a = maxTotalDMmass / self.m_a
         if a_0 is not None:
             self.a_0 = a_0
         else:
             self.a_0_reduced = np.sqrt(
                 2 * self.N_a * const.hbar**3 * const.c / self.m_a
             ).si
-        self.totalMassEnclosed = totalMassEnclosed
+        self.maxTotalDMmass = maxTotalDMmass
         self.rho_M_DM_SHM = rho_M_DM_SHM
 
     @staticmethod
@@ -589,7 +589,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         Each call replaces the stored inferred models with the selected states.
         Wavefunction and grid copies preserve the inference if TISE is rerun;
         call this method again to use new solutions. Constructor attributes
-        totalMassEnclosed, N_a and field amplitudes are unchanged. The
+        maxTotalDMmass, N_a and field amplitudes are unchanged. The
         The shell-mass limit sets the inferred central halo mass, subject to
         the Earth-enclosed-mass cap.
         A UserWarning flags shell fractions at or below float64 machine epsilon.

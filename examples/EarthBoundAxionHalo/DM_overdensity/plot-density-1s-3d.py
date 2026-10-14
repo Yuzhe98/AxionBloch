@@ -33,7 +33,7 @@ halo.solve_TISE_3D(
 rhoE_DM_MW = 0.4 * unit.GeV / const.c**2 / unit.cm**3
 state_names = ["1s", "2s", "2p", "3s", "3p", "3d"]
 colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-totalMassEnclosed = halo.totalMassEnclosed
+maxTotalDMmass = halo.maxTotalDMmass
 
 print("\nNormalization check for u_r:")
 print(f"{'state':<6} {'int |u_r|^2 dr':>18} {'|norm-1|':>14} {'rescaled':>12}")
@@ -61,7 +61,7 @@ for idx, name in enumerate(state_names):
     norm = halo.dr * np.sum(np.abs(u_r) ** 2)
     if np.isfinite(norm.value) and norm.value > 0:
         u_r = u_r / np.sqrt(norm)
-    rho_r = totalMassEnclosed * np.abs(u_r) ** 2 / (4 * np.pi * halo.r**2)
+    rho_r = maxTotalDMmass * np.abs(u_r) ** 2 / (4 * np.pi * halo.r**2)
     rho_r = np.where(np.isfinite(rho_r), rho_r, 0 * rho_r.unit)
     rho_to_rhoMW[name] = (rho_r / rhoE_DM_MW).to_value(unit.one)
     # rho_gcm3[name] = rho_r.to_value(unit.g / unit.cm**3)

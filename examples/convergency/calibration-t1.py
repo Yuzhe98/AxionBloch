@@ -37,7 +37,7 @@ INITIAL_MZ_VALUES = (0.0, 10.0)
 # Figure labels and limits are kept together for easy editing.
 T1_Y_LABEL = r"$M$ ($M_{\mathrm{eqb}}$)"
 TIME_X_LABEL = "Time (s)"
-RESIDUAL_Y_LABEL = "Residual"
+RESIDUAL_Y_LABEL = "Residual\n($M_{\\mathrm{eqb}}$)"
 CONVERGENCE_X_LABEL = "Simulation rate (Hz)"
 CONVERGENCE_Y_LABEL = r"$\epsilon_{L^2}$"
 
@@ -171,7 +171,7 @@ def main() -> None:
         height_ratios=(1.0, 0.33),
     )
     fig.subplots_adjust(
-        left=0.115, right=0.98, bottom=0.188, top=0.91, wspace=0.38, hspace=0.10
+        left=0.142, right=0.98, bottom=0.188, top=0.91, wspace=0.38, hspace=0.10
     )
     ax_relaxation = fig.add_subplot(gs[0, 0])
     ax_residual = fig.add_subplot(gs[1, 0], sharex=ax_relaxation)

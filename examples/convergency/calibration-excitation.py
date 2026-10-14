@@ -42,7 +42,7 @@ RABI_Y_LIMITS = (-1.08, 1.08)
 TIP_ANGLE_TICKS_DEG = (0.0, 90.0, 180.0, 270.0, 360.0)
 RABI_Y_LABEL = r"$M_y$ ($M_{\mathrm{eqb}}$)"
 RESIDUAL_X_LABEL = r"User-specified tip angle $\theta$ (°)"
-RESIDUAL_Y_LABEL = "Residual"
+RESIDUAL_Y_LABEL = "Residual\n($M_{\\mathrm{eqb}}$)"
 CONVERGENCE_X_LABEL = "Simulation rate (Hz)"
 CONVERGENCE_Y_LABEL = r"$\epsilon_{L^2}$"
 
@@ -348,8 +348,9 @@ def main() -> None:
         width_ratios=(1., 1.0),
         height_ratios=(1.0, 0.33),
     )
-    fig.subplots_adjust(left=0.115, right=0.98, bottom=0.188, top=0.91,
-                        wspace=0.38, hspace=0.10)
+    fig.subplots_adjust(
+        left=0.142, right=0.98, bottom=0.188, top=0.91, wspace=0.38, hspace=0.10
+    )
     ax_rabi = fig.add_subplot(gs[0, 0])
     ax_residual = fig.add_subplot(gs[1, 0], sharex=ax_rabi)
     ax_convergence = fig.add_subplot(gs[:, 1])

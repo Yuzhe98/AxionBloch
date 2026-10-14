@@ -34,7 +34,7 @@ Only plotting and serialization convert to plain numerical arrays. Optional
 `state_names` on the query and plot methods selects a subset of states with inferred mass scales.
 Inferences retain wavefunction copies; after solving new eigenstates,
 call `inferHaloMass` again to use those solutions. This API does not
-change the constructor's `totalMassEnclosed`, `N_a`, or field amplitudes:
+change the constructor's `maxTotalDMmass`, `N_a`, or field amplitudes:
 separate single-state hypotheses cannot share one total-mass normalization.
 
 ## Interpretation
@@ -73,5 +73,5 @@ The 1% convergence flag tests Moon-enclosed mass and Earth-surface density,
 not the whole profile. Extremely small plotted tails can reach the
 numerical noise floor. Existing output files are replaced on reruns.
 
-The older density examples use `totalMassEnclosed` as a whole-profile mass;
+The older density examples use `maxTotalDMmass` as a whole-profile mass;
 they do not perform the shell-to-total conversion.

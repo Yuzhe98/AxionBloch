@@ -1,7 +1,5 @@
-from functools import partial
-
 from axionbloch.dependency import *
-from axionbloch.utils import Lorentzian_0edge, _getLocationPrefix
+from axionbloch.utils import _getLocationPrefix
 
 
 class Magnet:
@@ -90,12 +88,10 @@ class Magnet:
     ):
         """Set the spin-packet sampling of the field inhomogeneity.
 
-        Discretises a Lorentzian field distribution into ``numPt`` spin packets
-        using a non-uniform sampling scheme (density proportional to
-        ``|x|^(1/2)`` in normalized coordinates) to oversample the peak region.
-        Each packet is assigned a weight ``ratio`` equal to its fraction of the
-        total Lorentzian area so that weighted averages reproduce the continuous
-        lineshape.
+        Discretises a Lorentzian field distribution into ``numPt`` equal-area
+        packets using midpoint quantiles of the Lorentzian CDF, truncated at
+        ``±nFWHM``. This avoids imposing an artificial window on the packet
+        weights. Increasing ``nFWHM`` reduces the truncation error.
 
         For ``numPt == 1`` or zero FWHM the field is treated as homogeneous and
         a single packet at ``B0`` with weight 1 is used.
@@ -124,21 +120,15 @@ class Magnet:
             self.ratios = np.ones(1)
         # inhomogeneous field
         else:
-            pdf = partial(
-                Lorentzian_0edge,
-                center=self.B0,
-                FWHM=self.FWHM_B0,
-                area=1,
-                offset=0,
-            )
             if verbose:
                 print(f"{_getLocationPrefix()} {msgPrefix} inhomogeneous field. self.numPt = {self.numPt}")
-            # uniform sampling over [-1, 1]
-            uni_samp = np.linspace(start=-1, stop=1, num=self.numPt, endpoint=True)
-            # transform uniform sampling to the desired distribution
-            self.B_spread = (
-                self.nFWHM * np.sign(uni_samp) * np.abs(uni_samp) ** 2
-            ) * self.FWHM_B0 + self.B0
+            # Midpoint quantiles of a Cauchy (Lorentzian) distribution.  The
+            # angular coordinate avoids subtracting nearly equal CDF values.
+            edge_angle = np.arctan(2.0 * self.nFWHM)
+            quantiles = (np.arange(self.numPt, dtype=float) + 0.5) / self.numPt
+            angles = (2.0 * quantiles - 1.0) * edge_angle
+            detuning_fwhm = 0.5 * np.tan(angles)
+            self.B_spread = detuning_fwhm * self.FWHM_B0 + self.B0
             if verbose:
                 print(f"{_getLocationPrefix()} {msgPrefix} B_spread.shape = {self.B_spread.shape}")
                 print(
@@ -172,24 +162,8 @@ class Magnet:
                 # plt.savefig('example figure - one-column.png', transparent=False)
                 plt.show()
 
-            # Define interval edges
-            edges = np.zeros(len(self.B_spread) + 1) * self.B_spread[0].unit
-            edges[1:-1] = (self.B_spread[:-1] + self.B_spread[1:]) / 2
-            edges[0] = self.B_spread[0] - abs(edges[2] - edges[1]) / 2
-            edges[-1] = self.B_spread[-1] + abs(edges[-2] - edges[-3]) / 2
-
-            self.ratios = np.zeros(self.B_spread.shape)
-            for i in range(len(self.B_spread)):
-                a, b = edges[i], edges[i + 1]
-                x = np.linspace(a, b, 32)
-                self.ratios[i] = np.trapezoid(pdf(x), x)
-            # high-frequency spins can create wiggles in the magnetization signal
-            # to suppress wiggles, add hamming window to decrease the ratio of high-frequency spins
-            # this is not ideal or physical. However, in simulations, we cannot use extremely large nFWHM
-            # to account for the real magnetic field distribution. We truncate at edges, instead.
-            self.ratios *= np.hamming(len(self.ratios)) ** 2
-            # normalize ratios to sum to 1
-            self.ratios /= np.sum(self.ratios)
+            # All midpoint quantiles represent the same probability mass.
+            self.ratios = np.full(self.numPt, 1.0 / self.numPt)
 
             if verbose:
                 print(
