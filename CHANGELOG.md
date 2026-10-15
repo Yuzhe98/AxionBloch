@@ -1,7 +1,9 @@
-v0.2.7 (2026-10-10)
+v0.2.8 (2026-10-10)
 --------------
 
 - improved calibration scripts. 
+- added shell-mass halo inference in EarthBoundAxionHalo. 
+- updated documentations accordingly.
 
 v0.2.7 (2026-09-04)
 --------------
@@ -80,4 +82,4 @@ log template:
 - 
 
 ### Fixed
-- 
+-

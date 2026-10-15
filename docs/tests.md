@@ -53,9 +53,26 @@ temporary PNG files and opened with the OS file viewer.
 ## Calibration tests
 
 Calibration tests compare simulation output against closed-form analytical
-solutions.  They parametrize over physically meaningful ranges of field
+solutions. They parametrize over physically meaningful ranges of field
 strength, relaxation time, and field inhomogeneity to confirm that the RK4
-integrator is accurate well below a {math}`\chi^2` threshold.
+integrator is accurate under a relative L2 threshold.
+
+For transverse signals, the comparison uses the complete vector
+{math}`(M_x,M_y)`, not only its magnitude. With `ycal` denoting the simulated
+{math}`M^\mathrm{simu}` and `yref` the analytical {math}`M^\mathrm{theo}`, the
+metric is
+
+```{math}
+\epsilon_{L^2} =
+\frac{\left[\sum_t \left((M_x^\mathrm{simu}-M_x^\mathrm{theo})^2
+ +(M_y^\mathrm{simu}-M_y^\mathrm{theo})^2\right)\right]^{1/2}}
+{\left[\sum_t \left((M_x^\mathrm{theo})^2+(M_y^\mathrm{theo})^2\right)\right]^{1/2}}.
+```
+
+The implementation reports both `epsilon_l2` and the retained diagnostic
+`epsilon_l2_squared`; assertions are made on the latter. For scalar T1 tests,
+the same normalized L2 construction is applied to the longitudinal departure
+from equilibrium, `Mz - 1`.
 
 All calibration tests use a single on-resonance proton spin packet
 (`nFWHM = 0`) to avoid the spin-packet explosion that occurs for large
@@ -65,18 +82,20 @@ by scaling `rate` and `duration` with the relevant relaxation time.
 
 ### Free-decay envelope (`test_calibrations_free_decay.py`)
 
-**36 cases** · tolerance {math}`\chi^2 \le 10^{-4}`
+**36 cases** · tolerance `epsilon_l2_squared <= 1e-4`
 
-After a 90° pulse the transverse envelope {math}`|M_{xy}(t)|` is compared to
-the free-decay kernel
+After a 90° pulse, both transverse components are compared to the complex
+free-decay reference. The reference is anchored to the simulated post-pulse
+transverse vector, so finite-pulse evolution is excluded from the comparison.
+The free-decay kernel is
 
 ```{math}
-|\mathrm{FD}_\mathrm{sub}(t)| = \left|\sum_i w_i\,e^{2\pi i\,\delta_i t}\right|
+\mathrm{FD}_\mathrm{sub}(t) = \sum_i w_i\,e^{2\pi i\,\delta_i t}
 ```
 
-where {math}`\delta_i = \gamma/(2\pi)\,B_{\mathrm{spread},i}` is the detuning
-of spin packet {math}`i` from the centre Larmor frequency and {math}`w_i` are
-the Hamming-squared weights from the magnet model.
+where {math}`\delta_i = \gamma B_i/(2\pi)-f_\mathrm{RCF}` is the rotating-frame
+detuning of spin packet {math}`i` and {math}`w_i` are the Hamming-squared
+weights from the magnet model.
 
 Parameters swept:
 
@@ -94,16 +113,17 @@ pytest "tests/test_calibrations_free_decay.py::test_free_decay_envelope[1ppm-1-1
 
 ### CW NMR signal buildup (`test_calibrations_cw_nmr.py`)
 
-**36 cases** · tolerance {math}`\chi^2 \le 10^{-4}`
+**36 cases** · tolerance `epsilon_l2_squared <= 2e-4`
 
-A weak on-resonance continuous-wave drive is applied and
-{math}`|M_{xy}(t)|` is compared to the free-decay integral formula
+A weak on-resonance CW drive is applied and the full transverse vector is
+compared to the complex free-decay integral formula
 
 ```{math}
-|M_{xy}(t)| = \gamma B_{1,\mathrm{eff}}\left|\int_0^t \mathrm{FD}_\mathrm{sub}(t')\,dt'\right|.
+\boldsymbol{M}_\perp(t) = \gamma B_{1,\mathrm{eff}}\int_0^t
+\mathrm{FD}_\mathrm{sub}(t')\,dt'
 ```
 
-The drive amplitude is chosen so that {math}`\gamma B_{1,\mathrm{eff}}\,t_\mathrm{end} = 5 \times 0.001\,\mathrm{rad}`, satisfying the weak-drive (linear-response) condition.
+The drive amplitude is chosen so that {math}`\gamma B_{1,\mathrm{eff}}\,t_\mathrm{end} = 5 \times 0.001\,\mathrm{rad}`, satisfying the weak-drive (linear-response) condition. The reported `epsilon_l2` combines the x and y component errors.
 
 Parameters swept:
 
@@ -121,7 +141,7 @@ pytest "tests/test_calibrations_cw_nmr.py::test_cw_signal_buildup[1ppm-1-1e+06Hz
 
 ### T1 longitudinal recovery (`test_calibrations_t1_relaxation.py`)
 
-**9 cases** · tolerance {math}`\chi^2 \le 10^{-3}`
+**9 cases** · tolerance `epsilon_l2_squared <= 1e-7`
 
 A 90° pulse tips {math}`M_z` to zero.  Free recovery is then compared to
 
@@ -148,7 +168,7 @@ pytest "tests/test_calibrations_t1_relaxation.py::test_t1_recovery[1.0s-1e+06Hz]
 
 ### Hyperpolarized T1 decay (`test_calibrations_t1_hyperpolarized.py`)
 
-**36 cases** · tolerance {math}`\chi^2 \le 10^{-3}`
+**36 cases** · tolerance `epsilon_l2_squared <= 1e-7`
 
 The sample starts in a longitudinally overpolarized state
 {math}`M_z(0) = k > 1` (no transverse magnetization, no excitation pulse).
@@ -175,6 +195,23 @@ Run a single case with a plot:
 ```
 pytest "tests/test_calibrations_t1_hyperpolarized.py::test_t1_hyperpolarized[10.0x-1s-1e+06Hz]" --show-plots
 ```
+
+### Rate-convergence examples
+
+The scripts in `examples/convergency/` repeat representative free-decay, CW,
+T1, pulse, fixed-point-count, and inhomogeneity calibrations at increasing
+simulation rates. Their scatter plots show the measured error against rate;
+the figures use an 8.5 cm plot width. For example:
+
+```
+python examples/convergency/calibration_convergence_free_decay.py
+python examples/convergency/calibration_convergence_cw.py
+python examples/convergency/calibration_convergence_t1.py
+```
+
+`examples/T1_inversion_recovery.py` separately demonstrates a T1 measurement
+sequence: π inversion, a variable wait, and a π/2 readout, repeated to obtain
+amplitude versus wait time.
 
 ---
 

@@ -213,6 +213,21 @@ Two example scripts use these helpers:
 The package includes calibration benchmarks for verifying the numerical
 integration against known analytical or experimental results.
 
+The calibration tests compare `ycal` (the simulated `M^simu`) with `yref`
+(the theoretical `M^theo`) using the relative L2 error. For transverse
+magnetization this uses the full vector `(Mx, My)` at every comparison sample:
+
+```{math}
+\epsilon_{L^2} =
+\frac{\|\boldsymbol{M}_\perp^\mathrm{simu}
+-\boldsymbol{M}_\perp^\mathrm{theo}\|_2}
+{\|\boldsymbol{M}_\perp^\mathrm{theo}\|_2}.
+```
+
+The tests retain `epsilon_l2_squared` for threshold checks. Finite-duration
+pulses are excluded whenever the analytical reference does not model pulse
+evolution. T1 checks apply the same normalized L2 construction to `Mz - 1`.
+
 ### Pulsed NMR — free decay and spin echo
 
 Apply a 90° pulse followed by a 180° pulse.  The simulated signal should:
@@ -226,6 +241,10 @@ Apply a 90° pulse followed by a 180° pulse.  The simulated signal should:
 This calibrates magnetic pulses, Larmor precession, and transverse
 relaxation.
 
+Rate-convergence examples are in
+`examples/convergency/calibration_convergence_free_decay.py` and
+`examples/convergency/calibration_convergence_cw.py`.
+
 ### Continuous-wave NMR
 
 With a weak on-resonance CW field ({math}`\gamma B T_2^* \ll 1`), the
@@ -237,11 +256,23 @@ M_\perp(t) = \gamma B\,T_2^*\!\left(1 - e^{-t/T_2^*}\right).
 
 This independently calibrates Larmor precession and {math}`T_2^*`.
 
-### Hyperpolarised sample
+### T1 recovery and inversion recovery
+
+The analytical T1 rate-convergence example is
+`examples/convergency/calibration_convergence_t1.py`. For a direct
+measurement-style sequence, run `examples/T1_inversion_recovery.py`. It
+applies a π pulse, waits for a variable time, applies a π/2 pulse, and plots
+the measured amplitude against wait time.
+
+### Hyperpolarized sample
 
 Set `pol > 0` in `Sample` to start from a hyperpolarised state.  The
 longitudinal magnetization then decays exponentially toward equilibrium
 with time constant {math}`T_1`, calibrating longitudinal relaxation.
+
+The corresponding tests are
+`tests/test_calibrations_t1_relaxation.py` and
+`tests/test_calibrations_t1_hyperpolarized.py`.
 
 ## Geographic station
 
@@ -275,6 +306,11 @@ Pre-built stations: `Mainz`, `Geneva`, `Baltimore`, `Boston`, `Tokyo`,
 `EarthBoundAxionHalo` solves the TISE for axions gravitationally bound to
 the Earth.
 
+The solver uses a positive interior radial grid with zero boundary values at
+the origin and outer cutoff. `N` is the number of interior samples and
+`extent` is the outer radius, so both quantities should be checked for grid
+and outer-radius convergence at the frequencies of interest.
+
 ### Solving for bound-state wavefunctions
 
 ```python
@@ -286,6 +322,7 @@ halo = EarthBoundAxionHalo(
     nu_a=1.348 * unit.MHz,
     N=int(2**12),
     extent=128.0 * unit.R_earth,
+    maxTotalDMmass=0.5 * unit.M_earth,
     verbose=True,
 )
 
@@ -294,6 +331,32 @@ halo.solve_TISE_3D(l_vals=[1], max_n_r=64)
 
 halo.listEigenStates()
 ```
+
+### Inferring halo mass from a shell limit
+
+For a measured or bounded mass in a geocentric shell, solve the desired
+states and call:
+
+```python
+shell_mass_limit = 4e-9 * unit.M_earth
+shell_radii = [12300 * unit.km, 384000 * unit.km]
+halo.inferHaloMass(shell_mass_limit, shell_radii, ["1s", "2p"])
+halo.getEnclosedMass()
+halo.getDensityAtEarthSurface(["1s", "2p"])
+```
+
+Each selected state is an independent single-state hypothesis. The shell
+probability fixes its mass scale; `maxEarthEnclosedMass` (default
+`0.5 * unit.M_earth`) caps the inferred mass inside Earth. This inference
+does not modify the normalized eigenstates or the constructor's
+`maxTotalDMmass`. Use `getDensity` for physical angularly averaged profiles
+and `plotDMdensity` for profiles relative to `rho_M_DM_SHM`.
+
+The complete examples are
+`examples/EarthBoundAxionHalo/DM_overdensity/density_by_shell_mass.py` and
+`density_by_shell_mass_sweep.py`. The sweep covers 100 Hz through 30 MHz by
+default and writes tables, reports, and figures under
+`outputs/frequency_sweep-5/`.
 
 ### Visualising eigenstates
 

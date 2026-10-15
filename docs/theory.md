@@ -487,6 +487,34 @@ distribution; outside the surface it reduces to the point-mass approximation
 {math}`\Phi(r) = -GM_\oplus/r`.  The reference point is the Earth's centre
 ({math}`\Phi = 0` at {math}`r = 0`).
 
+### Shell-mass normalization and convergence
+
+The bound-state eigenfunctions are normalized to unit radial probability. If
+the measured shell is `[a,b]`, its state probability is
+
+```{math}
+I(a,b)=\int_a^b |u(r)|^2\,dr.
+```
+
+`inferHaloMass(shell_mass_limit, [a, b], state_names)` assigns the scale
+`M_shell / I(a,b)` to each selected state independently. It integrates the
+shell directly with interior grid points and linearly interpolated values at
+both boundaries. `getEnclosedMass` and `getDensity` use the saved wavefunction
+and inferred scale without solving the TISE again. The angularly averaged
+density is
+
+```{math}
+\bar\rho(r)=\frac{M_\mathrm{scale}|u(r)|^2}{4\pi r^2}.
+```
+
+The inferred total mass is finite-domain mass over `[0, extent]`; it is not
+the full halo mass until the outer radius has converged. Shell fractions and
+density profiles likewise require radial-grid convergence. The optional
+`maxEarthEnclosedMass` constraint defaults to `0.5 M_\oplus` and limits the
+inferred mass inside one Earth radius. The constructor's `maxTotalDMmass`
+sets the default field normalization and is separate from this post-solve
+shell inference.
+
 ### Axion field gradient at a ground station
 
 For a superposition of eigenstates the total wavefunction is

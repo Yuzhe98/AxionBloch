@@ -134,6 +134,14 @@ Model (PEM) density profile.  Adds Earth-specific gradient helpers:
 {func}`~axionbloch.EarthBoundAxionHalo.EarthBoundAxionHalo.findGradientsWithMilkyWay`,
 and the pseudomagnetic-field conversion
 {func}`~axionbloch.EarthBoundAxionHalo.EarthBoundAxionHalo.getBfield`.
+The constructor accepts `N`, `extent`, and `maxTotalDMmass`; the latter is
+the default field-normalization mass and defaults to `0.5 * unit.M_earth`.
+For shell-based limits, use
+{func}`~axionbloch.EarthBoundAxionHalo.EarthBoundAxionHalo.inferHaloMass`,
+then query the independent inferred-state models with
+{func}`~axionbloch.EarthBoundAxionHalo.EarthBoundAxionHalo.getEnclosedMass`,
+{func}`~axionbloch.EarthBoundAxionHalo.EarthBoundAxionHalo.getDensity`, or
+{func}`~axionbloch.EarthBoundAxionHalo.EarthBoundAxionHalo.getDensityAtEarthSurface`.
 These helpers use the same `stateCoefficients` dictionary interface as the base
 class and resolve `meas_time=None` with `Time.now()`.
 Also exports helper functions used to build the potential:

@@ -5,10 +5,11 @@ top of the file, solve the desired states, and call the class methods.
 Run from the repository root:
 
 ```powershell
-python -m examples.EarthBoundAxionHalo.DM_overdensity.shell_normalized_density
+python -m examples.EarthBoundAxionHalo.DM_overdensity.density_by_shell_mass
 ```
 
-The example specifies an axion mass, the shell mass `(0.3 +/- 4) * 1e-9 M_earth`,
+The example specifies an axion frequency, the shell mass limit
+`4e-9 M_earth`,
 and geocentric radii of 12,300 km and 384,000 km. It has no command-line parser
 or `main()` function. Each selected eigenstate is an independent hypothesis.
 
@@ -69,7 +70,9 @@ the outer boundary.
 
 `density_by_shell_mass_sweep.py` scans frequencies and writes density tables
 and per-frequency reports.
-The 1% convergence flag tests Moon-enclosed mass and Earth-surface density,
+It scans the frequency range from 100 Hz to 30 MHz by default, using
+frequency-dependent radial-grid presets. The 1% convergence flag tests
+Moon-enclosed mass and Earth-surface density,
 not the whole profile. Extremely small plotted tails can reach the
 numerical noise floor. Existing output files are replaced on reruns.
 
