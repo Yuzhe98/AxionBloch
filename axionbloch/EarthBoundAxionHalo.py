@@ -259,6 +259,7 @@ def earth_grav_potential_earth_center():
 
     return Phi_func, r_unit, Phi_unit
 
+
 def plot_earth_grav_potential(showplot=True):
     msgPrefix = f"[{plot_earth_grav_potential.__name__}]"
     radius_m, density_kg_m3 = PREM_density_profile()
@@ -454,9 +455,11 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
     a_0: Quantity[unit.eV] | None = None
     # Halo masses use Earth masses by default.  Other mass quantities in this
     # class (for example the axion mass and PREM profile) keep their own units.
-    maxTotalDMmass: Quantity[unit.M_earth] | None = .5 * unit.M_earth
+    maxTotalDMmass: Quantity[unit.M_earth] | None = 0.01 * unit.M_earth
     g_aNN: Quantity[unit.GeV**-1] = 1e-9 * unit.GeV**-1
-    rho_M_DM_SHM: Quantity[unit.g / unit.cm**3] = 0.3 * unit.GeV / (const.c**2 * unit.cm**3)
+    rho_M_DM_SHM: Quantity[unit.g / unit.cm**3] = (
+        0.3 * unit.GeV / (const.c**2 * unit.cm**3)
+    )
 
     def __init__(
         self,
@@ -467,9 +470,11 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         extent: Quantity[unit.m] = 128.0 * unit.R_earth,
         getPot=earth_grav_potential_infty,
         a_0: Quantity[unit.eV] | None = None,
-        maxTotalDMmass: Quantity[unit.M_earth] | None = .5 * unit.M_earth,
+        maxTotalDMmass: Quantity[unit.M_earth] | None = 0.5 * unit.M_earth,
         g_aNN: Quantity[unit.GeV**-1] = 1e-9 * unit.GeV**-1,
-        rho_M_DM_SHM: Quantity[unit.g / unit.cm**3] = 0.3 * unit.GeV / (const.c**2 * unit.cm**3),
+        rho_M_DM_SHM: Quantity[unit.g / unit.cm**3] = 0.3
+        * unit.GeV
+        / (const.c**2 * unit.cm**3),
         verbose: bool = False,
     ):
         msgPrefix = f"[{self.__class__.__name__}.{self.__init__.__name__}]"
@@ -491,10 +496,16 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         # Keep the Earth-bound halo mass in the public/default halo unit while
         # retaining an Astropy Quantity.  Convert to SI only where a consumer
         # explicitly requests it (for example, density output below).
-        if not isinstance(maxTotalDMmass, Quantity) or not maxTotalDMmass.unit.is_equivalent(unit.kg):
+        if not isinstance(
+            maxTotalDMmass, Quantity
+        ) or not maxTotalDMmass.unit.is_equivalent(unit.kg):
             raise TypeError("maxTotalDMmass must be a mass Quantity.")
         maxTotalDMmass = maxTotalDMmass.to(unit.M_earth)
-        if not maxTotalDMmass.isscalar or not np.isfinite(maxTotalDMmass) or maxTotalDMmass < 0 * unit.M_earth:
+        if (
+            not maxTotalDMmass.isscalar
+            or not np.isfinite(maxTotalDMmass)
+            or maxTotalDMmass < 0 * unit.M_earth
+        ):
             raise ValueError("maxTotalDMmass must be finite, scalar and nonnegative.")
         self.N_a = maxTotalDMmass / self.m_a
         if a_0 is not None:
@@ -542,11 +553,15 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         interval_r = np.concatenate((Quantity([lower]), r[interior], Quantity([upper])))
         # Interpolate u at the limits, then integrate probability density |u|^2.
         interval_u = np.interp(interval_r, r, u)
-        return np.trapezoid(np.abs(interval_u)**2, x=interval_r)
+        return np.trapezoid(np.abs(interval_u) ** 2, x=interval_r)
 
-    def inferHaloMass(self, shell_mass_limit, radius_range,
-                           state_names=None,
-                           maxEarthEnclosedMass=0.5 * unit.M_earth):
+    def inferHaloMass(
+        self,
+        shell_mass_limit,
+        radius_range,
+        state_names=None,
+        maxEarthEnclosedMass=0.5 * unit.M_earth,
+    ):
         """Infer halo mass from a shell-mass limit for each eigenstate.
 
         The solved wavefunctions retain their unit-probability normalization;
@@ -597,23 +612,31 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         limit; check grid-resolution and outer-radius convergence independently.
         """
         # Validate and normalize the shell-mass limit, retaining it as Quantity.
-        if not isinstance(shell_mass_limit, Quantity) or not shell_mass_limit.unit.is_equivalent(unit.kg):
+        if not isinstance(
+            shell_mass_limit, Quantity
+        ) or not shell_mass_limit.unit.is_equivalent(unit.kg):
             raise TypeError("shell_mass_limit must be a mass Quantity.")
-        if (not shell_mass_limit.isscalar or not np.isfinite(shell_mass_limit)
-                or shell_mass_limit < 0 * unit.kg):
+        if (
+            not shell_mass_limit.isscalar
+            or not np.isfinite(shell_mass_limit)
+            or shell_mass_limit < 0 * unit.kg
+        ):
             raise ValueError("shell_mass_limit must be finite, scalar and nonnegative.")
         shell_mass_limit = shell_mass_limit.to(unit.M_earth)
         # Normalize the default central-mass constraint while keeping it as a
         # Quantity.  A disabled constraint is useful for intentionally
         # unconstrained analyses and small synthetic test domains.
         if maxEarthEnclosedMass is not None:
-            if (not isinstance(maxEarthEnclosedMass, Quantity)
-                    or not maxEarthEnclosedMass.unit.is_equivalent(unit.kg)):
+            if not isinstance(
+                maxEarthEnclosedMass, Quantity
+            ) or not maxEarthEnclosedMass.unit.is_equivalent(unit.kg):
                 raise TypeError("maxEarthEnclosedMass must be a mass Quantity or None.")
             maxEarthEnclosedMass = maxEarthEnclosedMass.to(unit.M_earth)
-            if (not maxEarthEnclosedMass.isscalar
-                    or not np.isfinite(maxEarthEnclosedMass)
-                    or maxEarthEnclosedMass < 0 * unit.M_earth):
+            if (
+                not maxEarthEnclosedMass.isscalar
+                or not np.isfinite(maxEarthEnclosedMass)
+                or maxEarthEnclosedMass < 0 * unit.M_earth
+            ):
                 raise ValueError(
                     "maxEarthEnclosedMass must be finite, scalar and nonnegative."
                 )
@@ -667,8 +690,15 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
                 earth_inside = self._integrateRadialProbability(
                     r, u, r[0], earth_radius
                 )
-            if not np.isfinite(shell) or shell <= 0 or not np.isfinite(total) or total <= 0:
-                raise ValueError(f"{name}: unresolved shell probability; cannot infer halo mass.")
+            if (
+                not np.isfinite(shell)
+                or shell <= 0
+                or not np.isfinite(total)
+                or total <= 0
+            ):
+                raise ValueError(
+                    f"{name}: unresolved shell probability; cannot infer halo mass."
+                )
             # Flag very small fractions without treating epsilon as an accuracy cutoff.
             shell_fraction = (shell / total).to(unit.one)
             if shell_fraction <= np.finfo(np.float64).eps:
@@ -763,7 +793,9 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
             r = model["r"]
             # Default to the saved domain boundary; otherwise validate the radius.
             cutoff = r[-1] if radius is None else radius
-            if not isinstance(cutoff, Quantity) or not cutoff.unit.is_equivalent(unit.m):
+            if not isinstance(cutoff, Quantity) or not cutoff.unit.is_equivalent(
+                unit.m
+            ):
                 raise TypeError("radius must be a length Quantity.")
             if not cutoff.isscalar or not np.isfinite(cutoff):
                 raise ValueError("radius must be finite and scalar.")
@@ -800,7 +832,12 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         # Require physical radii and exclude the undefined u/r evaluation at zero.
         if not isinstance(radii, Quantity) or not radii.unit.is_equivalent(unit.m):
             raise TypeError("radii must be a length Quantity.")
-        if radii.ndim > 1 or radii.size == 0 or not np.all(np.isfinite(radii)) or np.any(radii <= 0 * unit.m):
+        if (
+            radii.ndim > 1
+            or radii.size == 0
+            or not np.all(np.isfinite(radii))
+            or np.any(radii <= 0 * unit.m)
+        ):
             raise ValueError("radii must be finite, positive, scalar or 1-D.")
         # Use the snapshots from the latest mass inference, not newly solved states.
         result = {}
@@ -810,9 +847,11 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
             # Evaluate u on the requested radii without stripping Astropy units.
             u = np.interp(radii, model["r"], model["u"])
             # Divide radial probability density by spherical area for its angular mean.
-            profile = abs(u)**2 / (4 * np.pi * radii**2)
+            profile = abs(u) ** 2 / (4 * np.pi * radii**2)
             # Apply the inferred mass scale to the spatial profile.
-            result[name] = {"density": (model["scale"] * profile).to(unit.g / unit.cm**3)}
+            result[name] = {
+                "density": (model["scale"] * profile).to(unit.g / unit.cm**3)
+            }
         return result
 
     def getDensityAtEarthSurface(self, state_names=None):
@@ -840,10 +879,12 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         results = self.getDensity(1 * unit.R_earth, state_names=state_names)
 
         # Accept the SHM reference in mass-density or energy-density units.
-        reference = self.rho_M_DM_SHM.to(
-            unit.g / unit.cm**3
-        )
-        if not reference.isscalar or not np.isfinite(reference) or reference <= 0 * reference.unit:
+        reference = self.rho_M_DM_SHM.to(unit.g / unit.cm**3)
+        if (
+            not reference.isscalar
+            or not np.isfinite(reference)
+            or reference <= 0 * reference.unit
+        ):
             raise ValueError("rho_M_DM_SHM must be a positive finite scalar density.")
 
         # Provide the SHM ratio alongside the physical density.
@@ -851,8 +892,15 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
             result["density_ratio"] = (result["density"] / reference).to(unit.one)
         return results
 
-    def plotDMdensity(self, radii, state_names=None, showPlot=True,
-                    radius_unit=unit.R_earth, density_unit=None, scales=("log", "log")):
+    def plotDMdensity(
+        self,
+        radii,
+        state_names=None,
+        showPlot=True,
+        radius_unit=unit.R_earth,
+        density_unit=None,
+        scales=("log", "log"),
+    ):
         """Plot angularly averaged density profiles for inferred states.
 
         Parameters
@@ -894,19 +942,28 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         if radii.ndim != 1 or radii.size < 2 or np.any(np.diff(radii) <= 0 * unit.m):
             raise ValueError("Plot radii must be a strictly increasing 1-D array.")
         # Accept SHM density supplied either as mass density or energy density.
-        reference = self.rho_M_DM_SHM.to(unit.g / unit.cm**3, equivalencies=unit.mass_energy())
-        if not reference.isscalar or not np.isfinite(reference) or reference <= 0 * reference.unit:
+        reference = self.rho_M_DM_SHM.to(
+            unit.g / unit.cm**3, equivalencies=unit.mass_energy()
+        )
+        if (
+            not reference.isscalar
+            or not np.isfinite(reference)
+            or reference <= 0 * reference.unit
+        ):
             raise ValueError("rho_M_DM_SHM must be a positive finite scalar density.")
         # Plot one central density profile per selected state.
         fig, ax = plt.subplots(figsize=(13 / 2.54, 8 / 2.54), dpi=300)
         for name, profile in profiles.items():
             # Choose SHM ratios or physical units, converting to numbers only for plotting.
-            plotted = ((profile["density"] / reference).to(unit.one)
-                       if density_unit is None else profile["density"].to(density_unit))
+            plotted = (
+                (profile["density"] / reference).to(unit.one)
+                if density_unit is None
+                else profile["density"].to(density_unit)
+            )
             ax.plot(radii.to_value(radius_unit), plotted.value, label=name)
         ax.set_xscale(scales[0])
         ax.set_yscale(scales[1])
-        ax.grid(alpha=.25)
+        ax.grid(alpha=0.25)
         ax.legend(bbox_to_anchor=(1.0, 1.0), loc="upper left")
         # Label the displayed units, then arrange and optionally show the figure.
         if density_unit is None:
@@ -1239,8 +1296,13 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         tau = 2 * np.sum(np.abs(g1)) * dt
         return tau
 
-    def plot_u_r(self, state_names=None, showPlot=True, verbose=False,
-                 figsize=(8.5 / 2.54, 5.5 / 2.54)):
+    def plot_u_r(
+        self,
+        state_names=None,
+        showPlot=True,
+        verbose=False,
+        figsize=(8.5 / 2.54, 5.5 / 2.54),
+    ):
         """Overlay real u(r)=rR(r), following DM_overdensity/plot-rR_r.py.
 
         Parameters
@@ -1284,13 +1346,19 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         # Collect only states that have not already been solved.
         required = {}
         for name in names:
-            if (not isinstance(name, str) or len(name) < 2
-                    or not name[:-1].isdigit() or name[-1] not in self.orbitalLabels):
+            if (
+                not isinstance(name, str)
+                or len(name) < 2
+                or not name[:-1].isdigit()
+                or name[-1] not in self.orbitalLabels
+            ):
                 raise ValueError(f"Invalid eigenstate label: {name!r}")
             l = self.orbitalLabels.index(name[-1])
             count = int(name[:-1]) - l
             if not 1 <= count <= self.N:
-                raise ValueError(f"Eigenstate {name!r} is invalid or exceeds the grid size.")
+                raise ValueError(
+                    f"Eigenstate {name!r} is invalid or exceeds the grid size."
+                )
             if name not in self.states:
                 required[l] = max(required.get(l, 0), count)
         # Solve a fresh instance with the example's channel coverage, or fill gaps.
