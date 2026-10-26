@@ -455,7 +455,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
     a_0: Quantity[unit.eV] | None = None
     # Halo masses use Earth masses by default.  Other mass quantities in this
     # class (for example the axion mass and PREM profile) keep their own units.
-    maxTotalDMmass: Quantity[unit.M_earth] | None = 0.01 * unit.M_earth
+    maxTotalDMmass: Quantity[unit.M_earth] | None = 1.0 * unit.M_earth
     g_aNN: Quantity[unit.GeV**-1] = 1e-9 * unit.GeV**-1
     rho_M_DM_SHM: Quantity[unit.g / unit.cm**3] = (
         0.3 * unit.GeV / (const.c**2 * unit.cm**3)
@@ -470,7 +470,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         extent: Quantity[unit.m] = 128.0 * unit.R_earth,
         getPot=earth_grav_potential_infty,
         a_0: Quantity[unit.eV] | None = None,
-        maxTotalDMmass: Quantity[unit.M_earth] | None = 0.5 * unit.M_earth,
+        maxTotalDMmass: Quantity[unit.M_earth] | None = 1.0 * unit.M_earth,
         g_aNN: Quantity[unit.GeV**-1] = 1e-9 * unit.GeV**-1,
         rho_M_DM_SHM: Quantity[unit.g / unit.cm**3] = 0.3
         * unit.GeV
@@ -555,12 +555,152 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         interval_u = np.interp(interval_r, r, u)
         return np.trapezoid(np.abs(interval_u) ** 2, x=interval_r)
 
+    def estimateRunTime(self, return_range=False):
+        """Estimate wall time for the tested solve-and-infer workflow.
+
+        The estimate is based on saved convergence runs that measured
+        ``solve_TISE_3D(l_vals=[0, 1, 2], max_n_r=10)``, ``inferHaloMass`` for
+        12 states, and ``getDensityAtEarthSurface``. It therefore estimates
+        that complete workflow, not the isolated cost of ``inferHaloMass``.
+
+        Runtime is fit as a power law in ``N`` for each measured frequency,
+        then interpolated logarithmically between frequencies. Extent is not
+        modeled independently: the tests show the main scaling is with N, but
+        do not provide a clean independent extent-time model.
+
+        Parameters
+        ----------
+        return_range : bool, optional
+            If False (default), return the central estimate as a seconds
+            Quantity. If True, return ``(low, estimate, high)`` with a broad
+            factor-of-three planning interval to cover machine and run-to-run
+            variation.
+
+        Returns
+        -------
+        astropy.units.Quantity or tuple of Quantity
+            Estimated seconds, or a low/central/high tuple when
+            ``return_range=True``.
+
+        Warns
+        -----
+        RuntimeWarning
+            If frequency or N is outside the measured calibration range. The
+            estimator then uses a boundary power-law extrapolation.
+        """
+        # Measured full-workflow timings (seconds); 1 MHz uses the later,
+        # denser sweep, and 10/30 MHz use the targeted all-state checks.
+        samples = {
+            1e5: (
+                [50_000, 100_000, 200_000],
+                [1.563, 2.577, 4.889],
+            ),
+            1e6: (
+                [
+                    50_000,
+                    70_000,
+                    75_000,
+                    85_000,
+                    100_000,
+                    125_000,
+                    150_000,
+                    200_000,
+                    300_000,
+                    400_000,
+                    500_000,
+                    600_000,
+                    800_000,
+                    1_200_000,
+                    1_600_000,
+                    2_400_000,
+                    3_200_000,
+                ],
+                [
+                    0.599,
+                    0.657,
+                    0.817,
+                    0.750,
+                    0.891,
+                    1.152,
+                    1.767,
+                    2.045,
+                    3.031,
+                    3.859,
+                    4.385,
+                    5.794,
+                    6.686,
+                    9.875,
+                    13.870,
+                    19.016,
+                    26.377,
+                ],
+            ),
+            1e7: (
+                [400_000, 800_000, 1_600_000, 3_200_000],
+                [4.156, 8.626, 16.598, 28.607],
+            ),
+            3e7: (
+                [4_000_000, 8_000_000, 16_000_000],
+                [41.260, 81.574, 157.193],
+            ),
+        }
+        frequencies = np.asarray(sorted(samples), dtype=float)
+        frequency = self.nu_a.to_value(unit.Hz)
+        log_frequencies = np.log(frequencies)
+        log_frequency = np.log(frequency)
+        if frequency < frequencies[0] or frequency > frequencies[-1]:
+            warnings.warn(
+                "Runtime estimate is outside the measured frequency range "
+                "(100 kHz to 30 MHz); extrapolating from the nearest endpoint.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+
+        log_seconds_per_million, exponents = [], []
+        for calibration_frequency in frequencies:
+            counts, seconds = samples[calibration_frequency]
+            slope, intercept = np.polyfit(np.log(counts), np.log(seconds), 1)
+            exponents.append(slope)
+            log_seconds_per_million.append(intercept + slope * np.log(1e6))
+        slope = float(np.interp(log_frequency, log_frequencies, exponents))
+        log_seconds_per_million = float(
+            np.interp(log_frequency, log_frequencies, log_seconds_per_million)
+        )
+        estimate = np.exp(log_seconds_per_million + slope * np.log(self.N / 1e6))
+
+        if frequency in samples:
+            nearby_counts = samples[frequency][0]
+        else:
+            right = int(np.searchsorted(frequencies, frequency, side="left"))
+            calibration_indices = {
+                max(0, min(len(frequencies) - 1, right)),
+                max(0, min(len(frequencies) - 1, right - 1)),
+            }
+            nearby_counts = [
+                count
+                for index in calibration_indices
+                for count in samples[frequencies[index]][0]
+            ]
+        if self.N < min(nearby_counts) or self.N > max(nearby_counts):
+            warnings.warn(
+                f"N={self.N:,} is outside the measured N range near "
+                f"{frequency:g} Hz ({min(nearby_counts):,} to "
+                f"{max(nearby_counts):,}); "
+                "runtime uses power-law extrapolation.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        estimate *= unit.s
+        if return_range:
+            return estimate / 3, estimate, estimate * 3
+        return estimate
+
     def inferHaloMass(
         self,
         shell_mass_limit,
         radius_range,
         state_names=None,
-        maxEarthEnclosedMass=0.5 * unit.M_earth,
+        maxEarthEnclosedMass=0.0038 * unit.M_earth,
     ):
         """Infer halo mass from a shell-mass limit for each eigenstate.
 
@@ -583,7 +723,6 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
             Maximum allowed central inferred mass inside one Earth radius.
             Defaults to ``0.5 * unit.M_earth``. Pass ``None`` to disable this
             constraint.
-
         Returns
         -------
         results : dict
@@ -604,12 +743,14 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         Each call replaces the stored inferred models with the selected states.
         Wavefunction and grid copies preserve the inference if TISE is rerun;
         call this method again to use new solutions. Constructor attributes
-        maxTotalDMmass, N_a and field amplitudes are unchanged. The
-        The shell-mass limit sets the inferred central halo mass, subject to
-        the Earth-enclosed-mass cap.
+        The constructor's ``maxTotalDMmass`` also caps the inferred total mass.
+        The shell-mass limit sets the inferred central halo mass unless either
+        mass cap is tighter.
         A UserWarning flags shell fractions at or below float64 machine epsilon.
         This is a sensitivity diagnostic, not an absolute probability accuracy
         limit; check grid-resolution and outer-radius convergence independently.
+        ``estimateRunTime()`` estimates the full tested solve, inference, and
+        Earth-density-query workflow; it does not estimate this method alone.
         """
         # Validate and normalize the shell-mass limit, retaining it as Quantity.
         if not isinstance(
@@ -712,10 +853,14 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
                     UserWarning,
                     stacklevel=2,
                 )
-            # Use the shell-mass limit as the central shell-mass scale.  Cap
-            # the total halo mass at the scale that places at most the
-            # configured mass inside one Earth radius.
+            # The shell mass is an upper limit used to set the scale. Cap the
+            # result by both the constructor's total halo mass and the optional
+            # Earth-enclosed-mass constraint.
             scale = shell_mass_limit / shell
+            max_total_mass = getattr(self, "maxTotalDMmass", None)
+            if max_total_mass is not None:
+                total_limit_scale = max_total_mass / total
+                scale = min(scale, total_limit_scale)
             if maxEarthEnclosedMass is not None:
                 if not np.isfinite(earth_inside) or earth_inside <= 0:
                     raise ValueError(
