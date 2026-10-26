@@ -25,6 +25,12 @@ shell_radii = [12300 * unit.km, 384000 * unit.km]
 
 states = ["1s", "2s", "2p", "3s", "3p", "3d", "4s", "4p", "4d", "5s", "5p", "5d"]
 
+# Grid guidance from saved convergence runs is frequency dependent. For 100 Hz,
+# 1 kHz, and 10 kHz, settings were selected to keep the worst state-by-state
+# change in tracked energy, shell fraction, Moon-enclosed mass, and Earth
+# density below 0.01% versus the finest/largest tested reference. See
+# convergence_parameter_recommendations.md for evidence and limits.
+
 param_1Hz = {
     "nu_a": 1 * unit.Hz,
     "N": int(4e7),
@@ -39,45 +45,61 @@ param_10Hz = {
 
 param_100Hz = {
     "nu_a": 100 * unit.Hz,
-    "N": int(1e6),
+    "N": int(3e6),
     "extent": 1e6 * unit.R_earth,
 }
+# N=3M differs from the 8M reference by at most 0.0092%; extent 1e6 R_earth
+# differs from the 4e6 R_earth matched-spacing run by under 0.001%.
 
 param_1kHz = {
     "nu_a": 1 * unit.kHz,
-    "N": int(1e6),
+    "N": int(5e5),
     "extent": 1e5 * unit.R_earth,
 }
+# N=500k is within 0.0037% of the 2M reference; 375k fails because some
+# Earth-surface density ratios differ by more than 7%. Extent 1e5 is within
+# 0.0001% of the 2e5 R_earth matched-spacing run.
 
 param_10kHz = {
     "nu_a": 10 * unit.kHz,
-    "N": int(1e6),
+    "N": int(2.5e5),
     "extent": 1e4 * unit.R_earth,
 }
+# N=250k is within 0.0011% of the 2M reference; 125k fails for some Earth
+# densities. Extent 1e4 is within 0.001% of the 2e4 R_earth matched-spacing run.
 
 param_100kHz = {
     "nu_a": 100 * unit.kHz,
-    "N": int(1e5),
+    "N": int(5e4),
     "extent": 1e3 * unit.R_earth,
 }
+# N=50k is within 0.0023% of the 200k resolution reference; 1000 R_earth is
+# within 0.00003% of the 2000 R_earth extent reference (0.01% target).
 
 param_1MHz = {
     "nu_a": 1 * unit.MHz,
-    "N": int(1e5),
+    "N": int(7.5e4),
     "extent": 1e2 * unit.R_earth,
 }
+# N=75k is within 0.0033% of the 3.2M resolution reference; extent 100 is
+# within 0.00002% of 500 R_earth across tracked metrics (0.01% target).
 
 param_10MHz = {
     "nu_a": 10 * unit.MHz,
-    "N": int(1e5),
+    "N": int(8e5),
     "extent": 1e2 * unit.R_earth,
 }
+# For Earth-surface density, 800k differs from 3.2M by at most 0.0023%.
+# Shell fractions still differ by up to 84.8%, so shell-normalized mass scales
+# are not converged; use this only when the density profile is the target.
 
 param_30MHz = {
     "nu_a": 30 * unit.MHz,
-    "N": int(1e6),
+    "N": int(2e6),
     "extent": 70 * unit.R_earth,
 }
+# Exploratory only. All-state runs through 16M do not show density/shell
+# saturation; no quantitatively reliable 30 MHz grid is known yet.
 
 example_params = [
     param_1Hz, param_10Hz, param_100Hz, param_1kHz, param_10kHz,
@@ -147,12 +169,12 @@ def choose_params(frequency, examples):
 
 
 # Edit this frequency array for an arbitrary scan, e.g. [5, 25, 80] * unit.kHz.
-# scan_frequencies = np.geomspace(1e4, 3e7, 20) * unit.Hz
-scan_frequencies = np.geomspace(1e2, 3e7, 20) * unit.Hz
+scan_frequencies = np.geomspace(1e4, 3e7, 20) * unit.Hz
+# scan_frequencies = np.geomspace(1e2, 1e4, 12, endpoint=False) * unit.Hz
 # Alternatively: scan_frequencies = np.geomspace(1, 3e7, 20) * unit.Hz
 params = [choose_params(frequency, example_params) for frequency in scan_frequencies]
 
-output_dir = Path(__file__).resolve().parent / "outputs" / "frequency_sweep-5"
+output_dir = Path(__file__).resolve().parent / "outputs" / "frequency_sweep-8"
 output_dir.mkdir(parents=True, exist_ok=True)
 
 # Start a fresh combined table; append each frequency as soon as it is computed.

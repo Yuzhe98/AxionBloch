@@ -7,9 +7,9 @@ import numpy as np
 from astropy import constants as const, units as unit
 
 # Edit the input file and the states to include in the plot.
-input_path = Path(__file__).resolve().parent / "outputs" / "frequency_sweep-5" / "density_at_earth_vs_frequency.txt"
+input_path = Path(__file__).resolve().parent / "outputs" / "frequency_sweep-8" / "density_at_earth_vs_frequency.txt"
 state_names = ["1s", 
-            #    "2s", "2p", "3s", "3p", "3d",
+               "2s", "2p", "3s", "3p", "3d",
             # "4s", "4p", "4d", "5s", "5p", "5d"
                ]
 output_path = input_path.with_name("density_at_earth_vs_frequency.png")

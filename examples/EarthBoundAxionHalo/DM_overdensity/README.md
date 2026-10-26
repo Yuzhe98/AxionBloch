@@ -21,6 +21,13 @@ or `main()` function. Each selected eigenstate is an independent hypothesis.
   Earth masses. The default cap limits central mass inside Earth to
   `0.5 * unit.M_earth`. Omit `state_names` to use all solved
   states. The instance stores independent inferred mass scales for later calls.
+- `halo.estimateRunTime(return_range=False)` estimates the tested full
+  `solve_TISE_3D` + `inferHaloMass` + Earth-surface-density workflow for the
+  instance's frequency and `N`. It returns seconds, or a low/central/high
+  seconds tuple with `return_range=True`. The fit uses 100 kHz–30 MHz
+  measurements and assumes three angular-momentum channels, ten radial states,
+  and twelve inferred states. It is a planning estimate, not an isolated
+  `inferHaloMass` timing; out-of-range frequency or grid sizes trigger a warning.
 - `halo.getEnclosedMass(radius)` returns `mass` per state.
   Omit `radius` for the total mass over the simulated domain.
 - `halo.getDensity(radii)` returns angularly averaged `density` per state,
