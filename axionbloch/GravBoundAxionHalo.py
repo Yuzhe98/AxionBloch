@@ -323,7 +323,7 @@ class GravBoundAxionHalo:
 
     def getStateAmplitudeSpectrum(
         self,
-        stateCoefficients: dict[str, complex],
+        stateCoefficients: dict,
     ) -> dict:
         """Return normalized state amplitudes and their energy shifts.
 
@@ -519,9 +519,167 @@ class GravBoundAxionHalo:
             for name, coefficient in resolved.items()
         }
 
+    def findGradientsAlongDirection(
+        self,
+        stateCoefficients: dict,
+        station: Station,
+        meas_time: Time | None = None,
+        truncRadius: Quantity | None = None,
+        include_lorentz_boost: bool = True,
+        relative_velocity: Quantity | None = None,
+        showPlot: bool = False,
+        verbose: bool = False,
+    ):
+        """Compute gradient components along the radial ray to a station.
+
+        ``stateCoefficients`` maps ``(state_label, m)`` pairs to complex
+        coefficients, for example ``{("2p", 1): 1.0}``. A plain state label
+        such as ``"2p"`` is retained as shorthand for ``m=0``. The coefficients
+        are normalized together across all selected ``(n,l,m)`` modes.
+
+        Angular derivatives are evaluated directly from the spherical
+        harmonics at the station direction; radial derivatives use the sampled
+        radial wavefunctions. No full angular mesh is needed for this ray.
+        """
+        msgPrefix = f"[{self.__class__.__name__}.{self.findGradientsAlongDirection.__name__}]"
+        if not self.states:
+            raise RuntimeError("No eigenstates are available. Call solve_TISE_3D first.")
+        if not isinstance(stateCoefficients, dict) or not stateCoefficients:
+            raise TypeError("stateCoefficients must be a nonempty mapping.")
+
+        modes = []
+        for key, coefficient in stateCoefficients.items():
+            if isinstance(key, tuple) and len(key) == 2:
+                name, m = key
+            elif isinstance(key, str):
+                name, m = key, 0
+            else:
+                raise TypeError("Coefficient keys must be state labels or (state_label, m) pairs.")
+            if name not in self.states:
+                raise KeyError(f"Unknown eigenstate {name!r}. Available states: {sorted(self.states)}")
+            if not isinstance(m, (int, np.integer)):
+                raise TypeError(f"m for state {name!r} must be an integer.")
+            l = self.states[name]["l"]
+            if abs(m) > l:
+                raise ValueError(f"State {name!r} has l={l}; m must satisfy |m| <= l.")
+            if not np.isscalar(coefficient):
+                raise TypeError(f"Coefficient for {(name, m)!r} must be a scalar.")
+            try:
+                coefficient = complex(coefficient)
+            except (TypeError, ValueError) as exc:
+                raise TypeError(f"Coefficient for {(name, m)!r} must be numeric.") from exc
+            if not np.isfinite(coefficient):
+                raise ValueError(f"Coefficient for {(name, m)!r} must be finite.")
+            modes.append((name, int(m), coefficient))
+        norm = np.sqrt(sum(abs(coefficient) ** 2 for _, _, coefficient in modes))
+        if norm == 0:
+            raise ValueError("At least one state coefficient must be nonzero.")
+        modes = [(name, m, coefficient / norm) for name, m, coefficient in modes]
+
+        if meas_time is None:
+            print(msgPrefix, "Warning: time not provided. Using Time.now() as input.")
+            meas_time = Time.now()
+        _, theta_q, phi_q = station.in_solarZ_frame(meas_time=meas_time)
+        theta = theta_q.to_value(unit.rad)
+        phi = phi_q.to_value(unit.rad)
+
+        if truncRadius is None:
+            line_end = self.r[-1]
+        elif not isinstance(truncRadius, Quantity) or not truncRadius.unit.is_equivalent(self.r.unit):
+            raise TypeError("truncRadius must be a length Quantity.")
+        else:
+            line_end = truncRadius.to(self.r.unit)
+        if not line_end.isscalar or not np.isfinite(line_end.value):
+            raise ValueError("truncRadius must be a finite scalar.")
+        if line_end < self.r[0] or line_end > self.r[-1]:
+            raise ValueError("truncRadius must lie within the sampled radial grid.")
+
+        coordinates = self.r.to_value(self.r.unit)
+        stop_index = min(self.N, max(2, int(np.searchsorted(coordinates, line_end.value)) + 1))
+        output_stop = int(np.searchsorted(coordinates, line_end.value, side="right"))
+        r = self.r[:stop_index]
+        derivative_stop = min(self.N, max(3, stop_index + 1))
+        reference_state = self.states[modes[0][0]]
+        wavefunction_unit = reference_state["R_r"].unit
+        wavefunction = np.zeros(len(r), dtype=complex) * wavefunction_unit
+        grad_r = np.zeros(len(r), dtype=complex) * wavefunction_unit / self.r.unit
+        grad_theta = np.zeros(len(r), dtype=complex) * wavefunction_unit / self.r.unit
+        grad_phi = np.zeros(len(r), dtype=complex) * wavefunction_unit / self.r.unit
+        angular_frequency_wavefunction = np.zeros(len(r), dtype=complex) * wavefunction_unit / unit.s
+
+        for name, m, coefficient in modes:
+            state = self.states[name]
+            l = state["l"]
+            Y_lm, (dY_dtheta, dY_dphi) = sph_harm_y(l, m, theta, phi, diff_n=1)
+            radial = state["R_r"][:derivative_stop]
+            radial_derivative = np.gradient(
+                radial,
+                self.r[:derivative_stop],
+                edge_order=2 if derivative_stop >= 3 else 1,
+            )[:stop_index]
+            mode_wavefunction = coefficient * state["R_r"][:stop_index] * Y_lm
+            wavefunction += mode_wavefunction
+            grad_r += coefficient * radial_derivative * Y_lm
+            grad_theta += coefficient * state["R_r"][:stop_index] * dY_dtheta / r
+            grad_phi += (
+                coefficient * state["R_r"][:stop_index] * dY_dphi
+                / (r * np.sin(theta) + 1e-12 * r.unit)
+            )
+            mode_frequency = (
+                (self.m_a * const.c**2 + state["eigenE_expect"]) / const.hbar
+            ).to(1 / unit.s, equivalencies=unit.dimensionless_angles())
+            angular_frequency_wavefunction += mode_frequency * mode_wavefunction
+
+        if include_lorentz_boost:
+            if relative_velocity is None:
+                relative_velocity = station.rotation_velocity_in_solarZ_frame(meas_time)
+            if not isinstance(relative_velocity, Quantity):
+                raise TypeError("relative_velocity must be an astropy Quantity with velocity units.")
+            if relative_velocity.shape != (3,) or not relative_velocity.unit.is_equivalent(unit.m / unit.s):
+                raise ValueError("relative_velocity must have shape (3,) and velocity units.")
+            velocity = relative_velocity.to(unit.m / unit.s)
+            if np.linalg.norm(velocity) >= const.c:
+                raise ValueError("relative_velocity must be below c.")
+            vx, vy, vz = velocity
+            sin_theta, cos_theta = np.sin(theta), np.cos(theta)
+            sin_phi, cos_phi = np.sin(phi), np.cos(phi)
+            velocity_r = vx * sin_theta * cos_phi + vy * sin_theta * sin_phi + vz * cos_theta
+            velocity_theta = vx * cos_theta * cos_phi + vy * cos_theta * sin_phi - vz * sin_theta
+            velocity_phi = -vx * sin_phi + vy * cos_phi
+            boost_scale = -1j * angular_frequency_wavefunction / const.c**2
+            with unit.add_enabled_equivalencies(unit.dimensionless_angles()):
+                grad_r += boost_scale * velocity_r
+                grad_theta += boost_scale * velocity_theta
+                grad_phi += boost_scale * velocity_phi
+
+        r_line = np.linspace(r[0], line_end, 2**10)
+        line_coordinates = r_line.to_value(self.r.unit)
+        radial_coordinates = r.to_value(self.r.unit)
+        def interpolate(values):
+            return np.interp(line_coordinates, radial_coordinates, values.value) * values.unit
+        grad_r_line = interpolate(grad_r)
+        grad_theta_line = interpolate(grad_theta)
+        grad_phi_line = interpolate(grad_phi)
+        output_r = r[:output_stop]
+        output_wavefunction = wavefunction[:output_stop]
+        if showPlot:
+            self.plotGradients(
+                station=station,
+                label=station.name,
+                r=output_r,
+                R_r=output_wavefunction,
+                r_line=r_line,
+                grad_r_line=grad_r_line,
+                grad_theta_line=grad_theta_line,
+                grad_phi_line=grad_phi_line,
+            )
+        if verbose:
+            print(msgPrefix, "direct station-ray gradient evaluation complete")
+        return output_r, output_wavefunction, r_line, grad_r_line, grad_theta_line, grad_phi_line
+
     def findGradientsAtDirection(
         self,
-        stateCoefficients: dict[str, complex],
+        stateCoefficients: dict,
         station: Station | None = None,
         meas_time: Time | None = None,
         truncRadius: Quantity | None = None,
@@ -529,346 +687,28 @@ class GravBoundAxionHalo:
         relative_velocity: Quantity | None = None,
         showPlot: bool = True,
         verbose: bool = False,
+        magneticQuantumNumbers: dict[str, int] | None = None,
     ):
-        """Compute and plot the 3-D gradient of the total wavefunction at a direction.
-
-        Superimposes the requested eigenstates with user-specified complex
-        coefficients, computes the spherical-coordinate gradient
-        (∂_r, ∂_θ/r, ∂_φ/(r sinθ)), interpolates each component onto a radial
-        line pointing toward the requested direction, and plots the total
-        wavefunction and its three gradient components.
-
-        The direction should be specified by a :class:`~axionbloch.Station.Station`
-        object.
-
-        Parameters
-        ----------
-        stateCoefficients : dict of str to complex
-            Mapping from eigenstate labels to coefficients ``c_nlm``, for
-            example ``{"2p": 1, "3p": 1 + 1j}``. Coefficients are
-            automatically normalized so that
-            ``sum(abs(c_nlm)**2) = 1``.
-        station : Station, optional
-            Geographic station whose latitude, longitude, and elevation define
-            the direction.
-        truncRadius : Quantity
-            Truncation radius within the sampled grid, for reducing computation
-            and plotting time. An interpolation bracket and a derivative
-            neighbor are retained internally; returned samples do not exceed
-            this radius. Radial derivatives use actual coordinates and
-            second-order endpoint stencils (first order for a two-point grid).
-        include_lorentz_boost : bool
-            Add the first-order laboratory-frame gradient induced by motion
-            through the halo. For each mode, this contribution is
-            ``-1j * (omega_n / c**2) * v_rel * psi_n``, where
-            ``omega_n = (m_a * c**2 + E_n) / hbar``.
-        relative_velocity : Quantity, shape (3,), optional
-            Laboratory velocity relative to the halo, expressed in the
-            solar-Z Cartesian frame. If omitted, use the station's velocity
-            from Earth's rotation, corresponding to a nonrotating
-            geocentric halo. Pass an explicit zero vector for a corotating
-            halo.
-        Examples
-        --------
-        A coherent superposition is specified by one dictionary:
-
-        >>> from astropy.time import Time
-        >>> from axionbloch.Station import Mainz
-        >>> result = halo.findGradientsAtDirection(
-        ...     stateCoefficients={"2p": 1, "3p": 1 + 1j},
-        ...     station=Mainz,
-        ...     meas_time=Time("2022-12-14T12:00:00"),
-        ...     showPlot=False,
-        ... )
-        """
-
-        msgPrefix = (
-            f"[{self.__class__.__name__}.{self.findGradientsAtDirection.__name__}]"
-        )
-
-        # --- Resolve direction from station ---
-        assert station is not None, f"{_getLocationPrefix()} {msgPrefix} Please provide a Station."
-
-        if meas_time is None:
-            print(
-                msgPrefix, "Warning: time not provided. Using Time.now() as the input. "
-            )
-            meas_time = Time.now()
-        # geodetic lat/lon → spherical colatitude (theta) and azimuth (phi)
-        r_station, station_theta_solarZ, station_phi_solarZ = station.in_solarZ_frame(
-            meas_time=meas_time
-        )
-
-        # Keep the interpolation bracket in the 3-D mesh, and one further
-        # neighbor only in the 1-D derivative calculation.
-        start_index = 0
-        if truncRadius is None:
-            line_end = self.r[-1]
-        elif not isinstance(truncRadius, Quantity) or not truncRadius.unit.is_equivalent(self.r.unit):
-            raise TypeError(f"{_getLocationPrefix()} {msgPrefix} truncRadius must be a length Quantity.")
-        else:
-            line_end = truncRadius.to(self.r.unit)
-        if not line_end.isscalar or not np.isfinite(line_end.value):
-            raise ValueError(f"{_getLocationPrefix()} {msgPrefix} truncRadius must be a finite scalar.")
-        if line_end < self.r[0] or line_end > self.r[-1]:
-            raise ValueError(f"{_getLocationPrefix()} {msgPrefix} truncRadius must lie within the sampled radial grid.")
-        coordinates = self.r.to_value(self.r.unit)
-        cutoff_index = int(np.searchsorted(coordinates, line_end.to_value(self.r.unit)))
-        stop_index = min(self.N, max(2, cutoff_index + 1))
-        derivative_stop = min(self.N, max(3, stop_index + 1))
-        output_stop = int(np.searchsorted(coordinates, line_end.to_value(self.r.unit), side="right"))
-        if verbose:
-            print(msgPrefix, "interpolation samples:", stop_index,
-                  "derivative samples:", derivative_stop)
-        r = self.r[:stop_index]
-        self.sortByEigenE()
-        stateCoefficients = self._resolveStateCoefficients(
+        """Compatibility wrapper for :meth:`findGradientsAlongDirection`."""
+        if station is None:
+            raise ValueError("Please provide station=.")
+        if magneticQuantumNumbers:
+            converted = {}
+            for key, coefficient in stateCoefficients.items():
+                if isinstance(key, tuple):
+                    converted[key] = coefficient
+                else:
+                    converted[(key, magneticQuantumNumbers.get(key, 0))] = coefficient
+            stateCoefficients = converted
+        return self.findGradientsAlongDirection(
             stateCoefficients=stateCoefficients,
-        )
-        stateNames = list(stateCoefficients)
-
-        Nr, Ntheta, Nphi = len(r), 100, 100
-        theta_1Dgrid = np.linspace(0, PI, Ntheta)
-        phi_1Dgrid = np.linspace(0, 2 * PI, Nphi)
-        dtheta = theta_1Dgrid[1] - theta_1Dgrid[0]
-        dphi = phi_1Dgrid[1] - phi_1Dgrid[0]
-
-        # 3-D spherical mesh of shape (Nr, Ntheta, Nphi)
-        R_grid, Theta_grid, Phi_grid = np.meshgrid(
-            r, theta_1Dgrid, phi_1Dgrid, indexing="ij"
-        )
-        # grid.shape=(Nr, Ntheta, Nphi)
-        # R_grid unit: [length]
-        # Theta_grid / Phi_grid unit: radian
-
-        # Accumulate the spatial, time-independent superposition on the 3-D
-        # mesh. WF_total contains the full spatial dependence of all selected
-        # eigenstates.
-        WF_total = (
-            np.zeros(R_grid.shape, dtype=complex)
-            * self.states[stateNames[0]]["R_r"].unit
-        )
-
-        # WF_direction is WF_total restricted to the radial line pointing
-        # toward the station:
-        #
-        #   WF_direction(r) =
-        #       sum_j c_j R_j(r) Y_lj^mj(theta_station, phi_station).
-        #
-        # Thus, it is a one-dimensional complex array over r. It is neither a
-        # single state's radial wavefunction R_r nor the full 3-D WF_total.
-        # Time-dependent factors, including the Compton phase and
-        # exp(-i E_j t / hbar), are not included. Currently m = 0 is used for
-        # every selected state.
-        WF_direction = np.zeros(len(r), dtype=complex) * WF_total.unit
-        angular_frequency_WF_total = (
-            np.zeros(R_grid.shape, dtype=complex) * WF_total.unit / unit.s
-        )
-
-        grad_r = np.zeros(R_grid.shape, dtype=complex) * WF_total.unit / self.r.unit
-        for name in stateNames:
-            state = self.states[name]
-            n_r, l, m = state["n_r"], state["l"], 0
-            c = stateCoefficients[name]
-            eigenE_expect = state["eigenE_expect"]
-            # radial part broadcast over angular axes
-            R_nl = state["R_r"][start_index:stop_index, None, None]
-            # angular part: Y_lm(theta, phi) — note argument order for sph_harm_y
-            # Y_lm = sph_harm_y(m, l, Phi_grid, Theta_grid) wrong!
-            Y_lm = sph_harm_y(l, m, Theta_grid, Phi_grid)
-            # wavefunction
-            mode_WF = c * R_nl * Y_lm  # * np.exp(-1j * E * t)
-            WF_total += mode_WF
-            # Differentiate on the buffered 1-D coordinates, then broadcast.
-            # The extra neighbor prevents a one-sided stencil at the cutoff.
-            radial = state["R_r"][:derivative_stop]
-            derivative = np.gradient(
-                radial, self.r[:derivative_stop],
-                edge_order=2 if derivative_stop >= 3 else 1,
-            )
-            grad_r += c * derivative[:stop_index, None, None] * Y_lm
-            Y_direction = sph_harm_y(
-                l,
-                m,
-                station_theta_solarZ.to_value(unit.rad),
-                station_phi_solarZ.to_value(unit.rad),
-            )
-            WF_direction += c * state["R_r"][start_index:stop_index] * Y_direction
-            mode_angular_frequency = (
-                (self.m_a * const.c**2 + eigenE_expect) / const.hbar
-            ).to(
-                1 / unit.s,
-                equivalencies=unit.dimensionless_angles(),
-            )
-            angular_frequency_WF_total += mode_angular_frequency * mode_WF
-
-        # angular derivatives
-        dWF_dtheta = np.gradient(WF_total, dtheta, axis=1)
-        dWF_dphi = np.gradient(WF_total, dphi, axis=2)
-
-        # spherical-coordinate gradient components
-        grad_theta = dWF_dtheta / R_grid
-        # small regularization prevents division by zero at theta=0 and π
-        grad_phi = dWF_dphi / (R_grid * np.sin(Theta_grid) + 1e-12 * R_grid.unit)
-
-        if include_lorentz_boost:
-            if relative_velocity is None:
-                # vx, vy, vz in solar-Z frame. z axis points along the Earth-Sun line
-                # x follows Earth heliocentric velocity, orthogonalized against ẑ
-                # ŷ = ẑ × x̂
-                relative_velocity = station.rotation_velocity_in_solarZ_frame(meas_time)
-            if not isinstance(relative_velocity, Quantity):
-                raise TypeError(
-                    msgPrefix
-                    + " relative_velocity must be an astropy Quantity with velocity units."
-                )
-            if relative_velocity.shape != (
-                3,
-            ) or not relative_velocity.unit.is_equivalent(unit.m / unit.s):
-                raise ValueError(
-                    msgPrefix
-                    + " relative_velocity must have shape (3,) and velocity units."
-                )
-
-            velocity = relative_velocity.to(unit.m / unit.s)
-            speed = np.linalg.norm(velocity)
-            beta = (speed / const.c).to(unit.one)
-            if beta >= 1 * unit.one:
-                raise ValueError(f"{_getLocationPrefix()} {msgPrefix} relative_velocity must be below c.")
-
-            # here Theta_grid and Phi_grid are grid of the space
-            theta_values = Theta_grid.to_value(unit.rad)
-            phi_values = Phi_grid.to_value(unit.rad)
-            sin_theta, cos_theta = np.sin(theta_values), np.cos(theta_values)
-            sin_phi, cos_phi = np.sin(phi_values), np.cos(phi_values)
-
-            velocity_r = (
-                velocity[0] * sin_theta * cos_phi
-                + velocity[1] * sin_theta * sin_phi
-                + velocity[2] * cos_theta
-            )
-            velocity_theta = (
-                velocity[0] * cos_theta * cos_phi
-                + velocity[1] * cos_theta * sin_phi
-                - velocity[2] * sin_theta
-            )
-            velocity_phi = -velocity[0] * sin_phi + velocity[1] * cos_phi
-
-            # First order in v/c: the (gamma - 1) spatial correction is
-            # O(v^2/c^2) and is omitted. The time-derivative term remains
-            # because omega_n contains the rapid ALP Compton oscillation.
-            boost_scale = -1j * angular_frequency_WF_total / const.c**2
-
-            with unit.add_enabled_equivalencies(unit.dimensionless_angles()):
-                grad_r = grad_r + boost_scale * velocity_r
-                grad_theta = grad_theta + boost_scale * velocity_theta
-                grad_phi = grad_phi + boost_scale * velocity_phi
-
-            if verbose:
-                print(msgPrefix, "relative velocity =", velocity)
-                print(msgPrefix, "v/c = beta =", beta)
-
-        if verbose:
-            print(
-                msgPrefix, "grad_r.shape =", grad_r.shape, "grad_r.unit =", grad_r.unit
-            )
-            print(
-                msgPrefix,
-                "grad_theta.shape =",
-                grad_theta.shape,
-                "grad_theta.unit =",
-                grad_theta.unit,
-            )
-            print(
-                msgPrefix,
-                "grad_phi.shape =",
-                grad_phi.shape,
-                "grad_phi.unit =",
-                grad_phi.unit,
-            )
-            # example of earth bound halo
-            # grad_r.shape = (Nr, Ntheta, Nphi) grad_r.unit = 1 / (rad(1/2) [length](5/2))
-            # grad_theta.shape = (Nr, Ntheta, Nphi) grad_theta.unit = 1 / (rad(3/2) earthRad(5/2))
-            # grad_phi.shape = (Nr, Ntheta, Nphi) grad_phi.unit = 1 / (rad(3/2) earthRad(5/2))
-
-        # R_grid.shape = (Nr, Ntheta, Nphi)
-        # grad_r.shape = (Nr, Ntheta, Nphi)
-
-        tic = time.time()
-        interp_r = RegularGridInterpolator(
-            (r.value, theta_1Dgrid.value, phi_1Dgrid.value),
-            grad_r.value,
-            bounds_error=False,
-            fill_value=None,
-        )
-        interp_theta = RegularGridInterpolator(
-            (r.value, theta_1Dgrid.value, phi_1Dgrid.value),
-            grad_theta.value,
-            bounds_error=False,
-            fill_value=None,
-        )
-        interp_phi = RegularGridInterpolator(
-            (r.value, theta_1Dgrid.value, phi_1Dgrid.value),
-            grad_phi.value,
-            bounds_error=False,
-            fill_value=None,
-        )
-        toc = time.time()
-        if verbose:
-            print(f"{_getLocationPrefix()} {msgPrefix} interpolation time: {toc-tic:.2e} s")
-
-        # sample gradient along the radial line toward the station
-        Nr_plot = 2**10
-        r_line = np.linspace(r[0], line_end, Nr_plot)
-
-        # points = [[r, theta_direction, phi_direction], ...]
-        points = np.array(
-            [
-                [
-                    r_pt,
-                    station_theta_solarZ.to_value(unit.rad),
-                    station_phi_solarZ.to_value(unit.rad),
-                ]
-                for r_pt in r_line.value
-            ]
-        )
-
-        tic = time.time()
-        grad_r_line = np.asarray(interp_r(points)) * grad_r.unit
-        grad_theta_line = np.asarray(interp_theta(points)) * grad_theta.unit
-        grad_phi_line = np.asarray(interp_phi(points)) * grad_phi.unit
-        toc = time.time()
-        if verbose:
-            print(f"{_getLocationPrefix()} {msgPrefix} gradient along station direction time: {toc-tic:.2e} s")
-        # Hide interpolation and derivative buffer samples from callers.
-        r = r[:output_stop]
-        WF_direction = WF_direction[:output_stop]
-        if showPlot:
-            self.plotGradients(
-                station=station,
-                label=station.name,
-                r=r,
-                R_r=WF_direction,
-                r_line=r_line,
-                grad_r_line=grad_r_line,
-                grad_theta_line=grad_theta_line,
-                grad_phi_line=grad_phi_line,
-            )
-        if verbose:
-            earthRad_idx = np.argmin(np.abs(r_line - 1 * unit.earthRad))
-            print(msgPrefix, "r_line index @ station =", earthRad_idx)
-            print(msgPrefix, "grad_r @ station =", grad_r_line[earthRad_idx])
-            print(msgPrefix, "grad_theta @ station =", grad_theta_line[earthRad_idx])
-            print(msgPrefix, "grad_phi @ station =", grad_phi_line[earthRad_idx])
-        # The second return value is the combined time-independent spatial
-        # wavefunction along the station direction, not a single state's R_r.
-        return (
-            r,
-            WF_direction,
-            r_line,
-            grad_r_line,
-            grad_theta_line,
-            grad_phi_line,
+            station=station,
+            meas_time=meas_time,
+            truncRadius=truncRadius,
+            include_lorentz_boost=include_lorentz_boost,
+            relative_velocity=relative_velocity,
+            showPlot=showPlot,
+            verbose=verbose,
         )
 
     def plotGradients(
@@ -1018,7 +858,7 @@ class GravBoundAxionHalo:
 
     def findGradientsOverTime(
         self,
-        stateCoefficients: dict[str, complex],
+        stateCoefficients: dict,
         station: Station,
         meas_times: list[Time],
         truncRadius: Quantity | None = None,
@@ -1028,19 +868,20 @@ class GravBoundAxionHalo:
     ) -> dict:
         """Gradient components at a station evaluated over a list of epochs.
 
-        Calls :meth:`findGradientsAtDirection` for each time and collects the
+        Calls :meth:`findGradientsAlongDirection` for each time and collects the
         three gradient values at Earth's surface (r = 1 R_earth).
 
         Parameters
         ----------
-        stateCoefficients : dict of str to complex
-            Mapping from eigenstate names to coefficients.
+        stateCoefficients : dict
+            Mapping from ``(state_label, m)`` pairs to coefficients. A plain
+            state label selects its ``m=0`` mode.
         station : :class:`~axionbloch.Station.Station`
             Geographic location.
         meas_times : iterable of :class:`astropy.time.Time`
             Epochs at which to evaluate the gradients.
         truncRadius : Quantity, optional
-            Radial truncation passed through to :meth:`findGradientsAtDirection`.
+            Radial truncation passed through to :meth:`findGradientsAlongDirection`.
         include_lorentz_boost : bool
             Include the velocity-induced laboratory-frame gradient.
         relative_velocity : Quantity, shape (3,), optional
@@ -1067,7 +908,7 @@ class GravBoundAxionHalo:
             if verbose:
                 print(f"{_getLocationPrefix()} {msgPrefix} step {i}/{len(meas_times)}  t={meas_time.iso}")
             _, _, r_line, grad_r_line, grad_theta_line, grad_phi_line = (
-                self.findGradientsAtDirection(
+                self.findGradientsAlongDirection(
                     stateCoefficients=stateCoefficients,
                     station=station,
                     meas_time=meas_time,
@@ -1096,7 +937,7 @@ class GravBoundAxionHalo:
 
     def findOmega_aOverTime(
         self,
-        stateCoefficients: dict[str, complex],
+        stateCoefficients: dict,
         station: Station,
         meas_times,
         truncRadius: Quantity | None = None,
@@ -1114,8 +955,9 @@ class GravBoundAxionHalo:
 
         Parameters
         ----------
-        stateCoefficients : dict of str to complex
-            Mapping from eigenstate names to coefficients.
+        stateCoefficients : dict
+            Mapping from ``(state_label, m)`` pairs to coefficients. A plain
+            state label selects its ``m=0`` mode.
         station : :class:`~axionbloch.Station.Station`
             Geographic location.
         meas_times : iterable of :class:`astropy.time.Time`
@@ -1193,7 +1035,7 @@ class GravBoundAxionHalo:
 
     def findrmsOmega_aOverTime(
         self,
-        stateCoefficients: dict[str, complex],
+        stateCoefficients: dict,
         station: Station,
         meas_times,
         truncRadius: Quantity | None = None,
@@ -1329,7 +1171,7 @@ class GravBoundAxionHalo:
                     "state/coefficient dictionary."
                 )
             r, R_r, r_line, grad_r_line, grad_theta_line, grad_phi_line = (
-                self.findGradientsAtDirection(
+                self.findGradientsAlongDirection(
                     stateCoefficients=stateSelection,
                     station=station,
                     meas_time=meas_time,

@@ -455,7 +455,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
     a_0: Quantity[unit.eV] | None = None
     # Halo masses use Earth masses by default.  Other mass quantities in this
     # class (for example the axion mass and PREM profile) keep their own units.
-    maxTotalDMmass: Quantity[unit.M_earth] | None = 1.0 * unit.M_earth
+    maxTotalDMmass: Quantity[unit.M_earth] | None = 1.0e3 * unit.M_earth
     g_aNN: Quantity[unit.GeV**-1] = 1e-9 * unit.GeV**-1
     rho_M_DM_SHM: Quantity[unit.g / unit.cm**3] = (
         0.3 * unit.GeV / (const.c**2 * unit.cm**3)
@@ -470,7 +470,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         extent: Quantity[unit.m] = 128.0 * unit.R_earth,
         getPot=earth_grav_potential_infty,
         a_0: Quantity[unit.eV] | None = None,
-        maxTotalDMmass: Quantity[unit.M_earth] | None = 1.0 * unit.M_earth,
+        maxTotalDMmass: Quantity[unit.M_earth] | None = 1.0e3 * unit.M_earth,
         g_aNN: Quantity[unit.GeV**-1] = 1e-9 * unit.GeV**-1,
         rho_M_DM_SHM: Quantity[unit.g / unit.cm**3] = 0.3
         * unit.GeV
@@ -700,7 +700,7 @@ class EarthBoundAxionHalo(GravBoundAxionHalo):
         shell_mass_limit,
         radius_range,
         state_names=None,
-        maxEarthEnclosedMass=0.0038 * unit.M_earth,
+        maxEarthEnclosedMass=0.01 * unit.M_earth,
     ):
         """Infer halo mass from a shell-mass limit for each eigenstate.
 
